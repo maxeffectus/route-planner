@@ -1,89 +1,15 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Gemini Nano</title>
-</head>
-<body>
-    <h1>Gemini Nano</h1>
-    
-    <form id="form">
-        <textarea id="prompt" placeholder="Enter prompt..."></textarea><br>
-        <button type="submit">Send</button>
-    </form>
-    
-    <div id="status"></div>
-    <div id="response" style="white-space: pre-wrap; font-family: monospace; line-height: 1.4; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; border-radius: 4px; margin-top: 10px;"></div>
-
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>
-        // Simple markdown renderer function
-        function renderMarkdown(text) {
-            // Basic markdown to HTML conversion
-            return text
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')  // Bold
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')              // Italic
-                .replace(/`(.*?)`/g, '<code>$1</code>')            // Inline code
-                .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>') // Code blocks
-                .replace(/^### (.*$)/gm, '<h3>$1</h3>')            // H3
-                .replace(/^## (.*$)/gm, '<h2>$1</h2>')             // H2
-                .replace(/^# (.*$)/gm, '<h1>$1</h1>')              // H1
-                .replace(/^- (.*$)/gm, '<li>$1</li>')              // List items
-                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')         // Wrap lists
-                .replace(/\n/g, '<br>');                           // Line breaks
-        }
-
-        // Check language model availability on page load
-        window.addEventListener('load', async function() {
-            const status = document.getElementById('status');
-            try {
-                const availability = await LanguageModel.availability();
-                if (availability) {
-                    status.textContent = 'Language model is available';
-                } else {
-                    status.textContent = 'ATTENTION: Language model is NOT available';
-                }
-            } catch (error) {
-                status.textContent = 'ATTENTION: Language model is NOT available';
-            }
-        });
-
-        document.getElementById('form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const prompt = document.getElementById('prompt').value;
-            const response = document.getElementById('response');
-            
-            response.textContent = 'Sending...';
-            
-            let session;
-            try {
-                session = await LanguageModel.create();
-                const stream = await session.promptStreaming(prompt);
-                let result = '';
-                let previousChunk = '';
-                for await (const chunk of stream) {
-                const newChunk = chunk.startsWith(previousChunk)
-                    ? chunk.slice(previousChunk.length) : chunk;
-                result += newChunk;
-                response.innerHTML = renderMarkdown(result);
-                previousChunk = chunk;
-                }
-                
-                // After streaming is complete, render the full text as markdown
-                if (result) {
-                    response.innerHTML = renderMarkdown(result);
-                } else {
-                    response.textContent = 'No response';
-                }
-            } catch (error) {
-                console.error('Error:', error); // Debug log
-                response.textContent = 'Error: ' + error.message;
-            } finally {
-                if (session) {
-                    session.destroy();
-                }
-            }
-        });
-    </script>
-</body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Gemini Nano React Interface" />
+    <title>Gemini Nano React</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
