@@ -190,6 +190,29 @@ export class OpenStreetAPI extends MapsAPI {
     // 1. viewbox + bounded to limit search area
     // 2. Or we manually filter, which gives us more control
     
+    /**
+     * Raw OpenStreetMap/Nominatim place data format (real example):
+     * {
+     *   "place_id": 133115363,
+     *   "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+     *   "osm_type": "node",
+     *   "osm_id": 437612731,
+     *   "lat": "52.5205315",
+     *   "lon": "13.4051631",
+     *   "class": "amenity",
+     *   "type": "restaurant",
+     *   "place_rank": 30,
+     *   "importance": 0.00008875486381318407,
+     *   "addresstype": "amenity",
+     *   "name": "BLOCK HOUSE",
+     *   "display_name": "BLOCK HOUSE, 7, Karl-Liebknecht-Straße, Nikolaiviertel, Friedrichswerder, Митте, Berlin, 10178, Germany",
+     *   "boundingbox": ["52.5204815", "52.5205815", "13.4051131", "13.4052131"]
+     * }
+     * 
+     * Note: Some results may have additional fields like "icon", "address", etc.
+     */
+
+    
     // Calculate bounding box from center point and radius
     const radiusInDegrees = radius / 111320; // Convert meters to degrees (approximate)
     const minLat = location.lat - radiusInDegrees;
