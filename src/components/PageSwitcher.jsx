@@ -3,7 +3,8 @@ import React from 'react';
 export function PageSwitcher({ currentPage, onPageChange }) {
   const pages = [
     { id: 'gemini', label: '🤖 Gemini Nano', icon: '💬' },
-    { id: 'maps', label: '🗺️ Maps API Tester', icon: '📍' }
+    { id: 'maps', label: '🗺️ Maps API Tester', icon: '📍' },
+    { id: 'app', label: '🚗 The App', icon: '🗺️' }
   ];
 
   return (
