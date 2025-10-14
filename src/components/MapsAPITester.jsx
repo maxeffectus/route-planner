@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { OpenStreetAPI, GoogleMapsAPI } from '../services/MapsAPI';
+import { Autocomplete } from './Autocomplete';
 
 export function MapsAPITester() {
   const [provider, setProvider] = useState('openstreet');
@@ -19,8 +20,7 @@ export function MapsAPITester() {
   const [searchQuery, setSearchQuery] = useState('restaurant');
   const [searchLocation, setSearchLocation] = useState('{"lat": 52.520008, "lng": 13.404954}');
   const [searchRadius, setSearchRadius] = useState('1000');
-  const [cityQuery, setCityQuery] = useState('Berl');
-  const [cityLimit, setCityLimit] = useState('10');
+  const [selectedCity, setSelectedCity] = useState(null);
 
   const methods = [
     { value: 'geocodeAddress', label: 'Geocode Address' },
@@ -79,7 +79,10 @@ export function MapsAPITester() {
           break;
 
         case 'autocompleteCities':
-          response = await api.autocompleteCities(cityQuery, parseInt(cityLimit));
+          if (!selectedCity) {
+            throw new Error('Please select a city from the autocomplete dropdown');
+          }
+          response = selectedCity;
           break;
 
         case 'validateApiKey':
@@ -225,30 +228,45 @@ export function MapsAPITester() {
         return (
           <>
             <div style={{ marginBottom: '10px' }}>
-              <label style={labelStyle}>City Name (partial):</label>
-              <input
-                type="text"
-                value={cityQuery}
-                onChange={(e) => setCityQuery(e.target.value)}
-                placeholder="e.g., Berl, Paris, New Y..."
-                style={inputStyle}
+              <label style={labelStyle}>City Name:</label>
+              <Autocomplete
+                searchFunction={(query, limit) => getMapsAPI().autocompleteCities(query, limit)}
+                onSelect={(city) => {
+                  setSelectedCity(city);
+                  console.log('City selected:', city);
+                }}
+                renderSuggestion={(city) => (
+                  <>
+                    <div style={{ fontWeight: '500', color: '#333' }}>
+                      {city.name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                      {city.displayName}
+                    </div>
+                  </>
+                )}
+                placeholder="Start typing city name (min 2 characters)..."
+                minChars={2}
+                maxResults={5}
+                debounceMs={300}
               />
-              <small style={{ color: '#666', fontSize: '12px' }}>
-                Type partial city name to get autocomplete suggestions
+              <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '5px' }}>
+                Type at least 2 characters to see suggestions. Use arrow keys or mouse to select.
               </small>
             </div>
-            <div style={{ marginBottom: '10px' }}>
-              <label style={labelStyle}>Max Results:</label>
-              <input
-                type="number"
-                value={cityLimit}
-                onChange={(e) => setCityLimit(e.target.value)}
-                placeholder="10"
-                min="1"
-                max="50"
-                style={inputStyle}
-              />
-            </div>
+            
+            {selectedCity && (
+              <div style={{ 
+                padding: '10px', 
+                backgroundColor: '#e8f0fe', 
+                borderRadius: '4px',
+                marginBottom: '10px'
+              }}>
+                <strong>Selected City:</strong> {selectedCity.name}
+                <br />
+                <small>{selectedCity.displayName}</small>
+              </div>
+            )}
           </>
         );
 
