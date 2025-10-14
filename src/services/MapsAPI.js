@@ -76,6 +76,16 @@ export class MapsAPI {
   getProviderName() {
     throw new Error('getProviderName() must be implemented by subclass');
   }
+
+  /**
+   * Autocomplete city names as user types
+   * @param {string} query - Partial city name
+   * @param {number} limit - Max number of suggestions
+   * @returns {Promise<Array>} Array of city suggestions
+   */
+  async autocompleteCities(query, limit = 10) {
+    throw new Error('autocompleteCities() must be implemented by subclass');
+  }
 }
 
 
@@ -273,6 +283,78 @@ export class OpenStreetAPI extends MapsAPI {
     // OpenStreetMap doesn't require API key for basic usage
     return true;
   }
+
+  /**
+   * Autocomplete city names as user types
+   * @param {string} query - Partial city name
+   * @param {number} limit - Max number of suggestions (default: 10)
+   * @returns {Promise<Array>} Array of city suggestions
+   */
+  async autocompleteCities(query, limit = 10) {
+    /**
+     * Using Nominatim's search WITHOUT class restriction
+     * to get broader results, then filter on our end
+     */
+    const url = `${this.baseUrl}/search?` +
+      `q=${encodeURIComponent(query)}` +
+      `&format=json` +
+      `&limit=50` + // Get more results to filter
+      `&addressdetails=1`;
+    
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log('Raw Nominatim results for "' + query + '":', data.length, 'results');
+      if (data.length > 0) {
+        console.log(data.map(p => ({
+          name: p.name,
+          type: p.type,
+          class: p.class,
+          display_name: p.display_name
+        })));
+      }
+      
+      // Filter to only cities/towns/villages and format response
+      const cities = data
+        .filter(place => {
+          // Accept place types that are settlements
+          const validPlaceTypes = ['city', 'town', 'village', 'hamlet', 'municipality', 'borough'];
+          
+          // Accept boundary types that represent cities (ceremonial, administrative)
+          const validBoundaryTypes = ['ceremonial', 'administrative'];
+          
+          // Check if it's a valid place OR a city boundary
+          const isValidPlace = place.class === 'place' && validPlaceTypes.includes(place.type);
+          const isValidBoundary = place.class === 'boundary' && validBoundaryTypes.includes(place.type);
+          
+          return isValidPlace || isValidBoundary;
+        })
+        .map(place => ({
+          name: place.name || place.display_name.split(',')[0],
+          displayName: place.display_name,
+          location: {
+            lat: parseFloat(place.lat),
+            lng: parseFloat(place.lon)
+          },
+          type: place.type,
+          country: place.address?.country,
+          state: place.address?.state,
+          placeId: place.place_id
+        }))
+        .slice(0, limit); // Return only requested number
+      
+      console.log('Filtered cities:', cities.length);
+      
+      return cities;
+    } catch (error) {
+      throw new Error(`OpenStreetMap autocomplete error: ${error.message}`);
+    }
+  }
+
+  getProviderName() {
+    return 'OpenStreetMap';
+  }
 }
 
 
@@ -459,6 +541,77 @@ export class GoogleMapsAPI extends MapsAPI {
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * Autocomplete city names as user types
+   * @param {string} query - Partial city name
+   * @param {number} limit - Max number of suggestions (default: 10)
+   * @returns {Promise<Array>} Array of city suggestions
+   */
+  async autocompleteCities(query, limit = 10) {
+    const params = new URLSearchParams({
+      input: query,
+      types: '(cities)',
+      key: this.apiKey
+    });
+    
+    const url = `${this.baseUrl}/place/autocomplete/json?${params}`;
+    
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+        throw new Error(`Autocomplete failed: ${data.status}`);
+      }
+      
+      // Get place details for each prediction to get coordinates
+      const results = await Promise.all(
+        data.predictions.slice(0, limit).map(async (prediction) => {
+          try {
+            const detailsParams = new URLSearchParams({
+              place_id: prediction.place_id,
+              fields: 'name,geometry,address_components',
+              key: this.apiKey
+            });
+            
+            const detailsResponse = await fetch(
+              `${this.baseUrl}/place/details/json?${detailsParams}`
+            );
+            const details = await detailsResponse.json();
+            
+            if (details.status === 'OK') {
+              const addressComponents = details.result.address_components || [];
+              const country = addressComponents.find(c => c.types.includes('country'))?.long_name;
+              const state = addressComponents.find(c => c.types.includes('administrative_area_level_1'))?.long_name;
+              
+              return {
+                name: details.result.name,
+                displayName: prediction.description,
+                location: details.result.geometry.location,
+                type: 'city',
+                country: country,
+                state: state,
+                placeId: prediction.place_id
+              };
+            }
+            return null;
+          } catch (err) {
+            console.warn('Failed to get place details:', err);
+            return null;
+          }
+        })
+      );
+      
+      return results.filter(r => r !== null);
+    } catch (error) {
+      throw new Error(`Google Maps autocomplete error: ${error.message}`);
+    }
+  }
+
+  getProviderName() {
+    return 'Google Maps';
   }
 }
 

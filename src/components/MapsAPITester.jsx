@@ -19,6 +19,8 @@ export function MapsAPITester() {
   const [searchQuery, setSearchQuery] = useState('restaurant');
   const [searchLocation, setSearchLocation] = useState('{"lat": 52.520008, "lng": 13.404954}');
   const [searchRadius, setSearchRadius] = useState('1000');
+  const [cityQuery, setCityQuery] = useState('Berl');
+  const [cityLimit, setCityLimit] = useState('10');
 
   const methods = [
     { value: 'geocodeAddress', label: 'Geocode Address' },
@@ -26,6 +28,7 @@ export function MapsAPITester() {
     { value: 'calculateRoute', label: 'Calculate Route' },
     { value: 'getDistanceMatrix', label: 'Get Distance Matrix' },
     { value: 'searchPlaces', label: 'Search Places' },
+    { value: 'autocompleteCities', label: 'Autocomplete Cities' },
     { value: 'validateApiKey', label: 'Validate API Key' },
     { value: 'getProviderName', label: 'Get Provider Name' }
   ];
@@ -73,6 +76,10 @@ export function MapsAPITester() {
         case 'searchPlaces':
           const location = JSON.parse(searchLocation);
           response = await api.searchPlaces(searchQuery, location, parseInt(searchRadius));
+          break;
+
+        case 'autocompleteCities':
+          response = await api.autocompleteCities(cityQuery, parseInt(cityLimit));
           break;
 
         case 'validateApiKey':
@@ -208,6 +215,37 @@ export function MapsAPITester() {
                 value={searchRadius}
                 onChange={(e) => setSearchRadius(e.target.value)}
                 placeholder="1000"
+                style={inputStyle}
+              />
+            </div>
+          </>
+        );
+
+      case 'autocompleteCities':
+        return (
+          <>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={labelStyle}>City Name (partial):</label>
+              <input
+                type="text"
+                value={cityQuery}
+                onChange={(e) => setCityQuery(e.target.value)}
+                placeholder="e.g., Berl, Paris, New Y..."
+                style={inputStyle}
+              />
+              <small style={{ color: '#666', fontSize: '12px' }}>
+                Type partial city name to get autocomplete suggestions
+              </small>
+            </div>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={labelStyle}>Max Results:</label>
+              <input
+                type="number"
+                value={cityLimit}
+                onChange={(e) => setCityLimit(e.target.value)}
+                placeholder="10"
+                min="1"
+                max="50"
                 style={inputStyle}
               />
             </div>
