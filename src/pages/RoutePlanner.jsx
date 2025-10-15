@@ -1,29 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { Autocomplete } from '../components/Autocomplete';
+import { InteractiveMap } from '../components/InteractiveMap';
 
 export function RoutePlanner() {
   const [selectedCity, setSelectedCity] = useState(null);
-  const [mapSize, setMapSize] = useState(null);
-  const mapContainerRef = useRef(null);
   const mapsAPI = new OpenStreetAPI();
-
-  // Measure the map container size
-  useEffect(() => {
-    const updateMapSize = () => {
-      if (mapContainerRef.current) {
-        const { offsetWidth, offsetHeight } = mapContainerRef.current;
-        setMapSize({ 
-          width: Math.floor(offsetWidth), 
-          height: Math.floor(offsetHeight) 
-        });
-      }
-    };
-
-    updateMapSize();
-    window.addEventListener('resize', updateMapSize);
-    return () => window.removeEventListener('resize', updateMapSize);
-  }, []);
 
   return (
     <div style={{ 
@@ -118,51 +100,12 @@ export function RoutePlanner() {
         </div>
       </div>
 
-      {/* Right Half - Map */}
-      <div 
-        ref={mapContainerRef}
-        style={{ 
-          flex: '0 0 50%',
-          backgroundColor: '#e0e0e0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        {mapSize ? (
-          <img
-            src={selectedCity 
-              ? mapsAPI.getStaticMapUrl({
-                  bbox: selectedCity.boundingbox,
-                  size: mapSize,
-                  markers: [{ lat: selectedCity.location.lat, lng: selectedCity.location.lng, color: 'f00' }]
-                })
-              : mapsAPI.getStaticMapUrl({
-                  center: { lat: 0, lng: 0 },
-                  zoom: 0,
-                  size: mapSize
-                })
-            }
-            alt={selectedCity ? `Map of ${selectedCity.name}` : 'World Map'}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover'
-            }}
-            onError={(e) => {
-              console.error('Map image failed to load:', e.target.src);
-              if (selectedCity) {
-                console.log('City data:', selectedCity);
-              }
-            }}
-          />
-        ) : (
-          <div style={{ textAlign: 'center', color: '#999' }}>
-            <div style={{ fontSize: '24px' }}>Loading map...</div>
-          </div>
-        )}
+      {/* Right Half - Interactive Map */}
+      <div style={{ 
+        flex: '0 0 50%',
+        position: 'relative'
+      }}>
+        <InteractiveMap bbox={selectedCity?.boundingbox} />
       </div>
     </div>
   );
