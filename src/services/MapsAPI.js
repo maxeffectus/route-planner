@@ -86,6 +86,18 @@ export class MapsAPI {
   async autocompleteCities(query, limit = 10) {
     throw new Error('autocompleteCities() must be implemented by subclass');
   }
+
+  /**
+   * Get static map image URL
+   * @param {Object} center - Center point {lat, lng}
+   * @param {number} zoom - Zoom level (1-20)
+   * @param {Object} size - Image size {width, height}
+   * @param {Array} markers - Optional array of markers [{lat, lng, color}]
+   * @returns {string} URL to static map image
+   */
+  getStaticMapUrl(center, zoom = 13, size = { width: 600, height: 400 }, markers = []) {
+    throw new Error('getStaticMapUrl() must be implemented by subclass');
+  }
 }
 
 
@@ -337,6 +349,12 @@ export class OpenStreetAPI extends MapsAPI {
             lat: parseFloat(place.lat),
             lng: parseFloat(place.lon)
           },
+          boundingbox: place.boundingbox ? {
+            minLat: parseFloat(place.boundingbox[0]),
+            maxLat: parseFloat(place.boundingbox[1]),
+            minLng: parseFloat(place.boundingbox[2]),
+            maxLng: parseFloat(place.boundingbox[3])
+          } : null,
           type: place.type,
           country: place.address?.country,
           state: place.address?.state,
@@ -354,6 +372,67 @@ export class OpenStreetAPI extends MapsAPI {
 
   getProviderName() {
     return 'OpenStreetMap';
+  }
+
+  /**
+   * Get static map image URL using bounding box or center+zoom
+   * @param {Object} options - Map options
+   * @param {Object} options.center - Center point {lat, lng} (if not using bbox)
+   * @param {number} options.zoom - Zoom level (1-19) (if not using bbox)
+   * @param {Object} options.bbox - Bounding box {minLat, minLng, maxLat, maxLng} (alternative to center+zoom)
+   * @param {Object} options.size - Image size {width, height}
+   * @param {Array} options.markers - Optional array of markers [{lat, lng, color}]
+   * @returns {string} URL to static map image
+   */
+  getStaticMapUrl(options) {
+    const { center, zoom = 13, bbox, size = { width: 600, height: 400 }, markers = [] } = options;
+    
+    // Using OpenStreetMap Tile Server with center point
+    // Note: This returns a single tile URL. For production with bounding box support:
+    // - Use Geoapify (free 3000/day): https://www.geoapify.com/static-maps-api
+    // - Use MapTiler (free 100k/month): https://www.maptiler.com
+    // - Get your own Mapbox token: https://www.mapbox.com
+    
+    let actualCenter, actualZoom;
+    
+    if (bbox) {
+      // Calculate center from bounding box
+      actualCenter = {
+        lat: (bbox.minLat + bbox.maxLat) / 2,
+        lng: (bbox.minLng + bbox.maxLng) / 2
+      };
+      
+      // Calculate appropriate zoom level based on bbox size
+      const latDiff = Math.abs(bbox.maxLat - bbox.minLat);
+      const lngDiff = Math.abs(bbox.maxLng - bbox.minLng);
+      const maxDiff = Math.max(latDiff, lngDiff);
+      
+      // Estimate zoom level (rough approximation)
+      if (maxDiff > 10) actualZoom = 5;
+      else if (maxDiff > 5) actualZoom = 6;
+      else if (maxDiff > 2) actualZoom = 7;
+      else if (maxDiff > 1) actualZoom = 8;
+      else if (maxDiff > 0.5) actualZoom = 9;
+      else if (maxDiff > 0.2) actualZoom = 10;
+      else if (maxDiff > 0.1) actualZoom = 11;
+      else if (maxDiff > 0.05) actualZoom = 12;
+      else if (maxDiff > 0.02) actualZoom = 13;
+      else if (maxDiff > 0.01) actualZoom = 14;
+      else actualZoom = 15;
+    } else {
+      actualCenter = center;
+      actualZoom = zoom;
+    }
+    
+    // Calculate tile coordinates
+    const lat_rad = actualCenter.lat * Math.PI / 180;
+    const n = Math.pow(2, actualZoom);
+    const xtile = Math.floor((actualCenter.lng + 180) / 360 * n);
+    const ytile = Math.floor((1 - Math.log(Math.tan(lat_rad) + 1 / Math.cos(lat_rad)) / Math.PI) / 2 * n);
+    
+    // Return OSM tile URL
+    // Note: This is a single 256x256 tile. For production, use a proper static map service.
+    return `https://tile.openstreetmap.org/${actualZoom}/${xtile}/${ytile}.png`;
   }
 }
 
@@ -612,6 +691,48 @@ export class GoogleMapsAPI extends MapsAPI {
 
   getProviderName() {
     return 'Google Maps';
+  }
+
+  /**
+   * Get static map image URL using Google Maps Static API
+   * @param {Object} options - Map options
+   * @param {Object} options.center - Center point {lat, lng} (if not using bbox)
+   * @param {number} options.zoom - Zoom level (1-20) (if not using bbox)
+   * @param {Object} options.bbox - Bounding box {minLat, minLng, maxLat, maxLng} (alternative to center+zoom)
+   * @param {Object} options.size - Image size {width, height}
+   * @param {Array} options.markers - Optional array of markers [{lat, lng, color}]
+   * @returns {string} URL to static map image
+   */
+  getStaticMapUrl(options) {
+    const { center, zoom = 13, bbox, size = { width: 600, height: 400 }, markers = [] } = options;
+    const baseUrl = 'https://maps.googleapis.com/maps/api/staticmap';
+    
+    const params = new URLSearchParams({
+      size: `${size.width}x${size.height}`,
+      key: this.apiKey
+    });
+
+    // Use bounding box if provided, otherwise use center+zoom
+    if (bbox) {
+      // Google Maps uses visible parameter for bounding box
+      const sw = `${bbox.minLat},${bbox.minLng}`; // Southwest corner
+      const ne = `${bbox.maxLat},${bbox.maxLng}`; // Northeast corner
+      params.append('visible', sw);
+      params.append('visible', ne);
+    } else {
+      params.append('center', `${center.lat},${center.lng}`);
+      params.append('zoom', zoom);
+    }
+
+    // Add markers if provided
+    if (markers.length > 0) {
+      markers.forEach(marker => {
+        const color = marker.color || 'red';
+        params.append('markers', `color:${color}|${marker.lat},${marker.lng}`);
+      });
+    }
+
+    return `${baseUrl}?${params.toString()}`;
   }
 }
 
