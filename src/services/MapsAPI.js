@@ -89,13 +89,15 @@ export class MapsAPI {
 
   /**
    * Get static map image URL
-   * @param {Object} center - Center point {lat, lng}
-   * @param {number} zoom - Zoom level (1-20)
-   * @param {Object} size - Image size {width, height}
-   * @param {Array} markers - Optional array of markers [{lat, lng, color}]
+   * @param {Object} options - Map options
+   * @param {Object} options.center - Center point {lat, lng}
+   * @param {number} options.zoom - Zoom level (1-20)
+   * @param {Object} options.bbox - Bounding box {minLat, minLng, maxLat, maxLng}
+   * @param {Object} options.size - Image size {width, height}
+   * @param {Array} options.markers - Optional array of markers [{lat, lng, color}]
    * @returns {string} URL to static map image
    */
-  getStaticMapUrl(center, zoom = 13, size = { width: 600, height: 400 }, markers = []) {
+  getStaticMapUrl(options) {
     throw new Error('getStaticMapUrl() must be implemented by subclass');
   }
 }
@@ -375,7 +377,7 @@ export class OpenStreetAPI extends MapsAPI {
   }
 
   /**
-   * Get static map image URL using bounding box or center+zoom
+   * Get static map image URL
    * @param {Object} options - Map options
    * @param {Object} options.center - Center point {lat, lng} (if not using bbox)
    * @param {number} options.zoom - Zoom level (1-19) (if not using bbox)
@@ -632,7 +634,7 @@ export class GoogleMapsAPI extends MapsAPI {
     const params = new URLSearchParams({
       input: query,
       types: '(cities)',
-      key: this.apiKey
+      key: this.apiKey  // TODO: different keys for different Google map APIs
     });
     
     const url = `${this.baseUrl}/place/autocomplete/json?${params}`;
