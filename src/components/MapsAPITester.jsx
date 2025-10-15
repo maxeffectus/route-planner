@@ -21,6 +21,8 @@ export function MapsAPITester() {
   const [searchLocation, setSearchLocation] = useState('{"lat": 52.520008, "lng": 13.404954}');
   const [searchRadius, setSearchRadius] = useState('1000');
   const [selectedCity, setSelectedCity] = useState(null);
+  const [poiCategories, setPoiCategories] = useState('["attraction", "museum", "monument"]');
+  const [poiLimit, setPoiLimit] = useState('20');
 
   const methods = [
     { value: 'geocodeAddress', label: 'Geocode Address' },
@@ -29,6 +31,7 @@ export function MapsAPITester() {
     { value: 'getDistanceMatrix', label: 'Get Distance Matrix' },
     { value: 'searchPlaces', label: 'Search Places' },
     { value: 'autocompleteCities', label: 'Autocomplete Cities' },
+    { value: 'getPOI', label: 'Get Points of Interest (POI)' },
     { value: 'validateApiKey', label: 'Validate API Key' },
     { value: 'getProviderName', label: 'Get Provider Name' }
   ];
@@ -68,7 +71,7 @@ export function MapsAPITester() {
           break;
 
         case 'getDistanceMatrix':
-          const originsArray = JSON.parse(origins);
+          const originsArray = JSON.parse(origins);f
           const destinationsArray = JSON.parse(destinations);
           response = await api.getDistanceMatrix(originsArray, destinationsArray);
           break;
@@ -83,6 +86,14 @@ export function MapsAPITester() {
             throw new Error('Please select a city from the autocomplete dropdown');
           }
           response = selectedCity;
+          break;
+
+        case 'getPOI':
+          if (!selectedCity || !selectedCity.boundingbox) {
+            throw new Error('Please select a city first using Autocomplete Cities method');
+          }
+          const categoriesArray = JSON.parse(poiCategories);
+          response = await api.getPOI(selectedCity.boundingbox, categoriesArray, parseInt(poiLimit));
           break;
 
         case 'validateApiKey':
@@ -266,6 +277,82 @@ export function MapsAPITester() {
                 <br />
                 <small>{selectedCity.displayName}</small>
               </div>
+            )}
+          </>
+        );
+
+      case 'getPOI':
+        return (
+          <>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={labelStyle}>City Name:</label>
+              <Autocomplete
+                searchFunction={(query, limit) => getMapsAPI().autocompleteCities(query, limit)}
+                onSelect={(city) => {
+                  setSelectedCity(city);
+                  console.log('City selected:', city);
+                }}
+                renderSuggestion={(city) => (
+                  <>
+                    <div style={{ fontWeight: '500', color: '#333' }}>
+                      {city.name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                      {city.displayName}
+                    </div>
+                  </>
+                )}
+                placeholder="Start typing city name (min 2 characters)..."
+                minChars={2}
+                maxResults={5}
+                debounceMs={300}
+              />
+              <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '5px' }}>
+                Select a city to search for POIs
+              </small>
+            </div>
+            
+            {selectedCity && (
+              <>
+                <div style={{ 
+                  padding: '10px', 
+                  backgroundColor: '#e8f0fe', 
+                  borderRadius: '4px',
+                  marginBottom: '15px'
+                }}>
+                  <strong>Selected City:</strong> {selectedCity.name}
+                  <br />
+                  <small style={{ fontSize: '11px', color: '#666' }}>
+                    {selectedCity.displayName}
+                  </small>
+                </div>
+                
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={labelStyle}>Categories (JSON array):</label>
+                  <input
+                    type="text"
+                    value={poiCategories}
+                    onChange={(e) => setPoiCategories(e.target.value)}
+                    placeholder='["attraction", "museum", "monument"]'
+                    style={{ ...inputStyle, fontFamily: 'monospace' }}
+                  />
+                  <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '5px' }}>
+                    Options: attraction, museum, monument, viewpoint, artwork, gallery, castle, etc.
+                  </small>
+                </div>
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={labelStyle}>Max Results:</label>
+                  <input
+                    type="number"
+                    value={poiLimit}
+                    onChange={(e) => setPoiLimit(e.target.value)}
+                    placeholder="20"
+                    min="1"
+                    max="100"
+                    style={inputStyle}
+                  />
+                </div>
+              </>
             )}
           </>
         );

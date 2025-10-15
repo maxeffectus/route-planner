@@ -100,6 +100,17 @@ export class MapsAPI {
   getStaticMapUrl(options) {
     throw new Error('getStaticMapUrl() must be implemented by subclass');
   }
+
+  /**
+   * Get Points of Interest (POI) in an area
+   * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
+   * @param {Array<string>} categories - POI categories to search for (e.g., ['museum', 'attraction', 'monument'])
+   * @param {number} limit - Maximum number of results
+   * @returns {Promise<Array>} Array of POIs with name, type, location, etc.
+   */
+  async getPOI(bbox, categories = ['attraction', 'museum', 'monument'], limit = 50) {
+    throw new Error('getPOI() must be implemented by subclass');
+  }
 }
 
 
@@ -369,6 +380,66 @@ export class OpenStreetAPI extends MapsAPI {
       return cities;
     } catch (error) {
       throw new Error(`OpenStreetMap autocomplete error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get Points of Interest using Overpass API
+   * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
+   * @param {Array<string>} categories - POI categories (e.g., ['museum', 'attraction', 'monument'])
+   * @param {number} limit - Maximum number of results
+   * @returns {Promise<Array>} Array of POIs
+   */
+  async getPOI(bbox, categories = ['attraction', 'museum', 'monument'], limit = 50) {
+    // Build Overpass query for tourism POIs
+    const tourismTypes = categories.join('|');
+    
+    const query = `
+      [out:json][timeout:25];
+      (
+        node["tourism"~"${tourismTypes}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng});
+        way["tourism"~"${tourismTypes}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng});
+        relation["tourism"~"${tourismTypes}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng});
+      );
+      out center ${limit};
+    `.trim();
+
+    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Overpass API request failed: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      console.log(`Overpass API returned ${data.elements.length} POIs`);
+      
+      return data.elements.map(element => {
+        // Get coordinates (nodes have lat/lon, ways/relations have center)
+        const lat = element.lat || element.center?.lat;
+        const lon = element.lon || element.center?.lon;
+        
+        return {
+          id: element.id,
+          name: element.tags?.name || 'Unnamed',
+          type: element.tags?.tourism,
+          category: 'tourism',
+          location: {
+            lat: lat,
+            lng: lon
+          },
+          description: element.tags?.description,
+          website: element.tags?.website,
+          wikipedia: element.tags?.wikipedia,
+          osmType: element.type,
+          osmId: element.id
+        };
+      }).filter(poi => poi.location.lat && poi.location.lng); // Filter out POIs without coordinates
+      
+    } catch (error) {
+      throw new Error(`OpenStreetMap POI error: ${error.message}`);
     }
   }
 
@@ -689,6 +760,80 @@ export class GoogleMapsAPI extends MapsAPI {
     } catch (error) {
       throw new Error(`Google Maps autocomplete error: ${error.message}`);
     }
+  }
+
+  /**
+   * Get Points of Interest using Google Places API
+   * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
+   * @param {Array<string>} categories - POI categories (e.g., ['museum', 'attraction', 'monument'])
+   * @param {number} limit - Maximum number of results
+   * @returns {Promise<Array>} Array of POIs
+   */
+  async getPOI(bbox, categories = ['attraction', 'museum', 'monument'], limit = 50) {
+    // Google Places doesn't support bbox directly, so we search from center
+    const centerLat = (bbox.minLat + bbox.maxLat) / 2;
+    const centerLng = (bbox.minLng + bbox.maxLng) / 2;
+    
+    // Calculate radius from bbox
+    const latDiff = Math.abs(bbox.maxLat - bbox.minLat);
+    const lngDiff = Math.abs(bbox.maxLng - bbox.minLng);
+    const radiusInDegrees = Math.max(latDiff, lngDiff) / 2;
+    const radiusInMeters = Math.min(radiusInDegrees * 111320, 50000); // Max 50km
+    
+    // Map categories to Google types
+    const typeMapping = {
+      'attraction': 'tourist_attraction',
+      'museum': 'museum',
+      'monument': 'point_of_interest',
+      'viewpoint': 'point_of_interest'
+    };
+    
+    const allResults = [];
+    
+    // Query for each category
+    for (const category of categories.slice(0, 3)) { // Limit to 3 categories to avoid too many requests
+      const googleType = typeMapping[category] || 'tourist_attraction';
+      
+      const params = new URLSearchParams({
+        location: `${centerLat},${centerLng}`,
+        radius: Math.floor(radiusInMeters),
+        type: googleType,
+        key: this.apiKey
+      });
+      
+      const url = `${this.baseUrl}/place/nearbysearch/json?${params}`;
+      
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.status === 'OK' || data.status === 'ZERO_RESULTS') {
+          const results = (data.results || []).map(place => ({
+            id: place.place_id,
+            name: place.name,
+            type: googleType,
+            category: category,
+            location: place.geometry.location,
+            rating: place.rating,
+            userRatingsTotal: place.user_ratings_total,
+            vicinity: place.vicinity,
+            photos: place.photos?.map(p => p.photo_reference),
+            placeId: place.place_id
+          }));
+          
+          allResults.push(...results);
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch ${category} POIs:`, error);
+      }
+    }
+    
+    // Remove duplicates and limit results
+    const uniqueResults = Array.from(
+      new Map(allResults.map(item => [item.id, item])).values()
+    );
+    
+    return uniqueResults.slice(0, limit);
   }
 
   getProviderName() {
