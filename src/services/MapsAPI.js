@@ -394,6 +394,10 @@ export class OpenStreetAPI extends MapsAPI {
     // Build Overpass query for tourism POIs
     const tourismTypes = categories.join('|');
     
+    // Request more results than needed so we can sort and return top ones
+    // Overpass doesn't sort by significance, so we fetch extra and filter
+    const fetchLimit = Math.min(limit * 10, 500); // Get 10x more (max 500) to ensure we get significant ones
+    
     const query = `
       [out:json][timeout:25];
       (
@@ -401,7 +405,7 @@ export class OpenStreetAPI extends MapsAPI {
         way["tourism"~"${tourismTypes}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng});
         relation["tourism"~"${tourismTypes}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng});
       );
-      out center ${limit};
+      out center ${fetchLimit};
     `.trim();
 
     const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
@@ -416,10 +420,19 @@ export class OpenStreetAPI extends MapsAPI {
       
       console.log(`Overpass API returned ${data.elements.length} POIs`);
       
-      return data.elements.map(element => {
+      const pois = data.elements.map(element => {
         // Get coordinates (nodes have lat/lon, ways/relations have center)
         const lat = element.lat || element.center?.lat;
         const lon = element.lon || element.center?.lon;
+        
+        // Calculate significance score for sorting
+        let significance = 0;
+        if (element.tags?.wikipedia) significance += 10; // Has Wikipedia article
+        if (element.tags?.wikidata) significance += 5;   // Has Wikidata entry
+        if (element.tags?.website) significance += 3;    // Has official website
+        if (element.tags?.name) significance += 2;       // Has name
+        if (element.type === 'relation') significance += 3; // Larger feature
+        else if (element.type === 'way') significance += 1;
         
         return {
           id: element.id,
@@ -433,10 +446,19 @@ export class OpenStreetAPI extends MapsAPI {
           description: element.tags?.description,
           website: element.tags?.website,
           wikipedia: element.tags?.wikipedia,
+          wikidata: element.tags?.wikidata,
           osmType: element.type,
-          osmId: element.id
+          osmId: element.id,
+          significance: significance // For sorting
         };
-      }).filter(poi => poi.location.lat && poi.location.lng); // Filter out POIs without coordinates
+      })
+      .filter(poi => poi.location.lat && poi.location.lng) // Filter out POIs without coordinates
+      .sort((a, b) => b.significance - a.significance) // Sort by significance (highest first)
+      .slice(0, limit); // Return only requested number after sorting
+      
+      console.log(`Returning top ${pois.length} POIs sorted by significance`);
+      
+      return pois;
       
     } catch (error) {
       throw new Error(`OpenStreetMap POI error: ${error.message}`);
@@ -828,12 +850,22 @@ export class GoogleMapsAPI extends MapsAPI {
       }
     }
     
-    // Remove duplicates and limit results
+    // Remove duplicates and sort by rating
     const uniqueResults = Array.from(
       new Map(allResults.map(item => [item.id, item])).values()
     );
     
-    return uniqueResults.slice(0, limit);
+    // Sort by rating (highest first), then by number of ratings
+    const sorted = uniqueResults.sort((a, b) => {
+      // Primary sort: rating
+      if (b.rating !== a.rating) {
+        return (b.rating || 0) - (a.rating || 0);
+      }
+      // Secondary sort: number of ratings (popularity)
+      return (b.userRatingsTotal || 0) - (a.userRatingsTotal || 0);
+    });
+    
+    return sorted.slice(0, limit);
   }
 
   getProviderName() {
