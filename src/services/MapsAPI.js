@@ -104,11 +104,10 @@ export class MapsAPI {
   /**
    * Get Points of Interest (POI) in an area
    * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
-   * @param {Array<string>} categories - POI categories to search for (e.g., ['museum', 'attraction', 'monument'])
    * @param {number} limit - Maximum number of results
    * @returns {Promise<Array>} Array of POIs with name, type, location, etc.
    */
-  async getPOI(bbox, categories = ['attraction', 'museum', 'monument'], limit = 50) {
+  async getPOI(bbox, limit = 50) {
     throw new Error('getPOI() must be implemented by subclass');
   }
 }
@@ -386,26 +385,56 @@ export class OpenStreetAPI extends MapsAPI {
   /**
    * Get Points of Interest using Overpass API
    * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
-   * @param {Array<string>} categories - POI categories (e.g., ['museum', 'attraction', 'monument'])
    * @param {number} limit - Maximum number of results
    * @returns {Promise<Array>} Array of POIs
    */
-  async getPOI(bbox, categories = ['attraction', 'museum', 'monument'], limit = 50) {
-    // Build Overpass query for tourism POIs
-    const tourismTypes = categories.join('|');
+  async getPOI(bbox, limit = 50) {
+    // Build smart Overpass query that filters for significant POIs only
+    // Based on Wikipedia presence, landmark status, and type
     
-    // Request more results than needed so we can sort and return top ones
-    // Overpass doesn't sort by significance, so we fetch extra and filter
-    const fetchLimit = Math.min(limit * 10, 500); // Get 10x more (max 500) to ensure we get significant ones
+    const bboxStr = `${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng}`;
     
     const query = `
-      [out:json][timeout:25];
+      [out:json][timeout:90];
+      
+      // 1. Significant POIs only
       (
-        node["tourism"~"${tourismTypes}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng});
-        way["tourism"~"${tourismTypes}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng});
-        relation["tourism"~"${tourismTypes}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng});
-      );
-      out center ${fetchLimit};
+        // Museums and attractions: require landmark tag OR Wikipedia page
+        node["tourism"~"museum|attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        way["tourism"~"museum|attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        relation["tourism"~"museum|attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        
+        // Historic sites: castles, monuments, ruins (exclude small memorials)
+        node["historic"~"castle|monument|ruins"]["historic"!~"memorial"](${bboxStr});
+        way["historic"~"castle|monument|ruins"]["historic"!~"memorial"](${bboxStr});
+        relation["historic"~"castle|monument|ruins"]["historic"!~"memorial"](${bboxStr});
+        
+        // Places of worship: only major buildings (cathedrals, churches, mosques, temples)
+        node["amenity"="place_of_worship"]["building"~"cathedral|church|mosque|temple"](${bboxStr});
+        way["amenity"="place_of_worship"]["building"~"cathedral|church|mosque|temple"](${bboxStr});
+        relation["amenity"="place_of_worship"]["building"~"cathedral|church|mosque|temple"](${bboxStr});
+        
+        // Significant parks and gardens (must have name)
+        node["leisure"~"park|garden"]["name"](${bboxStr});
+        way["leisure"~"park|garden"]["name"](${bboxStr});
+        relation["leisure"~"park|garden"]["name"](${bboxStr});
+        
+        // Viewpoints with names (scenic overlooks)
+        node["tourism"="viewpoint"]["name"](${bboxStr});
+        way["tourism"="viewpoint"]["name"](${bboxStr}); 
+      )->.pois;
+
+      // 2. Get noise items
+      (
+        node["tourism"~"artwork|information"](${bboxStr});
+        way["tourism"~"artwork|information"](${bboxStr});
+        relation["tourism"~"artwork|information"](${bboxStr});
+      )->.noise;
+      
+      // 3. Subtract noise from pois
+      (.pois; - .noise;);
+    
+      out center;
     `.trim();
 
     const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
@@ -434,11 +463,22 @@ export class OpenStreetAPI extends MapsAPI {
         if (element.type === 'relation') significance += 3; // Larger feature
         else if (element.type === 'way') significance += 1;
         
+        // Extract image URL if available
+        let imageUrl = null;
+        if (element.tags?.wikimedia_commons) {
+          // Convert Wikimedia Commons filename to URL
+          const filename = element.tags.wikimedia_commons.replace('File:', '');
+          imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
+        } else if (element.tags?.image) {
+          // Direct image URL (rare but sometimes present)
+          imageUrl = element.tags.image;
+        }
+        
         return {
           id: element.id,
           name: element.tags?.name || 'Unnamed',
-          type: element.tags?.tourism,
-          category: 'tourism',
+          type: element.tags?.tourism || element.tags?.historic || element.tags?.amenity || element.tags?.leisure,
+          category: element.tags?.tourism ? 'tourism' : (element.tags?.historic ? 'historic' : 'other'),
           location: {
             lat: lat,
             lng: lon
@@ -447,6 +487,7 @@ export class OpenStreetAPI extends MapsAPI {
           website: element.tags?.website,
           wikipedia: element.tags?.wikipedia,
           wikidata: element.tags?.wikidata,
+          imageUrl: imageUrl,
           osmType: element.type,
           osmId: element.id,
           significance: significance // For sorting
@@ -787,11 +828,10 @@ export class GoogleMapsAPI extends MapsAPI {
   /**
    * Get Points of Interest using Google Places API
    * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
-   * @param {Array<string>} categories - POI categories (e.g., ['museum', 'attraction', 'monument'])
    * @param {number} limit - Maximum number of results
    * @returns {Promise<Array>} Array of POIs
    */
-  async getPOI(bbox, categories = ['attraction', 'museum', 'monument'], limit = 50) {
+  async getPOI(bbox, limit = 50) {
     // Google Places doesn't support bbox directly, so we search from center
     const centerLat = (bbox.minLat + bbox.maxLat) / 2;
     const centerLng = (bbox.minLng + bbox.maxLng) / 2;
@@ -810,10 +850,11 @@ export class GoogleMapsAPI extends MapsAPI {
       'viewpoint': 'point_of_interest'
     };
     
+    const categories = ['attraction', 'museum', 'monument'];
     const allResults = [];
     
     // Query for each category
-    for (const category of categories.slice(0, 3)) { // Limit to 3 categories to avoid too many requests
+    for (const category of categories) {
       const googleType = typeMapping[category] || 'tourist_attraction';
       
       const params = new URLSearchParams({
