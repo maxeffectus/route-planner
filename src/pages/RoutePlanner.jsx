@@ -8,7 +8,20 @@ export function RoutePlanner() {
   const [pois, setPois] = useState([]);
   const [isLoadingPOIs, setIsLoadingPOIs] = useState(false);
   const [poiError, setPoiError] = useState(null);
+  const [poiCache, setPoiCache] = useState([]); // Cache all fetched POIs
   const mapsAPI = new OpenStreetAPI();
+
+  // Helper: Check if a POI is within a bounding box
+  const isPoiInBbox = (poi, bbox) => {
+    if (!poi.location?.lat || !poi.location?.lng) return false;
+    const { lat, lng } = poi.location;
+    return (
+      lat >= bbox.minLat &&
+      lat <= bbox.maxLat &&
+      lng >= bbox.minLng &&
+      lng <= bbox.maxLng
+    );
+  };
 
   const handleFindPOIs = async () => {
     if (!selectedCity?.boundingbox) {
@@ -16,14 +29,50 @@ export function RoutePlanner() {
       return;
     }
 
+    const bbox = selectedCity.boundingbox;
+    const limit = 50;
+
     setIsLoadingPOIs(true);
     setPoiError(null);
-    setPois([]);
 
     try {
-      const results = await mapsAPI.getPOI(selectedCity.boundingbox, 50);
-      setPois(results);
-      console.log('POIs found:', results.length);
+      // Step 1: Find cached POIs within the bbox
+      const cachedPOIsInBbox = poiCache.filter(poi => isPoiInBbox(poi, bbox));
+      console.log(`Found ${cachedPOIsInBbox.length} cached POIs in bbox`);
+
+      // Step 2: Check if we have enough cached POIs
+      if (cachedPOIsInBbox.length >= limit) {
+        // We have enough cached POIs, just use them
+        setPois(cachedPOIsInBbox.slice(0, limit));
+        console.log('Using cached POIs only');
+        setIsLoadingPOIs(false);
+        return;
+      }
+
+      // Step 3: Show cached POIs immediately (for better UX)
+      setPois(cachedPOIsInBbox);
+
+      // Step 4: Fetch remaining POIs
+      const remainingLimit = limit - cachedPOIsInBbox.length;
+      console.log(`Fetching ${remainingLimit} more POIs from API`);
+      
+      const newPOIs = await mapsAPI.getPOI(bbox, limit);
+      
+      // Step 5: Merge cached and new POIs (avoiding duplicates by ID)
+      const cachedIds = new Set(poiCache.map(p => p.id));
+      const uniqueNewPOIs = newPOIs.filter(poi => !cachedIds.has(poi.id));
+      
+      // Step 6: Update cache with new POIs
+      if (uniqueNewPOIs.length > 0) {
+        setPoiCache(prev => [...prev, ...uniqueNewPOIs]);
+        console.log(`Added ${uniqueNewPOIs.length} new POIs to cache`);
+      }
+
+      // Step 7: Show combined results (cached + new POIs within bbox)
+      const allPOIsInBbox = newPOIs.filter(poi => isPoiInBbox(poi, bbox));
+      setPois(allPOIsInBbox.slice(0, limit));
+      console.log(`Total POIs displayed: ${allPOIsInBbox.length}`);
+
     } catch (error) {
       console.error('Error fetching POIs:', error);
       setPoiError(error.message || 'Failed to fetch points of interest');
@@ -162,6 +211,16 @@ export function RoutePlanner() {
               color: '#333'
             }}>
               Points of Interest ({pois.length})
+              {poiCache.length > 0 && (
+                <span style={{ 
+                  fontSize: '12px', 
+                  color: '#666',
+                  marginLeft: '8px',
+                  fontWeight: 'normal'
+                }}>
+                  ({poiCache.length} total in cache)
+                </span>
+              )}
             </h3>
             <div style={{
               maxHeight: '400px',
