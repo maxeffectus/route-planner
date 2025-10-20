@@ -458,71 +458,116 @@ export class OpenStreetAPI extends MapsAPI {
 
     const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Overpass API request failed: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      console.log(`Overpass API returned ${data.elements.length} POIs`);
-      
-      const pois = data.elements.map(element => {
-        // Get coordinates (nodes have lat/lon, ways/relations have center)
-        const lat = element.lat || element.center?.lat;
-        const lon = element.lon || element.center?.lon;
+    // Retry logic for 504 Gateway Timeout errors
+    const maxRetries = 3;
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Fetching POIs (attempt ${attempt}/${maxRetries})...`);
         
-        // Calculate significance score for sorting
-        let significance = 0;
-        if (element.tags?.wikipedia) significance += 10; // Has Wikipedia article
-        if (element.tags?.wikidata) significance += 5;   // Has Wikidata entry
-        if (element.tags?.website) significance += 3;    // Has official website
-        if (element.tags?.name) significance += 2;       // Has name
-        if (element.type === 'relation') significance += 3; // Larger feature
-        else if (element.type === 'way') significance += 1;
+        const response = await fetch(url);
         
-        // Extract image URL if available
-        let imageUrl = null;
-        if (element.tags?.wikimedia_commons) {
-          // Convert Wikimedia Commons filename to URL
-          const filename = element.tags.wikimedia_commons.replace('File:', '');
-          imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
-        } else if (element.tags?.image) {
-          // Direct image URL (rare but sometimes present)
-          imageUrl = element.tags.image;
+        // Check for 504 Gateway Timeout
+        if (response.status === 504) {
+          lastError = new Error(`Overpass API timeout (504) on attempt ${attempt}`);
+          console.warn(lastError.message);
+          
+          if (attempt < maxRetries) {
+            // Wait before retrying (exponential backoff: 2s, 4s, 8s)
+            const waitTime = Math.pow(2, attempt) * 1000;
+            console.log(`Waiting ${waitTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            continue; // Retry
+          } else {
+            // All retries exhausted
+            throw new Error(
+              `Overpass API server is overloaded (Gateway Timeout 504). ` +
+              `Failed after ${maxRetries} attempts. Please try again in a few moments, ` +
+              `or try zooming in to a smaller area.`
+            );
+          }
         }
         
-        return {
-          id: element.id,
-          name: element.tags?.name || 'Unnamed',
-          type: element.tags?.tourism || element.tags?.historic || element.tags?.amenity || element.tags?.leisure,
-          category: element.tags?.tourism ? 'tourism' : (element.tags?.historic ? 'historic' : 'other'),
-          location: {
-            lat: lat,
-            lng: lon
-          },
-          description: element.tags?.description,
-          website: element.tags?.website,
-          wikipedia: element.tags?.wikipedia,
-          wikidata: element.tags?.wikidata,
-          imageUrl: imageUrl,
-          osmType: element.type,
-          osmId: element.id,
-          significance: significance // For sorting
-        };
-      })
-      .filter(poi => poi.location.lat && poi.location.lng) // Filter out POIs without coordinates
-      .sort((a, b) => b.significance - a.significance) // Sort by significance (highest first)
-      .slice(0, limit); // Return only requested number after sorting
-      
-      console.log(`Returning top ${pois.length} POIs sorted by significance`);
-      
-      return pois;
-      
-    } catch (error) {
-      throw new Error(`OpenStreetMap POI error: ${error.message}`);
+        // Check for other HTTP errors
+        if (!response.ok) {
+          throw new Error(`Overpass API request failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        console.log(`Overpass API returned ${data.elements.length} POIs`);
+        
+        const pois = data.elements.map(element => {
+          // Get coordinates (nodes have lat/lon, ways/relations have center)
+          const lat = element.lat || element.center?.lat;
+          const lon = element.lon || element.center?.lon;
+          
+          // Calculate significance score for sorting
+          let significance = 0;
+          if (element.tags?.wikipedia) significance += 10; // Has Wikipedia article
+          if (element.tags?.wikidata) significance += 5;   // Has Wikidata entry
+          if (element.tags?.website) significance += 3;    // Has official website
+          if (element.tags?.name) significance += 2;       // Has name
+          if (element.type === 'relation') significance += 3; // Larger feature
+          else if (element.type === 'way') significance += 1;
+          
+          // Extract image URL if available
+          let imageUrl = null;
+          if (element.tags?.wikimedia_commons) {
+            // Convert Wikimedia Commons filename to URL
+            const filename = element.tags.wikimedia_commons.replace('File:', '');
+            imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
+          } else if (element.tags?.image) {
+            // Direct image URL (rare but sometimes present)
+            imageUrl = element.tags.image;
+          }
+          
+          return {
+            id: element.id,
+            name: element.tags?.name || 'Unnamed',
+            type: element.tags?.tourism || element.tags?.historic || element.tags?.amenity || element.tags?.leisure,
+            category: element.tags?.tourism ? 'tourism' : (element.tags?.historic ? 'historic' : 'other'),
+            location: {
+              lat: lat,
+              lng: lon
+            },
+            description: element.tags?.description,
+            website: element.tags?.website,
+            wikipedia: element.tags?.wikipedia,
+            wikidata: element.tags?.wikidata,
+            imageUrl: imageUrl,
+            osmType: element.type,
+            osmId: element.id,
+            significance: significance // For sorting
+          };
+        })
+        .filter(poi => poi.location.lat && poi.location.lng) // Filter out POIs without coordinates
+        .sort((a, b) => b.significance - a.significance) // Sort by significance (highest first)
+        .slice(0, limit); // Return only requested number after sorting
+        
+        console.log(`Returning top ${pois.length} POIs sorted by significance`);
+        
+        return pois;
+        
+      } catch (error) {
+        // If it's not a 504 error or we're on the last attempt, throw immediately
+        if (!error.message.includes('504') || attempt === maxRetries) {
+          throw new Error(`OpenStreetMap POI error: ${error.message}`);
+        }
+        
+        lastError = error;
+        console.warn(`Attempt ${attempt} failed:`, error.message);
+        
+        // Wait before retrying (exponential backoff)
+        const waitTime = Math.pow(2, attempt) * 1000;
+        console.log(`Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
     }
+    
+    // This should never be reached, but just in case
+    throw new Error(`OpenStreetMap POI error: ${lastError?.message || 'Unknown error after retries'}`);
   }
 
   getProviderName() {
