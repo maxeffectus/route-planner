@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
-import { Autocomplete } from '../components/Autocomplete';
 import { InteractiveMap } from '../components/InteractiveMap';
 
 export function RoutePlanner() {
-  const [selectedCity, setSelectedCity] = useState(null);
   const [pois, setPois] = useState([]);
   const [isLoadingPOIs, setIsLoadingPOIs] = useState(false);
   const [poiError, setPoiError] = useState(null);
   const [poiCache, setPoiCache] = useState([]); // Cache all fetched POIs
+  const [mapBounds, setMapBounds] = useState(null);
+  const [currentZoom, setCurrentZoom] = useState(2);
+  const [selectedCityBbox, setSelectedCityBbox] = useState(null);
   const mapsAPI = new OpenStreetAPI();
 
   // Helper: Check if a POI is within a bounding box
@@ -23,13 +24,33 @@ export function RoutePlanner() {
     );
   };
 
+  const handleBoundsChange = useCallback((bounds) => {
+    setMapBounds(bounds);
+  }, []);
+
+  const handleZoomChange = useCallback((zoom) => {
+    setCurrentZoom(zoom);
+  }, []);
+
+  const handleCitySelect = useCallback((city) => {
+    console.log('City selected:', city);
+    if (city.boundingbox) {
+      setSelectedCityBbox(city.boundingbox);
+    }
+  }, []);
+
   const handleFindPOIs = async () => {
-    if (!selectedCity?.boundingbox) {
-      setPoiError('Please select a city first');
+    if (!mapBounds) {
+      setPoiError('Map bounds not available');
       return;
     }
 
-    const bbox = selectedCity.boundingbox;
+    if (currentZoom < 11) {
+      setPoiError('Please zoom in to at least level 11 to search for POIs');
+      return;
+    }
+
+    const bbox = mapBounds;
     const limit = 50;
 
     setIsLoadingPOIs(true);
@@ -38,7 +59,7 @@ export function RoutePlanner() {
     try {
       // Step 1: Find cached POIs within the bbox
       const cachedPOIsInBbox = poiCache.filter(poi => isPoiInBbox(poi, bbox));
-      console.log(`Found ${cachedPOIsInBbox.length} cached POIs in bbox`);
+      console.log(`Found ${cachedPOIsInBbox.length} cached POIs in visible area`);
 
       // Step 2: Check if we have enough cached POIs
       if (cachedPOIsInBbox.length >= limit) {
@@ -55,6 +76,7 @@ export function RoutePlanner() {
       // Step 4: Fetch remaining POIs
       const remainingLimit = limit - cachedPOIsInBbox.length;
       console.log(`Fetching ${remainingLimit} more POIs from API`);
+      console.log('Search area:', bbox);
       
       const newPOIs = await mapsAPI.getPOI(bbox, limit);
       
@@ -87,7 +109,7 @@ export function RoutePlanner() {
       height: 'calc(100vh - 100px)', // Account for header
       gap: '0'
     }}>
-      {/* Left Half - Forms/Controls */}
+      {/* Left Half - POI List */}
       <div style={{ 
         flex: '0 0 50%',
         padding: '20px',
@@ -97,109 +119,9 @@ export function RoutePlanner() {
       }}>
         <h2 style={{ marginTop: 0 }}>🗺️ Route Planner</h2>
         
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: '8px', 
-            fontWeight: 'bold',
-            color: '#333'
-          }}>
-            Select City:
-          </label>
-          <Autocomplete
-            searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
-            onSelect={(city) => {
-              setSelectedCity(city);
-              console.log('City selected:', city);
-            }}
-            renderSuggestion={(city) => (
-              <>
-                <div style={{ fontWeight: '500', color: '#333' }}>
-                  {city.name}
-                </div>
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-                  {city.displayName}
-                </div>
-              </>
-            )}
-            placeholder="Start typing city name (min 2 characters)..."
-            minChars={2}
-            maxResults={5}
-            debounceMs={300}
-          />
-          <small style={{ 
-            color: '#666', 
-            fontSize: '12px', 
-            display: 'block', 
-            marginTop: '5px' 
-          }}>
-            Type at least 2 characters to see suggestions
-          </small>
-        </div>
-
-        {selectedCity && (
-          <div style={{ 
-            padding: '15px', 
-            backgroundColor: '#e8f0fe', 
-            borderRadius: '8px',
-            marginBottom: '20px',
-            border: '1px solid #4285f4'
-          }}>
-            <div style={{ fontWeight: 'bold', color: '#1a73e8', marginBottom: '5px' }}>
-              Selected City
-            </div>
-            <div style={{ fontSize: '16px', fontWeight: '500', marginBottom: '5px' }}>
-              {selectedCity.name}
-            </div>
-            <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
-              {selectedCity.displayName}
-            </div>
-            <div style={{ fontSize: '12px', color: '#555' }}>
-              📍 Coordinates: {selectedCity.location.lat.toFixed(4)}, {selectedCity.location.lng.toFixed(4)}
-            </div>
-          </div>
-        )}
-
-        {/* POI Finder */}
-        {selectedCity && (
-          <div style={{ marginBottom: '20px' }}>
-            <button
-              onClick={handleFindPOIs}
-              disabled={isLoadingPOIs}
-              style={{
-                width: '100%',
-                padding: '12px 20px',
-                backgroundColor: isLoadingPOIs ? '#ccc' : '#4285f4',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                cursor: isLoadingPOIs ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseOver={(e) => !isLoadingPOIs && (e.target.style.backgroundColor = '#1a73e8')}
-              onMouseOut={(e) => !isLoadingPOIs && (e.target.style.backgroundColor = '#4285f4')}
-            >
-              {isLoadingPOIs ? '🔄 Loading...' : '🔍 Find points of interest in the area'}
-            </button>
-          </div>
-        )}
-
-        {/* Error Display */}
-        {poiError && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#fce8e6',
-            border: '1px solid #c5221f',
-            borderRadius: '8px',
-            color: '#c5221f',
-            marginBottom: '20px',
-            fontSize: '14px'
-          }}>
-            ⚠️ {poiError}
-          </div>
-        )}
+        <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
+          Use the map on the right to explore. Zoom in to level 11 or higher to search for points of interest in the visible area.
+        </p>
 
         {/* POI List */}
         {pois.length > 0 && (
@@ -223,7 +145,7 @@ export function RoutePlanner() {
               )}
             </h3>
             <div style={{
-              maxHeight: '400px',
+              maxHeight: '600px',
               overflowY: 'auto',
               backgroundColor: '#fff',
               borderRadius: '8px',
@@ -266,6 +188,25 @@ export function RoutePlanner() {
             </div>
           </div>
         )}
+
+        {pois.length === 0 && !isLoadingPOIs && (
+          <div style={{
+            padding: '40px 20px',
+            textAlign: 'center',
+            color: '#999',
+            backgroundColor: '#fff',
+            borderRadius: '8px',
+            border: '1px dashed #ddd'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
+            <p style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '500' }}>
+              No POIs loaded yet
+            </p>
+            <p style={{ margin: 0, fontSize: '14px' }}>
+              Zoom in on the map and click "Find points of interest"
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Right Half - Interactive Map */}
@@ -273,9 +214,19 @@ export function RoutePlanner() {
         flex: '0 0 50%',
         position: 'relative'
       }}>
-        <InteractiveMap bbox={selectedCity?.boundingbox} pois={pois} />
+        <InteractiveMap 
+          bbox={selectedCityBbox}
+          pois={pois}
+          mapsAPI={mapsAPI}
+          onBoundsChange={handleBoundsChange}
+          onZoomChange={handleZoomChange}
+          onCitySelect={handleCitySelect}
+          onFindPOIs={handleFindPOIs}
+          isLoadingPOIs={isLoadingPOIs}
+          currentZoom={currentZoom}
+          poiError={poiError}
+        />
       </div>
     </div>
   );
 }
-

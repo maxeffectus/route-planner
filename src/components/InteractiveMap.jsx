@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { Autocomplete } from './Autocomplete';
 
 // Fix default marker icon issue in React-Leaflet
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -22,7 +23,6 @@ function MapUpdater({ bbox }) {
 
   useEffect(() => {
     if (bbox) {
-      // Fit map to bounding box
       const bounds = [
         [bbox.minLat, bbox.minLng],
         [bbox.maxLat, bbox.maxLng]
@@ -34,9 +34,65 @@ function MapUpdater({ bbox }) {
   return null;
 }
 
-export function InteractiveMap({ bbox, pois = [] }) {
-  const defaultCenter = [0, 0];
+// Component to track map movement and zoom
+function MapEventHandler({ onBoundsChange, onZoomChange }) {
+  const map = useMap();
+
+  // Initial bounds and zoom
+  useEffect(() => {
+    const updateBounds = () => {
+      const bounds = map.getBounds();
+      const zoom = map.getZoom();
+      
+      onBoundsChange({
+        minLat: bounds.getSouth(),
+        maxLat: bounds.getNorth(),
+        minLng: bounds.getWest(),
+        maxLng: bounds.getEast()
+      });
+      onZoomChange(zoom);
+    };
+
+    // Update immediately
+    updateBounds();
+  }, [map, onBoundsChange, onZoomChange]);
+
+  // Track map events
+  useMapEvents({
+    moveend: () => {
+      const bounds = map.getBounds();
+      onBoundsChange({
+        minLat: bounds.getSouth(),
+        maxLat: bounds.getNorth(),
+        minLng: bounds.getWest(),
+        maxLng: bounds.getEast()
+      });
+    },
+    zoomend: () => {
+      const zoom = map.getZoom();
+      onZoomChange(zoom);
+    }
+  });
+
+  return null;
+}
+
+export function InteractiveMap({ 
+  bbox, 
+  pois = [], 
+  mapsAPI,
+  onBoundsChange,
+  onZoomChange,
+  onCitySelect,
+  onFindPOIs,
+  isLoadingPOIs,
+  currentZoom,
+  poiError
+}) {
+  const defaultCenter = [20, 0];
   const defaultZoom = 2;
+
+  const canSearchPOIs = currentZoom >= 11;
 
   return (
     <MapContainer
@@ -44,7 +100,7 @@ export function InteractiveMap({ bbox, pois = [] }) {
       zoom={defaultZoom}
       style={{ 
         width: '100%', 
-        height: '100%' 
+        height: '100%'
       }}
       scrollWheelZoom={true}
     >
@@ -54,9 +110,127 @@ export function InteractiveMap({ bbox, pois = [] }) {
         maxZoom={19}
       />
       
-      {bbox && (
-        <MapUpdater bbox={bbox} />
-      )}
+      {bbox && <MapUpdater bbox={bbox} />}
+      
+      <MapEventHandler 
+        onBoundsChange={onBoundsChange} 
+        onZoomChange={onZoomChange}
+      />
+
+      {/* Overlay Controls */}
+      <div style={{
+        position: 'absolute',
+        top: '10px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 1000,
+        width: '90%',
+        maxWidth: '500px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px'
+      }}>
+        {/* Location Search */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+          padding: '12px'
+        }}>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            color: '#555',
+            marginBottom: '8px'
+          }}>
+            📍 Search location or zoom map to explore
+          </label>
+          <Autocomplete
+            searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
+            onSelect={onCitySelect}
+            renderSuggestion={(city) => (
+              <>
+                <div style={{ fontWeight: '500', color: '#333' }}>
+                  {city.name}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                  {city.displayName}
+                </div>
+              </>
+            )}
+            placeholder="Type city name..."
+            minChars={2}
+            maxResults={5}
+            debounceMs={300}
+          />
+        </div>
+
+        {/* Find POIs Button */}
+        <button
+          onClick={onFindPOIs}
+          disabled={!canSearchPOIs || isLoadingPOIs}
+          title={!canSearchPOIs ? 'Please zoom in to at least level 11' : 'Search for points of interest in visible area'}
+          style={{
+            padding: '12px 20px',
+            backgroundColor: (!canSearchPOIs || isLoadingPOIs) ? '#ccc' : '#34a853',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '15px',
+            fontWeight: 'bold',
+            cursor: (!canSearchPOIs || isLoadingPOIs) ? 'not-allowed' : 'pointer',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+            transition: 'all 0.2s',
+            position: 'relative'
+          }}
+          onMouseOver={(e) => {
+            if (canSearchPOIs && !isLoadingPOIs) {
+              e.target.style.backgroundColor = '#2d8e47';
+              e.target.style.transform = 'translateY(-1px)';
+            }
+          }}
+          onMouseOut={(e) => {
+            if (canSearchPOIs && !isLoadingPOIs) {
+              e.target.style.backgroundColor = '#34a853';
+              e.target.style.transform = 'translateY(0)';
+            }
+          }}
+        >
+          {isLoadingPOIs ? '🔄 Loading...' : 
+           !canSearchPOIs ? '🔍 Zoom in to search (min level 11)' :
+           '🔍 Find points of interest in visible area'}
+        </button>
+
+        {/* Zoom Indicator */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '6px',
+          padding: '8px 12px',
+          fontSize: '12px',
+          color: '#666',
+          textAlign: 'center',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+        }}>
+          Zoom level: <strong>{currentZoom}</strong> {currentZoom < 11 && '(zoom in to ≥11 to search POIs)'}
+        </div>
+
+        {/* Error Display */}
+        {poiError && (
+          <div style={{
+            backgroundColor: '#fce8e6',
+            border: '2px solid #c5221f',
+            borderRadius: '8px',
+            padding: '10px',
+            color: '#c5221f',
+            fontSize: '13px',
+            fontWeight: '500',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+          }}>
+            ⚠️ {poiError}
+          </div>
+        )}
+      </div>
 
       {/* POI Markers */}
       {pois.map((poi, index) => {
