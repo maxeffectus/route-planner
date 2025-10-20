@@ -516,14 +516,15 @@ export class OpenStreetAPI extends MapsAPI {
           
           // Extract image URL if available
           let imageUrl = null;
-          if (element.tags?.wikimedia_commons) {
+          if (element.tags?.image) {
+            // Direct image URL (highest priority - sometimes present)
+            imageUrl = element.tags.image;
+          } else if (element.tags?.wikimedia_commons) {
             // Convert Wikimedia Commons filename to URL
             const filename = element.tags.wikimedia_commons.replace('File:', '');
-            imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
-          } else if (element.tags?.image) {
-            // Direct image URL (rare but sometimes present)
-            imageUrl = element.tags.image;
+            imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=300`;
           }
+          // Note: If imageUrl is null, getPOIImage() will try Wikidata next
           
           return {
             id: element.id,
@@ -539,6 +540,7 @@ export class OpenStreetAPI extends MapsAPI {
             wikipedia: element.tags?.wikipedia,
             wikidata: element.tags?.wikidata,
             imageUrl: imageUrl,
+            wikimediaCommons: element.tags?.wikimedia_commons, // Keep raw tag for reference
             osmType: element.type,
             osmId: element.id,
             significance: significance // For sorting
@@ -573,18 +575,78 @@ export class OpenStreetAPI extends MapsAPI {
   }
 
   /**
-   * Get POI image URL
-   * @param {Object} poi - POI object with imageUrl field
-   * @returns {string} Image URL or placeholder
+   * Get POI image URL with multiple fallback options
+   * @param {Object} poi - POI object with image fields
+   * @returns {Promise<string>} Image URL or placeholder
    */
-  getPOIImage(poi) {
-    // Return imageUrl if available, otherwise return placeholder
+  async getPOIImage(poi) {
+    // Option 1: Direct imageUrl (already includes wikimedia_commons and image tag)
     if (poi.imageUrl) {
       return poi.imageUrl;
     }
     
-    // Return local placeholder image
+    // Option 2: Try Wikidata if available
+    if (poi.wikidata) {
+      try {
+        const wikidataImage = await this.getWikidataImage(poi.wikidata);
+        if (wikidataImage) {
+          return wikidataImage;
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch Wikidata image for ${poi.name}:`, error);
+      }
+    }
+    
+    // Fallback: Return local placeholder image
     return noImagePlaceholder;
+  }
+
+  /**
+   * Fetch image from Wikidata using P18 property
+   * @param {string} wikidataId - Wikidata ID (e.g., "Q123456")
+   * @returns {Promise<string|null>} Image URL or null
+   */
+  async getWikidataImage(wikidataId) {
+    try {
+      // Clean up the Wikidata ID (remove any prefix)
+      const cleanId = wikidataId.replace(/^[^Q]*/, '');
+      
+      // Wikidata API endpoint
+      const url = `https://www.wikidata.org/wiki/Special:EntityData/${cleanId}.json`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      // Navigate to the entity data
+      const entity = data.entities?.[cleanId];
+      if (!entity) {
+        return null;
+      }
+      
+      // Get P18 (image) property
+      const imageClaims = entity.claims?.P18;
+      if (!imageClaims || imageClaims.length === 0) {
+        return null;
+      }
+      
+      // Get the first image filename
+      const imageFilename = imageClaims[0].mainsnak?.datavalue?.value;
+      if (!imageFilename) {
+        return null;
+      }
+      
+      // Convert to Wikimedia Commons URL
+      const encodedFilename = encodeURIComponent(imageFilename.replace(/ /g, '_'));
+      return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodedFilename}?width=300`;
+      
+    } catch (error) {
+      console.warn('Wikidata image fetch error:', error);
+      return null;
+    }
   }
 
   getProviderName() {

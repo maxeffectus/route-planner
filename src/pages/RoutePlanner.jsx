@@ -1,7 +1,86 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { InteractiveMap } from '../components/InteractiveMap';
 import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
+
+// Component to handle async image loading for a POI
+function POIImage({ poi, mapsAPI, alt }) {
+  const [imageUrl, setImageUrl] = useState(noImagePlaceholder);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadImage = async () => {
+      setIsLoading(true);
+      try {
+        const url = await mapsAPI.getPOIImage(poi);
+        if (isMounted) {
+          setImageUrl(url);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.warn('Error loading POI image:', error);
+        if (isMounted) {
+          setImageUrl(noImagePlaceholder);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [poi, mapsAPI]);
+
+  return (
+    <div style={{
+      width: '80px',
+      height: '80px',
+      flexShrink: 0,
+      borderRadius: '6px',
+      overflow: 'hidden',
+      backgroundColor: '#f0f0f0',
+      border: '1px solid #ddd',
+      position: 'relative'
+    }}>
+      {isLoading && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontSize: '20px',
+          color: '#999'
+        }}>
+          ⏳
+        </div>
+      )}
+      <img 
+        src={imageUrl}
+        alt={alt}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center',
+          opacity: isLoading ? 0.3 : 1,
+          transition: 'opacity 0.3s'
+        }}
+        onError={(e) => {
+          // If image fails to load, use local placeholder
+          e.target.src = noImagePlaceholder;
+          setIsLoading(false);
+        }}
+        onLoad={() => {
+          setIsLoading(false);
+        }}
+      />
+    </div>
+  );
+}
 
 export function RoutePlanner() {
   const [pois, setPois] = useState([]);
@@ -209,7 +288,6 @@ export function RoutePlanner() {
                 const poiCategory = getPoiCategory(poi);
                 const color = categoryColors[poiCategory] || '#999';
                 const isSelected = selectedPoiId === poi.id;
-                const imageUrl = mapsAPI.getPOIImage(poi);
                 
                 return (
                   <div
@@ -241,30 +319,7 @@ export function RoutePlanner() {
                     }}
                   >
                     {/* POI Image */}
-                    <div style={{
-                      width: '80px',
-                      height: '80px',
-                      flexShrink: 0,
-                      borderRadius: '6px',
-                      overflow: 'hidden',
-                      backgroundColor: '#f0f0f0',
-                      border: '1px solid #ddd'
-                    }}>
-                      <img 
-                        src={imageUrl}
-                        alt={poi.name}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          objectPosition: 'center'
-                        }}
-                        onError={(e) => {
-                          // If image fails to load, use local placeholder
-                          e.target.src = noImagePlaceholder;
-                        }}
-                      />
-                    </div>
+                    <POIImage poi={poi} mapsAPI={mapsAPI} alt={poi.name} />
 
                     {/* POI Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
