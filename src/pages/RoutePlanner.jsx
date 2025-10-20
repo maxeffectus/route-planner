@@ -4,11 +4,18 @@ import { InteractiveMap } from '../components/InteractiveMap';
 import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
 
 // Component to handle async image loading for a POI
-function POIImage({ poi, mapsAPI, alt }) {
-  const [imageUrl, setImageUrl] = useState(noImagePlaceholder);
-  const [isLoading, setIsLoading] = useState(true);
+function POIImage({ poi, mapsAPI, alt, onImageLoaded }) {
+  const [imageUrl, setImageUrl] = useState(poi.resolvedImageUrl || noImagePlaceholder);
+  const [isLoading, setIsLoading] = useState(!poi.resolvedImageUrl);
 
   useEffect(() => {
+    // If we already have a resolved image URL, don't fetch again
+    if (poi.resolvedImageUrl) {
+      setImageUrl(poi.resolvedImageUrl);
+      setIsLoading(false);
+      return;
+    }
+
     let isMounted = true;
     
     const loadImage = async () => {
@@ -18,12 +25,20 @@ function POIImage({ poi, mapsAPI, alt }) {
         if (isMounted) {
           setImageUrl(url);
           setIsLoading(false);
+          // Notify parent that image was loaded so it can update the cache
+          if (onImageLoaded) {
+            onImageLoaded(poi.id, url);
+          }
         }
       } catch (error) {
         console.warn('Error loading POI image:', error);
         if (isMounted) {
           setImageUrl(noImagePlaceholder);
           setIsLoading(false);
+          // Cache the placeholder too to avoid re-fetching
+          if (onImageLoaded) {
+            onImageLoaded(poi.id, noImagePlaceholder);
+          }
         }
       }
     };
@@ -33,7 +48,7 @@ function POIImage({ poi, mapsAPI, alt }) {
     return () => {
       isMounted = false;
     };
-  }, [poi, mapsAPI]);
+  }, [poi, mapsAPI, onImageLoaded]);
 
   return (
     <div style={{
@@ -95,6 +110,26 @@ export function RoutePlanner() {
   ]);
   const [selectedPoiId, setSelectedPoiId] = useState(null);
   const mapsAPI = new OpenStreetAPI();
+
+  // Handler to update POI cache with resolved image URL
+  const handleImageLoaded = useCallback((poiId, imageUrl) => {
+    setPoiCache(prevCache => 
+      prevCache.map(cachedPoi => 
+        cachedPoi.id === poiId 
+          ? { ...cachedPoi, resolvedImageUrl: imageUrl }
+          : cachedPoi
+      )
+    );
+    
+    // Also update the current pois display
+    setPois(prevPois => 
+      prevPois.map(poi => 
+        poi.id === poiId 
+          ? { ...poi, resolvedImageUrl: imageUrl }
+          : poi
+      )
+    );
+  }, []);
 
   // Colorblind-friendly color mapping for POI categories
   const categoryColors = {
@@ -319,7 +354,12 @@ export function RoutePlanner() {
                     }}
                   >
                     {/* POI Image */}
-                    <POIImage poi={poi} mapsAPI={mapsAPI} alt={poi.name} />
+                    <POIImage 
+                      poi={poi} 
+                      mapsAPI={mapsAPI} 
+                      alt={poi.name}
+                      onImageLoaded={handleImageLoaded}
+                    />
 
                     {/* POI Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
