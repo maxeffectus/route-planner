@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { InteractiveMap } from '../components/InteractiveMap';
+import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
 
 export function RoutePlanner() {
   const [pois, setPois] = useState([]);
@@ -208,6 +209,7 @@ export function RoutePlanner() {
                 const poiCategory = getPoiCategory(poi);
                 const color = categoryColors[poiCategory] || '#999';
                 const isSelected = selectedPoiId === poi.id;
+                const imageUrl = mapsAPI.getPOIImage(poi);
                 
                 return (
                   <div
@@ -226,7 +228,10 @@ export function RoutePlanner() {
                       position: 'relative',
                       backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
                       transform: isSelected ? 'translateX(4px)' : 'translateX(0)',
-                      boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'
+                      boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                      display: 'flex',
+                      gap: '12px',
+                      alignItems: 'center'
                     }}
                     onMouseOver={(e) => {
                       if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5';
@@ -235,26 +240,58 @@ export function RoutePlanner() {
                       if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <div style={{ 
-                      fontWeight: '600', 
-                      color: '#1a73e8',
-                      marginBottom: '4px',
-                      fontSize: '15px'
+                    {/* POI Image */}
+                    <div style={{
+                      width: '80px',
+                      height: '80px',
+                      flexShrink: 0,
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      backgroundColor: '#f0f0f0',
+                      border: '1px solid #ddd'
                     }}>
-                      {poi.name}
+                      <img 
+                        src={imageUrl}
+                        alt={poi.name}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center'
+                        }}
+                        onError={(e) => {
+                          // If image fails to load, use local placeholder
+                          e.target.src = noImagePlaceholder;
+                        }}
+                      />
                     </div>
-                    <div style={{ 
-                      fontSize: '13px', 
-                      color: '#666',
-                      marginBottom: '2px'
-                    }}>
-                      📍 {poi.type || poi.category}
-                    </div>
-                    {poi.wikipedia && (
-                      <div style={{ fontSize: '12px', color: '#999' }}>
-                        📖 Wikipedia
+
+                    {/* POI Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        color: '#1a73e8',
+                        marginBottom: '4px',
+                        fontSize: '15px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {poi.name}
                       </div>
-                    )}
+                      <div style={{ 
+                        fontSize: '13px', 
+                        color: '#666',
+                        marginBottom: '2px'
+                      }}>
+                        📍 {poi.type || poi.category}
+                      </div>
+                      {poi.wikipedia && (
+                        <div style={{ fontSize: '12px', color: '#999' }}>
+                          📖 Wikipedia
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}

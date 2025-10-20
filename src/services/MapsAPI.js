@@ -1,3 +1,5 @@
+import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
+
 /**
  * Base class for Maps API integrations
  * Provides common interface for different map providers
@@ -568,6 +570,21 @@ export class OpenStreetAPI extends MapsAPI {
     
     // This should never be reached, but just in case
     throw new Error(`OpenStreetMap POI error: ${lastError?.message || 'Unknown error after retries'}`);
+  }
+
+  /**
+   * Get POI image URL
+   * @param {Object} poi - POI object with imageUrl field
+   * @returns {string} Image URL or placeholder
+   */
+  getPOIImage(poi) {
+    // Return imageUrl if available, otherwise return placeholder
+    if (poi.imageUrl) {
+      return poi.imageUrl;
+    }
+    
+    // Return local placeholder image
+    return noImagePlaceholder;
   }
 
   getProviderName() {
