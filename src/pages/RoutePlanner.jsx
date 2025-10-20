@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { InteractiveMap } from '../components/InteractiveMap';
 import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
@@ -7,6 +8,22 @@ import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
 function POIImage({ poi, mapsAPI, alt, onImageLoaded }) {
   const [imageUrl, setImageUrl] = useState(poi.resolvedImageUrl || noImagePlaceholder);
   const [isLoading, setIsLoading] = useState(!poi.resolvedImageUrl);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewPosition, setPreviewPosition] = useState({ top: 0, left: 0 });
+  const thumbnailRef = React.useRef(null);
+
+  // Update preview position when showing
+  const handleMouseEnter = (e) => {
+    if (!isPlaceholder) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      // Position to the right of the thumbnail with some spacing
+      setPreviewPosition({
+        top: rect.top + window.scrollY,
+        left: rect.right + 20 // 20px spacing from thumbnail
+      });
+      setShowPreview(true);
+    }
+  };
 
   useEffect(() => {
     // If we already have a resolved image URL, don't fetch again
@@ -50,17 +67,25 @@ function POIImage({ poi, mapsAPI, alt, onImageLoaded }) {
     };
   }, [poi, mapsAPI, onImageLoaded]);
 
+  const isPlaceholder = imageUrl === noImagePlaceholder;
+
   return (
-    <div style={{
-      width: '80px',
-      height: '80px',
-      flexShrink: 0,
-      borderRadius: '6px',
-      overflow: 'hidden',
-      backgroundColor: '#f0f0f0',
-      border: '1px solid #ddd',
-      position: 'relative'
-    }}>
+    <div 
+      ref={thumbnailRef}
+      style={{
+        width: '80px',
+        height: '80px',
+        flexShrink: 0,
+        borderRadius: '6px',
+        overflow: 'hidden',
+        backgroundColor: '#f0f0f0',
+        border: '1px solid #ddd',
+        position: 'relative',
+        cursor: isPlaceholder ? 'default' : 'pointer'
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShowPreview(false)}
+    >
       {isLoading && (
         <div style={{
           position: 'absolute',
@@ -93,6 +118,46 @@ function POIImage({ poi, mapsAPI, alt, onImageLoaded }) {
           setIsLoading(false);
         }}
       />
+
+      {/* Image Preview on Hover - Using Portal to render outside DOM hierarchy */}
+      {showPreview && !isPlaceholder && createPortal(
+        <div style={{
+          position: 'absolute',
+          top: `${previewPosition.top}px`,
+          left: `${previewPosition.left}px`,
+          zIndex: 999999,
+          pointerEvents: 'none'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            padding: '8px',
+            border: '2px solid #ddd'
+          }}>
+            <img 
+              src={imageUrl}
+              alt={alt}
+              style={{
+                maxWidth: '300px',
+                maxHeight: '300px',
+                display: 'block',
+                borderRadius: '4px'
+              }}
+            />
+            <div style={{
+              marginTop: '6px',
+              fontSize: '12px',
+              color: '#666',
+              textAlign: 'center',
+              fontWeight: '500'
+            }}>
+              {poi.name}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
