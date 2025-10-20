@@ -10,6 +10,9 @@ export function RoutePlanner() {
   const [mapBounds, setMapBounds] = useState(null);
   const [currentZoom, setCurrentZoom] = useState(2);
   const [selectedCityBbox, setSelectedCityBbox] = useState(null);
+  const [selectedCategories, setSelectedCategories] = useState([
+    'museum', 'attraction', 'historic', 'place_of_worship', 'park', 'viewpoint'
+  ]);
   const mapsAPI = new OpenStreetAPI();
 
   // Helper: Check if a POI is within a bounding box
@@ -23,6 +26,32 @@ export function RoutePlanner() {
       lng <= bbox.maxLng
     );
   };
+
+  // Helper: Determine POI category from its type/category field
+  const getPoiCategory = (poi) => {
+    const type = poi.type || poi.category || '';
+    const lowerType = type.toLowerCase();
+    
+    // Map POI types to our category system
+    if (lowerType.includes('museum')) return 'museum';
+    if (lowerType.includes('attraction')) return 'attraction';
+    if (lowerType.includes('historic') || lowerType.includes('castle') || 
+        lowerType.includes('monument') || lowerType.includes('ruins')) return 'historic';
+    if (lowerType.includes('place_of_worship') || lowerType.includes('worship')) return 'place_of_worship';
+    if (lowerType.includes('park') || lowerType.includes('garden')) return 'park';
+    if (lowerType.includes('viewpoint')) return 'viewpoint';
+    
+    // Default: return the original category if it matches one of ours
+    if (selectedCategories.includes(lowerType)) return lowerType;
+    
+    return null;
+  };
+
+  // Filter POIs based on selected categories
+  const filteredPois = pois.filter(poi => {
+    const poiCategory = getPoiCategory(poi);
+    return poiCategory && selectedCategories.includes(poiCategory);
+  });
 
   const handleBoundsChange = useCallback((bounds) => {
     setMapBounds(bounds);
@@ -50,6 +79,11 @@ export function RoutePlanner() {
       return;
     }
 
+    if (selectedCategories.length === 0) {
+      setPoiError('Please select at least one POI category');
+      return;
+    }
+
     const bbox = mapBounds;
     const fetchLimit = 100; // Fetch more POIs from API
 
@@ -64,11 +98,11 @@ export function RoutePlanner() {
       // Step 2: Show cached POIs immediately (for better UX)
       setPois(cachedPOIsInBbox);
 
-      // Step 3: Fetch new POIs from API
-      console.log(`Fetching POIs from API`);
+      // Step 3: Fetch new POIs from API with selected categories
+      console.log(`Fetching POIs from API with categories:`, selectedCategories);
       console.log('Search area:', bbox);
       
-      const newPOIs = await mapsAPI.getPOI(bbox, fetchLimit);
+      const newPOIs = await mapsAPI.getPOI(bbox, fetchLimit, selectedCategories);
       
       // Step 4: Merge cached and new POIs (avoiding duplicates by ID)
       const cachedIds = new Set(poiCache.map(p => p.id));
@@ -122,7 +156,7 @@ export function RoutePlanner() {
         </p>
 
         {/* POI List */}
-        {pois.length > 0 && (
+        {filteredPois.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
             <h3 style={{ 
               marginTop: 0, 
@@ -130,7 +164,7 @@ export function RoutePlanner() {
               fontSize: '18px',
               color: '#333'
             }}>
-              Points of Interest ({pois.length})
+              Points of Interest ({filteredPois.length})
               {poiCache.length > 0 && (
                 <span style={{ 
                   fontSize: '12px', 
@@ -149,12 +183,12 @@ export function RoutePlanner() {
               borderRadius: '8px',
               border: '1px solid #ddd'
             }}>
-              {pois.map((poi, index) => (
+              {filteredPois.map((poi, index) => (
                 <div
                   key={poi.id || index}
                   style={{
                     padding: '12px 16px',
-                    borderBottom: index < pois.length - 1 ? '1px solid #eee' : 'none',
+                    borderBottom: index < filteredPois.length - 1 ? '1px solid #eee' : 'none',
                     cursor: 'pointer',
                     transition: 'background-color 0.2s'
                   }}
@@ -187,7 +221,7 @@ export function RoutePlanner() {
           </div>
         )}
 
-        {pois.length === 0 && !isLoadingPOIs && (
+        {filteredPois.length === 0 && !isLoadingPOIs && (
           <div style={{
             padding: '40px 20px',
             textAlign: 'center',
@@ -214,7 +248,7 @@ export function RoutePlanner() {
       }}>
         <InteractiveMap 
           bbox={selectedCityBbox}
-          pois={pois}
+          pois={filteredPois}
           mapsAPI={mapsAPI}
           onBoundsChange={handleBoundsChange}
           onZoomChange={handleZoomChange}
@@ -223,7 +257,9 @@ export function RoutePlanner() {
           isLoadingPOIs={isLoadingPOIs}
           currentZoom={currentZoom}
           poiError={poiError}
-          hasPOIsInArea={pois.length > 0}
+          hasPOIsInArea={filteredPois.length > 0}
+          selectedCategories={selectedCategories}
+          onCategoriesChange={setSelectedCategories}
         />
       </div>
     </div>

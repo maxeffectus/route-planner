@@ -88,12 +88,34 @@ export function InteractiveMap({
   isLoadingPOIs,
   currentZoom,
   poiError,
-  hasPOIsInArea = false
+  hasPOIsInArea = false,
+  selectedCategories = [],
+  onCategoriesChange
 }) {
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
 
   const canSearchPOIs = currentZoom >= 11;
+
+  // Category definitions with display names
+  const categories = [
+    { value: 'museum', label: 'Museum' },
+    { value: 'attraction', label: 'Attraction' },
+    { value: 'historic', label: 'Historic' },
+    { value: 'place_of_worship', label: 'Place Of Worship' },
+    { value: 'park', label: 'Park' },
+    { value: 'viewpoint', label: 'Viewpoint' }
+  ];
+
+  const handleCategoryToggle = (categoryValue) => {
+    if (selectedCategories.includes(categoryValue)) {
+      // Remove category
+      onCategoriesChange(selectedCategories.filter(c => c !== categoryValue));
+    } else {
+      // Add category
+      onCategoriesChange([...selectedCategories, categoryValue]);
+    }
+  };
 
   return (
     <MapContainer
@@ -101,7 +123,7 @@ export function InteractiveMap({
       zoom={defaultZoom}
       style={{ 
         width: '100%', 
-        height: '100%'
+        height: '100%' 
       }}
       scrollWheelZoom={true}
     >
@@ -165,6 +187,57 @@ export function InteractiveMap({
             maxResults={5}
             debounceMs={300}
           />
+        </div>
+
+        {/* POI Category Filter */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+          padding: '12px'
+        }}>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            color: '#555',
+            marginBottom: '8px'
+          }}>
+            🏛️ POI Types
+          </label>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '8px'
+          }}>
+            {categories.map(category => (
+              <label 
+                key={category.value}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedCategories.includes(category.value)}
+                  onChange={() => handleCategoryToggle(category.value)}
+                  style={{
+                    marginRight: '6px',
+                    cursor: 'pointer'
+                  }}
+                />
+                <span>{category.label}</span>
+              </label>
+            ))}
+          </div>
         </div>
 
         {/* Find POIs Button */}

@@ -105,9 +105,10 @@ export class MapsAPI {
    * Get Points of Interest (POI) in an area
    * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
    * @param {number} limit - Maximum number of results
+   * @param {Array<string>} categories - POI categories to search for
    * @returns {Promise<Array>} Array of POIs with name, type, location, etc.
    */
-  async getPOI(bbox, limit = 50) {
+  async getPOI(bbox, limit = 50, categories = ['museum', 'attraction', 'historic', 'place_of_worship', 'park', 'viewpoint']) {
     throw new Error('getPOI() must be implemented by subclass');
   }
 }
@@ -386,42 +387,60 @@ export class OpenStreetAPI extends MapsAPI {
    * Get Points of Interest using Overpass API
    * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
    * @param {number} limit - Maximum number of results
+   * @param {Array<string>} categories - POI categories to search for
    * @returns {Promise<Array>} Array of POIs
    */
-  async getPOI(bbox, limit = 50) {
+  async getPOI(bbox, limit = 50, categories = ['museum', 'attraction', 'historic', 'place_of_worship', 'park', 'viewpoint']) {
     // Build smart Overpass query that filters for significant POIs only
-    // Based on Wikipedia presence, landmark status, and type
-    
+    // Based on Wikipedia presence, landmark status, and type    
     const bboxStr = `${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng}`;
-    
-    const query = `
-      [out:json][timeout:90];
-      
-      // 1. Significant POIs only
-      (
-        // Museums and attractions: require landmark tag OR Wikipedia page
-        node["tourism"~"museum|attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
-        way["tourism"~"museum|attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
-        relation["tourism"~"museum|attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
-        
-        // Historic sites: castles, monuments, ruins (exclude small memorials)
+    console.log('Getting POIs for bbox:', bboxStr, 'limit:', limit);
+    // Museums and attractions: require landmark tag OR Wikipedia page
+    const museums_query = `
+        node["tourism"="museum"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        way["tourism"="museum"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        relation["tourism"="museum"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+    `;
+    const attractions_query = `
+        node["tourism"="attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        way["tourism"="attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        relation["tourism"="attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+    `;
+    // Historic sites: castles, monuments, ruins (exclude small memorials)
+    const historic_sites_query = `
         node["historic"~"castle|monument|ruins"]["historic"!~"memorial"](${bboxStr});
         way["historic"~"castle|monument|ruins"]["historic"!~"memorial"](${bboxStr});
         relation["historic"~"castle|monument|ruins"]["historic"!~"memorial"](${bboxStr});
-        
-        // Places of worship: only major buildings (cathedrals, churches, mosques, temples)
+    `;
+    // Places of worship: only major buildings (cathedrals, churches, mosques, temples)
+    const places_of_worship_query = `
         node["amenity"="place_of_worship"]["building"~"cathedral|church|mosque|temple"](${bboxStr});
         way["amenity"="place_of_worship"]["building"~"cathedral|church|mosque|temple"](${bboxStr});
         relation["amenity"="place_of_worship"]["building"~"cathedral|church|mosque|temple"](${bboxStr});
-        
-        // Significant parks and gardens (must have name)
+    `;
+    // Significant parks and gardens (must have name)
+    const parks_and_gardens_query = `
         node["leisure"~"park|garden"]["name"](${bboxStr});
         way["leisure"~"park|garden"]["name"](${bboxStr});
         relation["leisure"~"park|garden"]["name"](${bboxStr});
-        
-        // Viewpoints with names (scenic overlooks)
+    `;
+    // Viewpoints with names (scenic overlooks)
+    const viewpoints_query = `
         node["tourism"="viewpoint"]["name"](${bboxStr});
-        way["tourism"="viewpoint"]["name"](${bboxStr}); 
+        way["tourism"="viewpoint"]["name"](${bboxStr});
+        relation["tourism"="viewpoint"]["name"](${bboxStr});
+    `;
+
+    const query = `
+      [out:json][timeout:90];
+      // 1. Significant POIs only
+      (
+        ${categories.includes('museum') ? museums_query : ''}
+        ${categories.includes('attraction') ? attractions_query : ''}
+        ${categories.includes('historic') ? historic_sites_query : ''}
+        ${categories.includes('place_of_worship') ? places_of_worship_query : ''}
+        ${categories.includes('park') ? parks_and_gardens_query : ''}
+        ${categories.includes('viewpoint') ? viewpoints_query : ''}
       )->.pois;
 
       // 2. Get noise items
@@ -829,9 +848,10 @@ export class GoogleMapsAPI extends MapsAPI {
    * Get Points of Interest using Google Places API
    * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
    * @param {number} limit - Maximum number of results
+   * @param {Array<string>} categories - POI categories to search for
    * @returns {Promise<Array>} Array of POIs
    */
-  async getPOI(bbox, limit = 50) {
+  async getPOI(bbox, limit = 50, categories = ['museum', 'attraction', 'historic', 'place_of_worship', 'park', 'viewpoint']) {
     // Google Places doesn't support bbox directly, so we search from center
     const centerLat = (bbox.minLat + bbox.maxLat) / 2;
     const centerLng = (bbox.minLng + bbox.maxLng) / 2;
@@ -847,10 +867,12 @@ export class GoogleMapsAPI extends MapsAPI {
       'attraction': 'tourist_attraction',
       'museum': 'museum',
       'monument': 'point_of_interest',
+      'historic': 'point_of_interest',
+      'place_of_worship': 'place_of_worship',
+      'park': 'park',
       'viewpoint': 'point_of_interest'
     };
     
-    const categories = ['attraction', 'museum', 'monument'];
     const allResults = [];
     
     // Query for each category
