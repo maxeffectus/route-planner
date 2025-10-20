@@ -1,0 +1,113 @@
+/**
+ * POI (Point of Interest) class - Single source of truth for POI data
+ */
+export class POI {
+  constructor(data) {
+    this.id = data.id;
+    this.name = data.name || 'Unnamed';
+    this.type = data.type;
+    this.category = data.category;
+    this.location = data.location;
+    this.description = data.description;
+    this.website = data.website;
+    this.wikipedia = data.wikipedia;
+    this.wikidata = data.wikidata;
+    this.imageUrl = data.imageUrl;
+    this.wikimediaCommons = data.wikimediaCommons;
+    this.osmType = data.osmType;
+    this.osmId = data.osmId;
+    this.significance = data.significance;
+    
+    // Cached resolved image URL (set after fetching)
+    this.resolvedImageUrl = data.resolvedImageUrl || null;
+  }
+
+  /**
+   * Get the resolved image URL or null if not yet fetched
+   */
+  getResolvedImageUrl() {
+    return this.resolvedImageUrl;
+  }
+
+  /**
+   * Set the resolved image URL (after fetching)
+   */
+  setResolvedImageUrl(url) {
+    this.resolvedImageUrl = url;
+  }
+
+  /**
+   * Check if POI has a resolved image
+   */
+  hasResolvedImage() {
+    return this.resolvedImageUrl !== null;
+  }
+
+  /**
+   * Check if POI is within a bounding box
+   */
+  isInBbox(bbox) {
+    if (!this.location?.lat || !this.location?.lng) return false;
+    const { lat, lng } = this.location;
+    return (
+      lat >= bbox.minLat &&
+      lat <= bbox.maxLat &&
+      lng >= bbox.minLng &&
+      lng <= bbox.maxLng
+    );
+  }
+
+  /**
+   * Get Wikipedia URL
+   */
+  getWikipediaUrl() {
+    if (!this.wikipedia) return null;
+    const article = this.wikipedia.split(':')[1] || this.wikipedia;
+    return `https://en.wikipedia.org/wiki/${article}`;
+  }
+
+  /**
+   * Check if POI has Wikipedia page
+   */
+  hasWikipedia() {
+    return !!this.wikipedia;
+  }
+
+  /**
+   * Check if POI has official website
+   */
+  hasWebsite() {
+    return !!this.website;
+  }
+
+  /**
+   * Convert to plain object (for JSON serialization, etc.)
+   */
+  toJSON() {
+    return {
+      id: this.id,
+      name: this.name,
+      type: this.type,
+      category: this.category,
+      location: this.location,
+      description: this.description,
+      website: this.website,
+      wikipedia: this.wikipedia,
+      wikidata: this.wikidata,
+      imageUrl: this.imageUrl,
+      wikimediaCommons: this.wikimediaCommons,
+      osmType: this.osmType,
+      osmId: this.osmId,
+      significance: this.significance,
+      resolvedImageUrl: this.resolvedImageUrl
+    };
+  }
+
+  /**
+   * Create POI instance from plain object
+   */
+  static fromJSON(data) {
+    return new POI(data);
+  }
+}
+

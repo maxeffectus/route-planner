@@ -1,166 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { InteractiveMap } from '../components/InteractiveMap';
-import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
-
-// Component to handle async image loading for a POI
-function POIImage({ poi, mapsAPI, alt, onImageLoaded }) {
-  const [imageUrl, setImageUrl] = useState(poi.resolvedImageUrl || noImagePlaceholder);
-  const [isLoading, setIsLoading] = useState(!poi.resolvedImageUrl);
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewPosition, setPreviewPosition] = useState({ top: 0, left: 0 });
-  const thumbnailRef = React.useRef(null);
-
-  // Update preview position when showing
-  const handleMouseEnter = (e) => {
-    if (!isPlaceholder) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      // Position to the right of the thumbnail with some spacing
-      setPreviewPosition({
-        top: rect.top + window.scrollY,
-        left: rect.right + 20 // 20px spacing from thumbnail
-      });
-      setShowPreview(true);
-    }
-  };
-
-  useEffect(() => {
-    // If we already have a resolved image URL, don't fetch again
-    if (poi.resolvedImageUrl) {
-      setImageUrl(poi.resolvedImageUrl);
-      setIsLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-    
-    const loadImage = async () => {
-      setIsLoading(true);
-      try {
-        const url = await mapsAPI.getPOIImage(poi);
-        if (isMounted) {
-          setImageUrl(url);
-          setIsLoading(false);
-          // Notify parent that image was loaded so it can update the cache
-          if (onImageLoaded) {
-            onImageLoaded(poi.id, url);
-          }
-        }
-      } catch (error) {
-        console.warn('Error loading POI image:', error);
-        if (isMounted) {
-          setImageUrl(noImagePlaceholder);
-          setIsLoading(false);
-          // Cache the placeholder too to avoid re-fetching
-          if (onImageLoaded) {
-            onImageLoaded(poi.id, noImagePlaceholder);
-          }
-        }
-      }
-    };
-
-    loadImage();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [poi, mapsAPI, onImageLoaded]);
-
-  const isPlaceholder = imageUrl === noImagePlaceholder;
-
-  return (
-    <div 
-      ref={thumbnailRef}
-      style={{
-        width: '80px',
-        height: '80px',
-        flexShrink: 0,
-        borderRadius: '6px',
-        overflow: 'hidden',
-        backgroundColor: '#f0f0f0',
-        border: '1px solid #ddd',
-        position: 'relative',
-        cursor: isPlaceholder ? 'default' : 'pointer'
-      }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setShowPreview(false)}
-    >
-      {isLoading && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          fontSize: '20px',
-          color: '#999'
-        }}>
-          ⏳
-        </div>
-      )}
-      <img 
-        src={imageUrl}
-        alt={alt}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          objectPosition: 'center',
-          opacity: isLoading ? 0.3 : 1,
-          transition: 'opacity 0.3s'
-        }}
-        onError={(e) => {
-          // If image fails to load, use local placeholder
-          e.target.src = noImagePlaceholder;
-          setIsLoading(false);
-        }}
-        onLoad={() => {
-          setIsLoading(false);
-        }}
-      />
-
-      {/* Image Preview on Hover - Using Portal to render outside DOM hierarchy */}
-      {showPreview && !isPlaceholder && createPortal(
-        <div style={{
-          position: 'absolute',
-          top: `${previewPosition.top}px`,
-          left: `${previewPosition.left}px`,
-          zIndex: 999999,
-          pointerEvents: 'none'
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-            padding: '8px',
-            border: '2px solid #ddd'
-          }}>
-            <img 
-              src={imageUrl}
-              alt={alt}
-              style={{
-                maxWidth: '300px',
-                maxHeight: '300px',
-                display: 'block',
-                borderRadius: '4px'
-              }}
-            />
-            <div style={{
-              marginTop: '6px',
-              fontSize: '12px',
-              color: '#666',
-              textAlign: 'center',
-              fontWeight: '500'
-            }}>
-              {poi.name}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
+import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
 
 export function RoutePlanner() {
   const [pois, setPois] = useState([]);
@@ -179,20 +20,23 @@ export function RoutePlanner() {
   // Handler to update POI cache with resolved image URL
   const handleImageLoaded = useCallback((poiId, imageUrl) => {
     setPoiCache(prevCache => 
-      prevCache.map(cachedPoi => 
-        cachedPoi.id === poiId 
-          ? { ...cachedPoi, resolvedImageUrl: imageUrl }
-          : cachedPoi
-      )
+      prevCache.map(cachedPoi => {
+        if (cachedPoi.id === poiId) {
+          // Update POI instance with resolved image
+          cachedPoi.setResolvedImageUrl(imageUrl);
+        }
+        return cachedPoi;
+      })
     );
     
     // Also update the current pois display
     setPois(prevPois => 
-      prevPois.map(poi => 
-        poi.id === poiId 
-          ? { ...poi, resolvedImageUrl: imageUrl }
-          : poi
-      )
+      prevPois.map(poi => {
+        if (poi.id === poiId) {
+          poi.setResolvedImageUrl(imageUrl);
+        }
+        return poi;
+      })
     );
   }, []);
 
@@ -208,6 +52,11 @@ export function RoutePlanner() {
 
   // Helper: Check if a POI is within a bounding box
   const isPoiInBbox = (poi, bbox) => {
+    // Use POI instance method if available, otherwise fallback
+    if (poi.isInBbox) {
+      return poi.isInBbox(bbox);
+    }
+    // Fallback for plain objects
     if (!poi.location?.lat || !poi.location?.lng) return false;
     const { lat, lng } = poi.location;
     return (
@@ -219,7 +68,7 @@ export function RoutePlanner() {
   };
 
   // Helper: Determine POI category from its type/category field
-  const getPoiCategory = (poi) => {
+  const getPoiCategory = useCallback((poi) => {
     const type = poi.type || poi.category || '';
     const lowerType = type.toLowerCase();
     
@@ -236,7 +85,7 @@ export function RoutePlanner() {
     if (selectedCategories.includes(lowerType)) return lowerType;
     
     return null;
-  };
+  }, [selectedCategories]);
 
   // Filter POIs based on selected categories
   const filteredPois = pois.filter(poi => {
@@ -419,38 +268,19 @@ export function RoutePlanner() {
                     }}
                   >
                     {/* POI Image */}
-                    <POIImage 
+                    <POIImageThumbnail 
                       poi={poi} 
                       mapsAPI={mapsAPI} 
-                      alt={poi.name}
                       onImageLoaded={handleImageLoaded}
+                      size={80}
+                      showPreview={true}
                     />
 
                     {/* POI Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ 
-                        fontWeight: '600', 
-                        color: '#1a73e8',
-                        marginBottom: '4px',
-                        fontSize: '15px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {poi.name}
-                      </div>
-                      <div style={{ 
-                        fontSize: '13px', 
-                        color: '#666',
-                        marginBottom: '2px'
-                      }}>
-                        📍 {poi.type || poi.category}
-                      </div>
-                      {poi.wikipedia && (
-                        <div style={{ fontSize: '12px', color: '#999' }}>
-                          📖 Wikipedia
-                        </div>
-                      )}
+                      <POITitle poi={poi} color={color} variant="default" />
+                      <POIType poi={poi} />
+                      <POILinks poi={poi} fontSize="11px" gap="8px" />
                     </div>
                   </div>
                 );
@@ -502,6 +332,7 @@ export function RoutePlanner() {
           getPoiCategory={getPoiCategory}
           selectedPoiId={selectedPoiId}
           onPoiSelect={setSelectedPoiId}
+          onImageLoaded={handleImageLoaded}
         />
       </div>
     </div>

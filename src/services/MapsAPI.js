@@ -1,4 +1,5 @@
 import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
+import { POI } from '../models/POI';
 
 /**
  * Base class for Maps API integrations
@@ -526,7 +527,7 @@ export class OpenStreetAPI extends MapsAPI {
           }
           // Note: If imageUrl is null, getPOIImage() will try Wikidata next
           
-          return {
+          return new POI({
             id: element.id,
             name: element.tags?.name || 'Unnamed',
             type: element.tags?.tourism || element.tags?.historic || element.tags?.amenity || element.tags?.leisure,
@@ -540,11 +541,11 @@ export class OpenStreetAPI extends MapsAPI {
             wikipedia: element.tags?.wikipedia,
             wikidata: element.tags?.wikidata,
             imageUrl: imageUrl,
-            wikimediaCommons: element.tags?.wikimedia_commons, // Keep raw tag for reference
+            wikimediaCommons: element.tags?.wikimedia_commons,
             osmType: element.type,
             osmId: element.id,
-            significance: significance // For sorting
-          };
+            significance: significance
+          });
         })
         .filter(poi => poi.location.lat && poi.location.lng) // Filter out POIs without coordinates
         .sort((a, b) => b.significance - a.significance) // Sort by significance (highest first)

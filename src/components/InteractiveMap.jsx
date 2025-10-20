@@ -3,10 +3,81 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 're
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Autocomplete } from './Autocomplete';
+import { POIImageThumbnail, POITitle, POIType, POILinks, POIDescription } from './POIComponents';
 
 // Fix default marker icon issue in React-Leaflet
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Shared popup content component using reusable POI components
+function PopupContent({ poi, color, onClose, mapsAPI, onImageLoaded }) {
+  return (
+    <div 
+      style={{ minWidth: '240px', position: 'relative' }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Custom close button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onClose && onClose();
+        }}
+        style={{
+          position: 'absolute',
+          top: '-4px',
+          right: '-4px',
+          background: '#fff',
+          border: '2px solid #ddd',
+          borderRadius: '50%',
+          width: '24px',
+          height: '24px',
+          cursor: 'pointer',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          color: '#666',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 0,
+          lineHeight: 1,
+          transition: 'all 0.2s',
+          zIndex: 1000
+        }}
+        onMouseOver={(e) => {
+          e.target.style.backgroundColor = '#f44336';
+          e.target.style.color = 'white';
+          e.target.style.borderColor = '#f44336';
+        }}
+        onMouseOut={(e) => {
+          e.target.style.backgroundColor = '#fff';
+          e.target.style.color = '#666';
+          e.target.style.borderColor = '#ddd';
+        }}
+        title="Close and deselect"
+      >
+        ×
+      </button>
+
+      {/* POI Image - Full width in popup */}
+      <div style={{ marginBottom: '12px' }}>
+        <POIImageThumbnail 
+          poi={poi}
+          mapsAPI={mapsAPI}
+          onImageLoaded={onImageLoaded}
+          size="100%"
+          height={120}
+          showPreview={false}
+        />
+      </div>
+
+      <POITitle poi={poi} color={color} variant="popup" />
+      <POIType poi={poi} />
+      <POIDescription poi={poi} />
+      <POILinks poi={poi} fontSize="12px" gap="12px" />
+    </div>
+  );
+}
 
 let DefaultIcon = L.icon({
   iconUrl: icon,
@@ -218,7 +289,8 @@ export function InteractiveMap({
   categoryColors = {},
   getPoiCategory,
   selectedPoiId = null,
-  onPoiSelect
+  onPoiSelect,
+  onImageLoaded
 }) {
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
@@ -523,121 +595,19 @@ export function InteractiveMap({
               autoClose={false}
               closeButton={false}
             >
-              <div style={{ minWidth: '200px', position: 'relative' }}>
-                {/* Custom close button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    
-                    // Set flag to prevent marker click from firing
-                    isInteractingRef.current = true;
-                    
-                    onPoiSelect && onPoiSelect(null);
-                    
-                    // Reset flag after a short delay
-                    setTimeout(() => {
-                      isInteractingRef.current = false;
-                    }, 100);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: '-4px',
-                    right: '-4px',
-                    background: '#fff',
-                    border: '2px solid #ddd',
-                    borderRadius: '50%',
-                    width: '24px',
-                    height: '24px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    color: '#666',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0,
-                    lineHeight: 1,
-                    transition: 'all 0.2s',
-                    zIndex: 1000
-                  }}
-                  onMouseOver={(e) => {
-                    e.target.style.backgroundColor = '#f44336';
-                    e.target.style.color = 'white';
-                    e.target.style.borderColor = '#f44336';
-                  }}
-                  onMouseOut={(e) => {
-                    e.target.style.backgroundColor = '#fff';
-                    e.target.style.color = '#666';
-                    e.target.style.borderColor = '#ddd';
-                  }}
-                  title="Close and deselect"
-                >
-                  ×
-                </button>
-
-                <h3 style={{ 
-                  margin: '0 0 8px 0', 
-                  fontSize: '16px',
-                  color: color,
-                  borderLeft: `4px solid ${color}`,
-                  paddingLeft: '8px',
-                  paddingRight: '24px'
-                }}>
-                  {poi.name}
-                </h3>
-                
-                <div style={{ 
-                  fontSize: '13px', 
-                  color: '#666',
-                  marginBottom: '6px' 
-                }}>
-                  <strong>Type:</strong> {poi.type || poi.category}
-                </div>
-
-                {poi.description && (
-                  <div style={{ 
-                    fontSize: '13px', 
-                    marginBottom: '6px' 
-                  }}>
-                    {poi.description}
-                  </div>
-                )}
-
-                {poi.wikipedia && (
-                  <div style={{ marginTop: '8px' }}>
-                    <a 
-                      href={`https://en.wikipedia.org/wiki/${poi.wikipedia.split(':')[1] || poi.wikipedia}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: '#4285f4',
-                        textDecoration: 'none',
-                        fontSize: '13px'
-                      }}
-                    >
-                      📖 View on Wikipedia →
-                    </a>
-                  </div>
-                )}
-
-                {poi.website && (
-                  <div style={{ marginTop: '6px' }}>
-                    <a 
-                      href={poi.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: '#4285f4',
-                        textDecoration: 'none',
-                        fontSize: '13px'
-                      }}
-                    >
-                      🌐 Official Website →
-                    </a>
-                  </div>
-                )}
-              </div>
+              <PopupContent 
+                poi={poi} 
+                color={color}
+                mapsAPI={mapsAPI}
+                onImageLoaded={onImageLoaded}
+                onClose={() => {
+                  isInteractingRef.current = true;
+                  onPoiSelect && onPoiSelect(null);
+                  setTimeout(() => {
+                    isInteractingRef.current = false;
+                  }, 100);
+                }}
+              />
             </Popup>
           </Marker>
         );
