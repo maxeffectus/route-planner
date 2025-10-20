@@ -13,6 +13,7 @@ export function RoutePlanner() {
   const [selectedCategories, setSelectedCategories] = useState([
     'museum', 'attraction', 'historic', 'place_of_worship', 'park', 'viewpoint'
   ]);
+  const [selectedPoiId, setSelectedPoiId] = useState(null);
   const mapsAPI = new OpenStreetAPI();
 
   // Colorblind-friendly color mapping for POI categories
@@ -62,6 +63,16 @@ export function RoutePlanner() {
     const poiCategory = getPoiCategory(poi);
     return poiCategory && selectedCategories.includes(poiCategory);
   });
+
+  // Auto-scroll selected POI into view
+  React.useEffect(() => {
+    if (selectedPoiId) {
+      const element = document.getElementById(`poi-item-${selectedPoiId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [selectedPoiId]);
 
   const handleBoundsChange = useCallback((bounds) => {
     setMapBounds(bounds);
@@ -196,20 +207,33 @@ export function RoutePlanner() {
               {filteredPois.map((poi, index) => {
                 const poiCategory = getPoiCategory(poi);
                 const color = categoryColors[poiCategory] || '#999';
+                const isSelected = selectedPoiId === poi.id;
                 
                 return (
                   <div
                     key={poi.id || index}
+                    id={`poi-item-${poi.id}`}
+                    onClick={() => {
+                      // Toggle selection: if already selected, deselect; otherwise select
+                      setSelectedPoiId(prevId => prevId === poi.id ? null : poi.id);
+                    }}
                     style={{
                       padding: '12px 16px',
                       borderBottom: index < filteredPois.length - 1 ? '1px solid #eee' : 'none',
                       cursor: 'pointer',
-                      transition: 'background-color 0.2s',
+                      transition: 'all 0.2s',
                       borderLeft: `4px solid ${color}`,
-                      position: 'relative'
+                      position: 'relative',
+                      backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
+                      transform: isSelected ? 'translateX(4px)' : 'translateX(0)',
+                      boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none'
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    onMouseOver={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
                     <div style={{ 
                       fontWeight: '600', 
@@ -279,6 +303,8 @@ export function RoutePlanner() {
           onCategoriesChange={setSelectedCategories}
           categoryColors={categoryColors}
           getPoiCategory={getPoiCategory}
+          selectedPoiId={selectedPoiId}
+          onPoiSelect={setSelectedPoiId}
         />
       </div>
     </div>

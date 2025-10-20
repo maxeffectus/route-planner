@@ -77,6 +77,99 @@ function MapEventHandler({ onBoundsChange, onZoomChange }) {
   return null;
 }
 
+// Component to handle selected POI (open popup and pan to location)
+function SelectedPOIHandler({ selectedPoiId, pois }) {
+  const map = useMap();
+  const timeoutRef = React.useRef(null);
+  const currentSelectedIdRef = React.useRef(selectedPoiId);
+
+  // Update ref whenever selectedPoiId changes
+  React.useEffect(() => {
+    currentSelectedIdRef.current = selectedPoiId;
+  }, [selectedPoiId]);
+
+  useEffect(() => {
+    // Clear any pending timeout from previous selection
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    if (selectedPoiId && pois) {
+      const selectedPoi = pois.find(poi => poi.id === selectedPoiId);
+      if (selectedPoi && selectedPoi.location) {
+        // Find the marker for the selected POI
+        let selectedMarker = null;
+        map.eachLayer((layer) => {
+          if (layer instanceof L.Marker) {
+            const layerLatLng = layer.getLatLng();
+            if (layerLatLng.lat === selectedPoi.location.lat && 
+                layerLatLng.lng === selectedPoi.location.lng) {
+              selectedMarker = layer;
+            }
+          }
+        });
+
+        // Close all OTHER popups (not the selected one)
+        map.eachLayer((layer) => {
+          if (layer instanceof L.Marker && layer !== selectedMarker) {
+            layer.closePopup();
+          }
+        });
+        
+        // Check if POI is already in view
+        const bounds = map.getBounds();
+        const isInView = bounds.contains([selectedPoi.location.lat, selectedPoi.location.lng]);
+        const needsZoom = map.getZoom() < 15;
+        
+        if (isInView && !needsZoom) {
+          // POI is already visible and zoomed in - open popup immediately
+          if (selectedMarker) {
+            selectedMarker.openPopup();
+          }
+        } else {
+          // POI needs panning/zooming - animate then open popup
+          map.flyTo([selectedPoi.location.lat, selectedPoi.location.lng], Math.max(map.getZoom(), 15), {
+            duration: 0.8
+          });
+
+          // Open popup after animation
+          if (selectedMarker) {
+            const poiIdToOpen = selectedPoi.id;
+            timeoutRef.current = setTimeout(() => {
+              // Double-check that this POI is still selected before opening (use ref for current value)
+              if (currentSelectedIdRef.current === poiIdToOpen) {
+                selectedMarker.openPopup();
+              }
+              timeoutRef.current = null;
+            }, 900); // Wait for flyTo animation
+          }
+        }
+      }
+    } else {
+      // Close all popups when deselecting (selectedPoiId is null or undefined)
+      map.closePopup();
+      
+      // Also ensure all marker popups are closed
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Marker) {
+          layer.closePopup();
+        }
+      });
+    }
+
+    // Cleanup function to cancel timeout if component unmounts or selectedPoiId changes
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [selectedPoiId, pois, map]);
+
+  return null;
+}
+
 export function InteractiveMap({ 
   bbox, 
   pois = [], 
@@ -92,12 +185,17 @@ export function InteractiveMap({
   selectedCategories = [],
   onCategoriesChange,
   categoryColors = {},
-  getPoiCategory
+  getPoiCategory,
+  selectedPoiId = null,
+  onPoiSelect
 }) {
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
 
   const canSearchPOIs = currentZoom >= 11;
+  
+  // Track if we're in the middle of an interaction to prevent event conflicts
+  const isInteractingRef = React.useRef(false);
 
   // Category definitions with display names
   const categories = [
@@ -110,20 +208,25 @@ export function InteractiveMap({
   ];
 
   // Create custom colored marker icon
-  const createColoredIcon = (color) => {
+  const createColoredIcon = (color, isSelected = false) => {
+    const size = isSelected ? 35 : 25;
+    const iconSize = isSelected ? 35 : 25;
+    const iconAnchor = isSelected ? [17, 34] : [12, 24];
+    
     return L.divIcon({
       className: 'custom-poi-marker',
       html: `<div style="
         background-color: ${color};
-        width: 25px;
-        height: 25px;
+        width: ${size}px;
+        height: ${size}px;
         border-radius: 50% 50% 50% 0;
         transform: rotate(-45deg);
-        border: 2px solid white;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        border: 3px solid white;
+        box-shadow: 0 ${isSelected ? '4px 12px' : '2px 5px'} rgba(0,0,0,${isSelected ? '0.4' : '0.3'});
+        transition: all 0.2s;
       "></div>`,
-      iconSize: [25, 25],
-      iconAnchor: [12, 24]
+      iconSize: [iconSize, iconSize],
+      iconAnchor: iconAnchor
     });
   };
 
@@ -158,6 +261,11 @@ export function InteractiveMap({
       <MapEventHandler 
         onBoundsChange={onBoundsChange} 
         onZoomChange={onZoomChange}
+      />
+
+      <SelectedPOIHandler 
+        selectedPoiId={selectedPoiId}
+        pois={pois}
       />
 
       {/* Overlay Controls */}
@@ -354,22 +462,90 @@ export function InteractiveMap({
         
         const poiCategory = getPoiCategory ? getPoiCategory(poi) : null;
         const color = categoryColors[poiCategory] || '#999';
-        const customIcon = createColoredIcon(color);
+        const isSelected = selectedPoiId === poi.id;
+        const customIcon = createColoredIcon(color, isSelected);
         
         return (
           <Marker 
             key={poi.id || index} 
             position={[poi.location.lat, poi.location.lng]}
             icon={customIcon}
+            eventHandlers={{
+              click: () => {
+                // Prevent action if we're in the middle of another interaction
+                if (isInteractingRef.current) {
+                  return;
+                }
+                
+                // Toggle selection: if already selected, deselect; otherwise select
+                onPoiSelect && onPoiSelect(isSelected ? null : poi.id);
+              }
+            }}
           >
-            <Popup>
-              <div style={{ minWidth: '200px' }}>
+            <Popup 
+              autoClose={false}
+              closeButton={false}
+            >
+              <div style={{ minWidth: '200px', position: 'relative' }}>
+                {/* Custom close button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    // Set flag to prevent marker click from firing
+                    isInteractingRef.current = true;
+                    
+                    onPoiSelect && onPoiSelect(null);
+                    
+                    // Reset flag after a short delay
+                    setTimeout(() => {
+                      isInteractingRef.current = false;
+                    }, 100);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    background: '#fff',
+                    border: '2px solid #ddd',
+                    borderRadius: '50%',
+                    width: '24px',
+                    height: '24px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: '#666',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    lineHeight: 1,
+                    transition: 'all 0.2s',
+                    zIndex: 1000
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#f44336';
+                    e.target.style.color = 'white';
+                    e.target.style.borderColor = '#f44336';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = '#fff';
+                    e.target.style.color = '#666';
+                    e.target.style.borderColor = '#ddd';
+                  }}
+                  title="Close and deselect"
+                >
+                  ×
+                </button>
+
                 <h3 style={{ 
                   margin: '0 0 8px 0', 
                   fontSize: '16px',
                   color: color,
                   borderLeft: `4px solid ${color}`,
-                  paddingLeft: '8px'
+                  paddingLeft: '8px',
+                  paddingRight: '24px'
                 }}>
                   {poi.name}
                 </h3>
