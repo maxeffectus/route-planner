@@ -4,13 +4,14 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Autocomplete } from './Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks, POIDescription } from './POIComponents';
+import { getAllCategories } from '../utils/categoryMapping';
 
 // Fix default marker icon issue in React-Leaflet
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Shared popup content component using reusable POI components
-function PopupContent({ poi, color, onClose, mapsAPI, onImageLoaded }) {
+function PopupContent({ poi, color, onClose, mapsAPI, onImageLoaded, getPoiCategory }) {
   return (
     <div 
       style={{ minWidth: '240px', position: 'relative' }}
@@ -72,7 +73,7 @@ function PopupContent({ poi, color, onClose, mapsAPI, onImageLoaded }) {
       </div>
 
       <POITitle poi={poi} color={color} variant="popup" />
-      <POIType poi={poi} />
+      <POIType poi={poi} getPoiCategory={getPoiCategory} />
       <POIDescription poi={poi} />
       <POILinks poi={poi} fontSize="12px" gap="12px" />
     </div>
@@ -300,15 +301,8 @@ export function InteractiveMap({
   // Track if we're in the middle of an interaction to prevent event conflicts
   const isInteractingRef = React.useRef(false);
 
-  // Category definitions with display names
-  const categories = [
-    { value: 'museum', label: 'Museum' },
-    { value: 'attraction', label: 'Attraction' },
-    { value: 'historic', label: 'Historic' },
-    { value: 'place_of_worship', label: 'Place Of Worship' },
-    { value: 'park', label: 'Park' },
-    { value: 'viewpoint', label: 'Viewpoint' }
-  ];
+  // Category definitions from central config
+  const categories = getAllCategories();
 
   // Create custom colored marker icon
   const createColoredIcon = (color, isSelected = false) => {
@@ -600,6 +594,7 @@ export function InteractiveMap({
                 color={color}
                 mapsAPI={mapsAPI}
                 onImageLoaded={onImageLoaded}
+                getPoiCategory={getPoiCategory}
                 onClose={() => {
                   isInteractingRef.current = true;
                   onPoiSelect && onPoiSelect(null);

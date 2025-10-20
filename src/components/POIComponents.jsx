@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
+import { getCategoryLabel } from '../utils/categoryMapping';
 
 /**
  * POI Image Thumbnail Component
@@ -191,16 +192,24 @@ export function POITitle({ poi, color, variant = 'default' }) {
 
 /**
  * POI Type Component
- * Displays POI type/category with icon
+ * Displays POI type/category with icon using proper display label
  */
-export function POIType({ poi }) {
+export function POIType({ poi, getPoiCategory }) {
+  // Get the standardized category
+  const category = getPoiCategory ? getPoiCategory(poi) : null;
+  
+  // Get the display label
+  const displayLabel = category 
+    ? getCategoryLabel(category) 
+    : getCategoryLabel(poi.type || poi.category);
+
   return (
     <div style={{ 
       fontSize: '13px', 
       color: '#666',
       marginBottom: '4px'
     }}>
-      📍 {poi.type || poi.category}
+      📍 {displayLabel}
     </div>
   );
 }

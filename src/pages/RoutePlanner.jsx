@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
+import { getAllCategoryValues } from '../utils/categoryMapping';
 
 export function RoutePlanner() {
   const [pois, setPois] = useState([]);
@@ -11,9 +12,7 @@ export function RoutePlanner() {
   const [mapBounds, setMapBounds] = useState(null);
   const [currentZoom, setCurrentZoom] = useState(2);
   const [selectedCityBbox, setSelectedCityBbox] = useState(null);
-  const [selectedCategories, setSelectedCategories] = useState([
-    'museum', 'attraction', 'historic', 'place_of_worship', 'park', 'viewpoint'
-  ]);
+  const [selectedCategories, setSelectedCategories] = useState(getAllCategoryValues());
   const [selectedPoiId, setSelectedPoiId] = useState(null);
   const mapsAPI = new OpenStreetAPI();
 
@@ -279,7 +278,7 @@ export function RoutePlanner() {
                     {/* POI Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <POITitle poi={poi} color={color} variant="default" />
-                      <POIType poi={poi} />
+                      <POIType poi={poi} getPoiCategory={getPoiCategory} />
                       <POILinks poi={poi} fontSize="11px" gap="8px" />
                     </div>
                   </div>
