@@ -51,7 +51,7 @@ export function RoutePlanner() {
     }
 
     const bbox = mapBounds;
-    const limit = 50;
+    const fetchLimit = 100; // Fetch more POIs from API
 
     setIsLoadingPOIs(true);
     setPoiError(null);
@@ -61,38 +61,36 @@ export function RoutePlanner() {
       const cachedPOIsInBbox = poiCache.filter(poi => isPoiInBbox(poi, bbox));
       console.log(`Found ${cachedPOIsInBbox.length} cached POIs in visible area`);
 
-      // Step 2: Check if we have enough cached POIs
-      if (cachedPOIsInBbox.length >= limit) {
-        // We have enough cached POIs, just use them
-        setPois(cachedPOIsInBbox.slice(0, limit));
-        console.log('Using cached POIs only');
-        setIsLoadingPOIs(false);
-        return;
-      }
-
-      // Step 3: Show cached POIs immediately (for better UX)
+      // Step 2: Show cached POIs immediately (for better UX)
       setPois(cachedPOIsInBbox);
 
-      // Step 4: Fetch remaining POIs
-      const remainingLimit = limit - cachedPOIsInBbox.length;
-      console.log(`Fetching ${remainingLimit} more POIs from API`);
+      // Step 3: Fetch new POIs from API
+      console.log(`Fetching POIs from API`);
       console.log('Search area:', bbox);
       
-      const newPOIs = await mapsAPI.getPOI(bbox, limit);
+      const newPOIs = await mapsAPI.getPOI(bbox, fetchLimit);
       
-      // Step 5: Merge cached and new POIs (avoiding duplicates by ID)
+      // Step 4: Merge cached and new POIs (avoiding duplicates by ID)
       const cachedIds = new Set(poiCache.map(p => p.id));
       const uniqueNewPOIs = newPOIs.filter(poi => !cachedIds.has(poi.id));
       
-      // Step 6: Update cache with new POIs
+      // Step 5: Update cache with new POIs
       if (uniqueNewPOIs.length > 0) {
         setPoiCache(prev => [...prev, ...uniqueNewPOIs]);
         console.log(`Added ${uniqueNewPOIs.length} new POIs to cache`);
       }
 
-      // Step 7: Show combined results (cached + new POIs within bbox)
-      const allPOIsInBbox = newPOIs.filter(poi => isPoiInBbox(poi, bbox));
-      setPois(allPOIsInBbox.slice(0, limit));
+      // Step 6: Show ALL POIs within bbox (no limit)
+      const allPOIsInBbox = [...cachedPOIsInBbox];
+      
+      // Add new POIs that are in bbox
+      newPOIs.forEach(poi => {
+        if (isPoiInBbox(poi, bbox) && !cachedIds.has(poi.id)) {
+          allPOIsInBbox.push(poi);
+        }
+      });
+      
+      setPois(allPOIsInBbox);
       console.log(`Total POIs displayed: ${allPOIsInBbox.length}`);
 
     } catch (error) {
@@ -225,6 +223,7 @@ export function RoutePlanner() {
           isLoadingPOIs={isLoadingPOIs}
           currentZoom={currentZoom}
           poiError={poiError}
+          hasPOIsInArea={pois.length > 0}
         />
       </div>
     </div>

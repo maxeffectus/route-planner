@@ -87,7 +87,8 @@ export function InteractiveMap({
   onFindPOIs,
   isLoadingPOIs,
   currentZoom,
-  poiError
+  poiError,
+  hasPOIsInArea = false
 }) {
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
@@ -199,6 +200,7 @@ export function InteractiveMap({
         >
           {isLoadingPOIs ? '🔄 Loading...' : 
            !canSearchPOIs ? '🔍 Zoom in to search (min level 11)' :
+           hasPOIsInArea ? '🔍 Find more points of interest in visible area' :
            '🔍 Find points of interest in visible area'}
         </button>
 
