@@ -35,7 +35,7 @@ function MapUpdater({ bbox }) {
 }
 
 // Component to track map movement and zoom
-function MapEventHandler({ onBoundsChange, onZoomChange }) {
+function MapEventHandler({ onBoundsChange, onZoomChange, onMapClick }) {
   const map = useMap();
 
   // Initial bounds and zoom
@@ -71,6 +71,12 @@ function MapEventHandler({ onBoundsChange, onZoomChange }) {
     zoomend: () => {
       const zoom = map.getZoom();
       onZoomChange(zoom);
+    },
+    click: (e) => {
+      // When clicking on the map (not on a marker), trigger the callback
+      if (onMapClick) {
+        onMapClick(e);
+      }
     }
   });
 
@@ -82,6 +88,7 @@ function SelectedPOIHandler({ selectedPoiId, pois }) {
   const map = useMap();
   const timeoutRef = React.useRef(null);
   const currentSelectedIdRef = React.useRef(selectedPoiId);
+  const lastCenteredIdRef = React.useRef(null); // Track which POI we last centered on
 
   // Update ref whenever selectedPoiId changes
   React.useEffect(() => {
@@ -117,38 +124,54 @@ function SelectedPOIHandler({ selectedPoiId, pois }) {
           }
         });
         
-        // Check if POI is already in view
-        const bounds = map.getBounds();
-        const isInView = bounds.contains([selectedPoi.location.lat, selectedPoi.location.lng]);
-        const needsZoom = map.getZoom() < 15;
+        // Only center the map if we haven't centered on this POI yet
+        const shouldCenter = lastCenteredIdRef.current !== selectedPoiId;
         
-        if (isInView && !needsZoom) {
-          // POI is already visible and zoomed in - open popup immediately
-          if (selectedMarker) {
-            selectedMarker.openPopup();
+        if (shouldCenter) {
+          // Mark this POI as centered
+          lastCenteredIdRef.current = selectedPoiId;
+          
+          // Check if POI is already in view
+          const bounds = map.getBounds();
+          const isInView = bounds.contains([selectedPoi.location.lat, selectedPoi.location.lng]);
+          const needsZoom = map.getZoom() < 15;
+          
+          if (isInView && !needsZoom) {
+            // POI is already visible and zoomed in - open popup immediately
+            if (selectedMarker) {
+              selectedMarker.openPopup();
+            }
+          } else {
+            // POI needs panning/zooming - animate then open popup
+            map.flyTo([selectedPoi.location.lat, selectedPoi.location.lng], Math.max(map.getZoom(), 15), {
+              duration: 0.8
+            });
+
+            // Open popup after animation
+            if (selectedMarker) {
+              const poiIdToOpen = selectedPoi.id;
+              timeoutRef.current = setTimeout(() => {
+                // Double-check that this POI is still selected before opening (use ref for current value)
+                if (currentSelectedIdRef.current === poiIdToOpen) {
+                  selectedMarker.openPopup();
+                }
+                timeoutRef.current = null;
+              }, 900); // Wait for flyTo animation
+            }
           }
         } else {
-          // POI needs panning/zooming - animate then open popup
-          map.flyTo([selectedPoi.location.lat, selectedPoi.location.lng], Math.max(map.getZoom(), 15), {
-            duration: 0.8
-          });
-
-          // Open popup after animation
-          if (selectedMarker) {
-            const poiIdToOpen = selectedPoi.id;
-            timeoutRef.current = setTimeout(() => {
-              // Double-check that this POI is still selected before opening (use ref for current value)
-              if (currentSelectedIdRef.current === poiIdToOpen) {
-                selectedMarker.openPopup();
-              }
-              timeoutRef.current = null;
-            }, 900); // Wait for flyTo animation
+          // POI was already centered, just ensure popup is open
+          if (selectedMarker && !selectedMarker.isPopupOpen()) {
+            selectedMarker.openPopup();
           }
         }
       }
     } else {
       // Close all popups when deselecting (selectedPoiId is null or undefined)
       map.closePopup();
+      
+      // Reset the centered tracking
+      lastCenteredIdRef.current = null;
       
       // Also ensure all marker popups are closed
       map.eachLayer((layer) => {
@@ -261,6 +284,12 @@ export function InteractiveMap({
       <MapEventHandler 
         onBoundsChange={onBoundsChange} 
         onZoomChange={onZoomChange}
+        onMapClick={() => {
+          // Deselect any selected POI when clicking on the map background
+          if (selectedPoiId) {
+            onPoiSelect && onPoiSelect(null);
+          }
+        }}
       />
 
       <SelectedPOIHandler 
