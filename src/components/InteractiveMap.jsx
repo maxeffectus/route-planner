@@ -18,7 +18,7 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 // Component to handle map updates when bbox changes
-function MapUpdater({ bbox }) {
+function MapUpdater({ bbox, onZoomChange }) {
   const map = useMap();
 
   useEffect(() => {
@@ -28,8 +28,16 @@ function MapUpdater({ bbox }) {
         [bbox.maxLat, bbox.maxLng]
       ];
       map.fitBounds(bounds, { padding: [50, 50] });
+      
+      // Manually update zoom after fitBounds (it may not trigger zoomend immediately)
+      setTimeout(() => {
+        const newZoom = map.getZoom();
+        if (onZoomChange) {
+          onZoomChange(newZoom);
+        }
+      }, 100);
     }
-  }, [bbox, map]);
+  }, [bbox, map, onZoomChange]);
 
   return null;
 }
@@ -279,7 +287,7 @@ export function InteractiveMap({
         maxZoom={19}
       />
       
-      {bbox && <MapUpdater bbox={bbox} />}
+      {bbox && <MapUpdater bbox={bbox} onZoomChange={onZoomChange} />}
       
       <MapEventHandler 
         onBoundsChange={onBoundsChange} 
