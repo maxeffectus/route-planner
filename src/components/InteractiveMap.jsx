@@ -167,28 +167,43 @@ export function InteractiveMap({
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 1000,
-        width: '90%',
-        maxWidth: '500px',
+        width: '95%',
+        maxWidth: '800px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '10px'
+        gap: '8px'
       }}>
-        {/* Location Search */}
+        {/* Location Search with Zoom Level */}
         <div style={{
           backgroundColor: 'white',
           borderRadius: '8px',
           boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-          padding: '12px'
+          padding: '10px 12px'
         }}>
-          <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            color: '#555',
-            marginBottom: '8px'
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '6px'
           }}>
-            📍 Search location or zoom map to explore
-          </label>
+            <label style={{
+              fontSize: '12px',
+              fontWeight: 'bold',
+              color: '#555'
+            }}>
+              📍 Search location
+            </label>
+            <div style={{
+              fontSize: '11px',
+              color: '#666',
+              backgroundColor: '#f0f0f0',
+              padding: '3px 8px',
+              borderRadius: '4px',
+              border: '1px solid #ddd'
+            }}>
+              Zoom: <strong>{currentZoom}</strong> {currentZoom < 11 && '(need ≥11)'}
+            </div>
+          </div>
           <Autocomplete
             searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
             onSelect={onCitySelect}
@@ -209,27 +224,28 @@ export function InteractiveMap({
           />
         </div>
 
-        {/* POI Category Filter */}
+        {/* POI Category Filter - Compact Single Row */}
         <div style={{
           backgroundColor: 'white',
           borderRadius: '8px',
           boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-          padding: '12px'
+          padding: '8px 12px'
         }}>
-          <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            color: '#555',
-            marginBottom: '8px'
-          }}>
-            🏛️ POI Types
-          </label>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '8px'
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '6px'
           }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 'bold',
+              color: '#555',
+              marginRight: '4px',
+              whiteSpace: 'nowrap'
+            }}>
+              🏛️ POI:
+            </span>
             {categories.map(category => {
               const color = categoryColors[category.value] || '#999';
               
@@ -239,21 +255,24 @@ export function InteractiveMap({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    fontSize: '12px',
+                    fontSize: '11px',
                     cursor: 'pointer',
-                    padding: '4px',
+                    padding: '3px 6px',
                     borderRadius: '4px',
-                    transition: 'background-color 0.2s'
+                    transition: 'background-color 0.2s',
+                    backgroundColor: '#f8f8f8',
+                    border: '1px solid #e0e0e0',
+                    whiteSpace: 'nowrap'
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e8e8e8'}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f8f8f8'}
                 >
                   <div style={{
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '3px',
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '2px',
                     backgroundColor: color,
-                    marginRight: '6px',
+                    marginRight: '4px',
                     border: '1px solid rgba(0,0,0,0.2)',
                     flexShrink: 0
                   }} />
@@ -262,8 +281,10 @@ export function InteractiveMap({
                     checked={selectedCategories.includes(category.value)}
                     onChange={() => handleCategoryToggle(category.value)}
                     style={{
-                      marginRight: '6px',
-                      cursor: 'pointer'
+                      marginRight: '4px',
+                      cursor: 'pointer',
+                      width: '14px',
+                      height: '14px'
                     }}
                   />
                   <span>{category.label}</span>
@@ -279,12 +300,12 @@ export function InteractiveMap({
           disabled={!canSearchPOIs || isLoadingPOIs}
           title={!canSearchPOIs ? 'Please zoom in to at least level 11' : 'Search for points of interest in visible area'}
           style={{
-            padding: '12px 20px',
+            padding: '10px 16px',
             backgroundColor: (!canSearchPOIs || isLoadingPOIs) ? '#ccc' : '#34a853',
             color: 'white',
             border: 'none',
             borderRadius: '8px',
-            fontSize: '15px',
+            fontSize: '14px',
             fontWeight: 'bold',
             cursor: (!canSearchPOIs || isLoadingPOIs) ? 'not-allowed' : 'pointer',
             boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
@@ -309,19 +330,6 @@ export function InteractiveMap({
            hasPOIsInArea ? '🔍 Find more points of interest in visible area' :
            '🔍 Find points of interest in visible area'}
         </button>
-
-        {/* Zoom Indicator */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '6px',
-          padding: '8px 12px',
-          fontSize: '12px',
-          color: '#666',
-          textAlign: 'center',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
-        }}>
-          Zoom level: <strong>{currentZoom}</strong> {currentZoom < 11 && '(zoom in to ≥11 to search POIs)'}
-        </div>
 
         {/* Error Display */}
         {poiError && (
