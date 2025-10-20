@@ -90,7 +90,9 @@ export function InteractiveMap({
   poiError,
   hasPOIsInArea = false,
   selectedCategories = [],
-  onCategoriesChange
+  onCategoriesChange,
+  categoryColors = {},
+  getPoiCategory
 }) {
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
@@ -106,6 +108,24 @@ export function InteractiveMap({
     { value: 'park', label: 'Park' },
     { value: 'viewpoint', label: 'Viewpoint' }
   ];
+
+  // Create custom colored marker icon
+  const createColoredIcon = (color) => {
+    return L.divIcon({
+      className: 'custom-poi-marker',
+      html: `<div style="
+        background-color: ${color};
+        width: 25px;
+        height: 25px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        border: 2px solid white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      "></div>`,
+      iconSize: [25, 25],
+      iconAnchor: [12, 24]
+    });
+  };
 
   const handleCategoryToggle = (categoryValue) => {
     if (selectedCategories.includes(categoryValue)) {
@@ -210,33 +230,46 @@ export function InteractiveMap({
             gridTemplateColumns: 'repeat(2, 1fr)',
             gap: '8px'
           }}>
-            {categories.map(category => (
-              <label 
-                key={category.value}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  borderRadius: '4px',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedCategories.includes(category.value)}
-                  onChange={() => handleCategoryToggle(category.value)}
+            {categories.map(category => {
+              const color = categoryColors[category.value] || '#999';
+              
+              return (
+                <label 
+                  key={category.value}
                   style={{
-                    marginRight: '6px',
-                    cursor: 'pointer'
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    transition: 'background-color 0.2s'
                   }}
-                />
-                <span>{category.label}</span>
-              </label>
-            ))}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '3px',
+                    backgroundColor: color,
+                    marginRight: '6px',
+                    border: '1px solid rgba(0,0,0,0.2)',
+                    flexShrink: 0
+                  }} />
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(category.value)}
+                    onChange={() => handleCategoryToggle(category.value)}
+                    style={{
+                      marginRight: '6px',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <span>{category.label}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
 
@@ -311,17 +344,24 @@ export function InteractiveMap({
       {pois.map((poi, index) => {
         if (!poi.location?.lat || !poi.location?.lng) return null;
         
+        const poiCategory = getPoiCategory ? getPoiCategory(poi) : null;
+        const color = categoryColors[poiCategory] || '#999';
+        const customIcon = createColoredIcon(color);
+        
         return (
           <Marker 
             key={poi.id || index} 
             position={[poi.location.lat, poi.location.lng]}
+            icon={customIcon}
           >
             <Popup>
               <div style={{ minWidth: '200px' }}>
                 <h3 style={{ 
                   margin: '0 0 8px 0', 
                   fontSize: '16px',
-                  color: '#1a73e8'
+                  color: color,
+                  borderLeft: `4px solid ${color}`,
+                  paddingLeft: '8px'
                 }}>
                   {poi.name}
                 </h3>

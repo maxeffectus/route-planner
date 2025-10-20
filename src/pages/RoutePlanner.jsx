@@ -15,6 +15,16 @@ export function RoutePlanner() {
   ]);
   const mapsAPI = new OpenStreetAPI();
 
+  // Colorblind-friendly color mapping for POI categories
+  const categoryColors = {
+    'museum': '#1976D2',        // Blue
+    'attraction': '#FF6F00',    // Orange
+    'historic': '#795548',      // Brown
+    'place_of_worship': '#7B1FA2', // Purple
+    'park': '#388E3C',          // Green
+    'viewpoint': '#00897B'      // Teal
+  };
+
   // Helper: Check if a POI is within a bounding box
   const isPoiInBbox = (poi, bbox) => {
     if (!poi.location?.lat || !poi.location?.lng) return false;
@@ -183,40 +193,47 @@ export function RoutePlanner() {
               borderRadius: '8px',
               border: '1px solid #ddd'
             }}>
-              {filteredPois.map((poi, index) => (
-                <div
-                  key={poi.id || index}
-                  style={{
-                    padding: '12px 16px',
-                    borderBottom: index < filteredPois.length - 1 ? '1px solid #eee' : 'none',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <div style={{ 
-                    fontWeight: '600', 
-                    color: '#1a73e8',
-                    marginBottom: '4px',
-                    fontSize: '15px'
-                  }}>
-                    {poi.name}
-                  </div>
-                  <div style={{ 
-                    fontSize: '13px', 
-                    color: '#666',
-                    marginBottom: '2px'
-                  }}>
-                    📍 {poi.type || poi.category}
-                  </div>
-                  {poi.wikipedia && (
-                    <div style={{ fontSize: '12px', color: '#999' }}>
-                      📖 Wikipedia
+              {filteredPois.map((poi, index) => {
+                const poiCategory = getPoiCategory(poi);
+                const color = categoryColors[poiCategory] || '#999';
+                
+                return (
+                  <div
+                    key={poi.id || index}
+                    style={{
+                      padding: '12px 16px',
+                      borderBottom: index < filteredPois.length - 1 ? '1px solid #eee' : 'none',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s',
+                      borderLeft: `4px solid ${color}`,
+                      position: 'relative'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <div style={{ 
+                      fontWeight: '600', 
+                      color: '#1a73e8',
+                      marginBottom: '4px',
+                      fontSize: '15px'
+                    }}>
+                      {poi.name}
                     </div>
-                  )}
-                </div>
-              ))}
+                    <div style={{ 
+                      fontSize: '13px', 
+                      color: '#666',
+                      marginBottom: '2px'
+                    }}>
+                      📍 {poi.type || poi.category}
+                    </div>
+                    {poi.wikipedia && (
+                      <div style={{ fontSize: '12px', color: '#999' }}>
+                        📖 Wikipedia
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -260,6 +277,8 @@ export function RoutePlanner() {
           hasPOIsInArea={filteredPois.length > 0}
           selectedCategories={selectedCategories}
           onCategoriesChange={setSelectedCategories}
+          categoryColors={categoryColors}
+          getPoiCategory={getPoiCategory}
         />
       </div>
     </div>
