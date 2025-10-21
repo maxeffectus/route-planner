@@ -59,11 +59,20 @@ export class POI {
 
   /**
    * Get Wikipedia URL
+   * OpenStreetMap format: "language:Article_Name" (e.g., "en:Eiffel_Tower")
+   * The article name is already in Wikipedia's URL format
    */
   getWikipediaUrl() {
     if (!this.wikipedia) return null;
-    const article = this.wikipedia.split(':')[1] || this.wikipedia;
-    return `https://en.wikipedia.org/wiki/${article}`;
+    
+    // Check if it contains a language prefix
+    if (this.wikipedia.includes(':')) {
+      const [language, article] = this.wikipedia.split(':', 2);
+      return `https://${language}.wikipedia.org/wiki/${article}`;
+    }
+    
+    // If no language prefix, assume English and use as-is
+    return `https://en.wikipedia.org/wiki/${this.wikipedia}`;
   }
 
   /**
