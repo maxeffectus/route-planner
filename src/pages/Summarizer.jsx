@@ -4,7 +4,7 @@ import { StatusBar } from '../components/StatusBar';
 import { PromptForm } from '../components/PromptForm';
 import { ResponseDisplay } from '../components/ResponseDisplay';
 
-export function SummarizerPage() {
+export function Summarizer() {
   const [inputText, setInputText] = useState('');
   const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(false);

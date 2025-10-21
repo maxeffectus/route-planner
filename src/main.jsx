@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
-import App from './App.jsx'
-import MapsTestPage from './MapsTestPage.jsx'
+import { GeminiNano } from './pages/GeminiNano.jsx'
+import { MapsTest } from './pages/MapsTest.jsx'
 import { RoutePlanner } from './pages/RoutePlanner.jsx'
-import { SummarizerPage } from './pages/SummarizerPage.jsx'
+import { Summarizer } from './pages/Summarizer.jsx'
 import { PageSwitcher } from './components/PageSwitcher.jsx'
 
 function AppContainer() {
@@ -13,15 +13,15 @@ function AppContainer() {
   const renderPage = () => {
     switch (currentPage) {
       case 'gemini':
-        return <App />;
+        return <GeminiNano />;
       case 'summarizer':
-        return <SummarizerPage />;
+        return <Summarizer />;
       case 'maps':
-        return <MapsTestPage />;
+        return <MapsTest />;
       case 'app':
         return <RoutePlanner />;
       default:
-        return <App />;
+        return <GeminiNano />;
     }
   };
 

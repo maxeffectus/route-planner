@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useLanguageModel } from './hooks/useLanguageModel';
-import { StatusBar } from './components/StatusBar';
-import { PromptForm } from './components/PromptForm';
-import { ResponseDisplay } from './components/ResponseDisplay';
+import { useLanguageModel } from '../hooks/useLanguageModel';
+import { StatusBar } from '../components/StatusBar';
+import { PromptForm } from '../components/PromptForm';
+import { ResponseDisplay } from '../components/ResponseDisplay';
 
-function App() {
+export function GeminiNano() {
   const [prompt, setPrompt] = useState('');
   const [response, setResponse] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -75,4 +75,3 @@ function App() {
   );
 }
 
-export default App;
