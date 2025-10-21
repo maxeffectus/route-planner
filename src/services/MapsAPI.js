@@ -125,6 +125,12 @@ export class OpenStreetAPI extends MapsAPI {
     super(apiKey);
     this.baseUrl = 'https://nominatim.openstreetmap.org';
     this.routingUrl = 'https://router.project-osrm.org';
+    // Request queue for Wikidata to avoid rate limiting
+    this.wikidataQueue = [];
+    this.isProcessingQueue = false;
+    this.requestDelay = 500; // ms between requests
+    // Cache for failed Wikidata requests to avoid retrying
+    this.failedWikidataIds = new Set();
   }
 
   getProviderName() {
@@ -607,36 +613,82 @@ export class OpenStreetAPI extends MapsAPI {
    * @param {string} wikidataId - Wikidata ID (e.g., "Q123456")
    * @returns {Promise<string|null>} Image URL or null
    */
+  /**
+   * Process the Wikidata request queue with rate limiting
+   */
+  async processWikidataQueue() {
+    if (this.isProcessingQueue || this.wikidataQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessingQueue = true;
+
+    while (this.wikidataQueue.length > 0) {
+      const { wikidataId, resolve } = this.wikidataQueue.shift();
+      
+      try {
+        const imageUrl = await this.fetchWikidataImageDirect(wikidataId);
+        resolve(imageUrl);
+      } catch (error) {
+        console.warn(`Wikidata fetch error for ${wikidataId}:`, error);
+        resolve(null);
+      }
+
+      // Wait before processing next request to avoid rate limiting
+      if (this.wikidataQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, this.requestDelay));
+      }
+    }
+
+    this.isProcessingQueue = false;
+  }
+
+  /**
+   * Add Wikidata request to queue
+   */
   async getWikidataImage(wikidataId) {
+    // Check if this ID has already failed
+    if (this.failedWikidataIds.has(wikidataId)) {
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      this.wikidataQueue.push({ wikidataId, resolve });
+      this.processWikidataQueue();
+    });
+  }
+
+  /**
+   * Fetch image from Wikidata using Action API (better CORS support)
+   */
+  async fetchWikidataImageDirect(wikidataId) {
     try {
       // Clean up the Wikidata ID (remove any prefix)
       const cleanId = wikidataId.replace(/^[^Q]*/, '');
       
-      // Wikidata API endpoint
-      const url = `https://www.wikidata.org/wiki/Special:EntityData/${cleanId}.json`;
+      // Use Wikidata Action API instead of Special:EntityData (better CORS support)
+      const url = `https://www.wikidata.org/w/api.php?` +
+        `action=wbgetclaims&entity=${cleanId}&property=P18&format=json&origin=*`;
       
       const response = await fetch(url);
       if (!response.ok) {
+        this.failedWikidataIds.add(wikidataId);
         return null;
       }
       
       const data = await response.json();
       
-      // Navigate to the entity data
-      const entity = data.entities?.[cleanId];
-      if (!entity) {
-        return null;
-      }
-      
-      // Get P18 (image) property
-      const imageClaims = entity.claims?.P18;
+      // Get P18 (image) property claims
+      const imageClaims = data.claims?.P18;
       if (!imageClaims || imageClaims.length === 0) {
+        this.failedWikidataIds.add(wikidataId);
         return null;
       }
       
       // Get the first image filename
       const imageFilename = imageClaims[0].mainsnak?.datavalue?.value;
       if (!imageFilename) {
+        this.failedWikidataIds.add(wikidataId);
         return null;
       }
       
@@ -645,7 +697,8 @@ export class OpenStreetAPI extends MapsAPI {
       return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodedFilename}?width=300`;
       
     } catch (error) {
-      console.warn('Wikidata image fetch error:', error);
+      console.warn(`Wikidata image fetch error for ${wikidataId}:`, error);
+      this.failedWikidataIds.add(wikidataId);
       return null;
     }
   }
