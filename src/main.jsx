@@ -21,7 +21,7 @@ function AppContainer() {
       case 'app':
         return <RoutePlanner />;
       default:
-        return <GeminiNano />;
+        return <RoutePlanner />;
     }
   };
 
