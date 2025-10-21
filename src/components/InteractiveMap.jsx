@@ -402,7 +402,7 @@ export function InteractiveMap({
               fontWeight: 'bold',
               color: '#555'
             }}>
-              📍 Search location
+              📍 Where would you like to go?
             </label>
             <div style={{
               fontSize: '11px',
@@ -428,7 +428,7 @@ export function InteractiveMap({
                 </div>
               </>
             )}
-            placeholder="Type city name..."
+            placeholder="Type city name or use the map to zoom in to your destination..."
             minChars={2}
             maxResults={5}
             debounceMs={300}
