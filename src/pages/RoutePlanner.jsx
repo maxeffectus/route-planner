@@ -92,6 +92,20 @@ export function RoutePlanner() {
     return poiCategory && selectedCategories.includes(poiCategory);
   });
 
+  // Auto-show cached POIs when map bounds or categories change
+  useEffect(() => {
+    if (mapBounds && poiCache.length > 0) {
+      // Show all cached POIs that are in the current visible area
+      const cachedPOIsInBbox = poiCache.filter(poi => isPoiInBbox(poi, mapBounds));
+      
+      // Only update if there are cached POIs to show and we're not currently loading
+      if (cachedPOIsInBbox.length > 0 && !isLoadingPOIs) {
+        setPois(cachedPOIsInBbox);
+        console.log(`Auto-showing ${cachedPOIsInBbox.length} cached POIs in visible area`);
+      }
+    }
+  }, [mapBounds, selectedCategories, poiCache, isLoadingPOIs]);
+
   // Auto-scroll selected POI into view
   React.useEffect(() => {
     if (selectedPoiId) {
@@ -163,18 +177,13 @@ export function RoutePlanner() {
         console.log(`Added ${uniqueNewPOIs.length} new POIs to cache`);
       }
 
-      // Step 6: Show ALL POIs within bbox (no limit)
-      const allPOIsInBbox = [...cachedPOIsInBbox];
-      
-      // Add new POIs that are in bbox
-      newPOIs.forEach(poi => {
-        if (isPoiInBbox(poi, bbox) && !cachedIds.has(poi.id)) {
-          allPOIsInBbox.push(poi);
-        }
-      });
+      // Step 6: Show ALL POIs within bbox (cached + new)
+      // Get all cached POIs in bbox again (poiCache was just updated)
+      const updatedCache = [...poiCache, ...uniqueNewPOIs];
+      const allPOIsInBbox = updatedCache.filter(poi => isPoiInBbox(poi, bbox));
       
       setPois(allPOIsInBbox);
-      console.log(`Total POIs displayed: ${allPOIsInBbox.length}`);
+      console.log(`Total POIs displayed: ${allPOIsInBbox.length} (${cachedPOIsInBbox.length} cached + ${uniqueNewPOIs.length} new)`);
 
     } catch (error) {
       console.error('Error fetching POIs:', error);
