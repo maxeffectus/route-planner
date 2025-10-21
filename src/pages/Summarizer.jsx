@@ -10,15 +10,29 @@ export function Summarizer() {
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef(null);
   
+  // Summarizer creation options
+  const [summarizerType, setSummarizerType] = useState('key-points');
+  const [summarizerFormat, setSummarizerFormat] = useState('markdown');
+  const [summarizerLength, setSummarizerLength] = useState('medium');
+  const [inputLanguages, setInputLanguages] = useState(['en']);
+  const [outputLanguage, setOutputLanguage] = useState('en');
+  const [contextLanguages, setContextLanguages] = useState(['en']);
+  
+  // Summarization options
+  const [context, setContext] = useState('This article is intended for identifying travelers needs and interests.');
+  
   const { 
     status, 
     isApiReady,
     isDownloading,
     downloadProgress,
     availability,
+    hasSession,
     checkAvailability,
     downloadModel,
-    summarizeText
+    createSession,
+    summarizeText,
+    destroySummarizer
   } = useSummarizer();
 
   const handleFileUpload = (event) => {
@@ -45,6 +59,15 @@ export function Summarizer() {
     fileInputRef.current?.click();
   };
 
+  const handleDownloadModel = async () => {
+    const options = {
+      type: summarizerType,
+      format: summarizerFormat,
+      length: summarizerLength
+    };
+    await downloadModel(options);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -53,7 +76,13 @@ export function Summarizer() {
     setSummary('Summarizing...');
 
     try {
-      const stream = await summarizeText(inputText);
+      const options = {
+        context,
+        type: summarizerType,
+        format: summarizerFormat,
+        length: summarizerLength
+      };
+      const stream = await summarizeText(inputText, options);
       let result = '';
       let previousChunk = '';
 
@@ -72,9 +101,27 @@ export function Summarizer() {
     }
   };
 
-  const handleReset = () => {
+  const handleCreateSession = async () => {
+    const options = {
+      type: summarizerType,
+      format: summarizerFormat,
+      length: summarizerLength,
+      expectedInputLanguages: inputLanguages,
+      outputLanguage: outputLanguage,
+      expectedContextLanguages: contextLanguages
+    };
+    
+    try {
+      await createSession(options);
+    } catch (error) {
+      console.error('Failed to create session:', error);
+    }
+  };
+
+  const handleReset = async () => {
     setSummary('');
     setInputText('');
+    await destroySummarizer();
   };
 
   return (
@@ -86,11 +133,192 @@ export function Summarizer() {
         onCheckAvailability={checkAvailability} 
       />
 
+      {/* Summarizer Options */}
+      <div style={{ 
+        marginBottom: '20px', 
+        padding: '15px', 
+        backgroundColor: '#f5f5f5', 
+        borderRadius: '8px',
+        border: '1px solid #ddd'
+      }}>
+        <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '16px' }}>
+          Summarizer Configuration
+        </h3>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', display: 'block', marginBottom: '4px' }}>
+              Type
+            </label>
+            <select 
+              value={summarizerType} 
+              onChange={(e) => setSummarizerType(e.target.value)}
+              disabled={hasSession}
+              style={{ 
+                width: '100%', 
+                padding: '6px 8px', 
+                borderRadius: '4px', 
+                border: '1px solid #ccc',
+                fontSize: '14px',
+                cursor: hasSession ? 'not-allowed' : 'pointer',
+                opacity: hasSession ? 0.6 : 1
+              }}
+            >
+              <option value="key-points">Key Points</option>
+              <option value="tl;dr">TL;DR</option>
+              <option value="teaser">Teaser</option>
+              <option value="headline">Headline</option>
+            </select>
+          </div>
+          
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', display: 'block', marginBottom: '4px' }}>
+              Format
+            </label>
+            <select 
+              value={summarizerFormat} 
+              onChange={(e) => setSummarizerFormat(e.target.value)}
+              disabled={hasSession}
+              style={{ 
+                width: '100%', 
+                padding: '6px 8px', 
+                borderRadius: '4px', 
+                border: '1px solid #ccc',
+                fontSize: '14px',
+                cursor: hasSession ? 'not-allowed' : 'pointer',
+                opacity: hasSession ? 0.6 : 1
+              }}
+            >
+              <option value="markdown">Markdown</option>
+              <option value="plain-text">Plain Text</option>
+            </select>
+          </div>
+          
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', display: 'block', marginBottom: '4px' }}>
+              Length
+            </label>
+            <select 
+              value={summarizerLength} 
+              onChange={(e) => setSummarizerLength(e.target.value)}
+              disabled={hasSession}
+              style={{ 
+                width: '100%', 
+                padding: '6px 8px', 
+                borderRadius: '4px', 
+                border: '1px solid #ccc',
+                fontSize: '14px',
+                cursor: hasSession ? 'not-allowed' : 'pointer',
+                opacity: hasSession ? 0.6 : 1
+              }}
+            >
+              <option value="short">Short</option>
+              <option value="medium">Medium</option>
+              <option value="long">Long</option>
+            </select>
+          </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginTop: '10px' }}>
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', display: 'block', marginBottom: '4px' }}>
+              Input Languages
+            </label>
+            <select 
+              value={inputLanguages[0]} 
+              onChange={(e) => setInputLanguages([e.target.value])}
+              disabled={hasSession}
+              style={{ 
+                width: '100%', 
+                padding: '6px 8px', 
+                borderRadius: '4px', 
+                border: '1px solid #ccc',
+                fontSize: '14px',
+                cursor: hasSession ? 'not-allowed' : 'pointer',
+                opacity: hasSession ? 0.6 : 1
+              }}
+            >
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="ja">Japanese</option>
+            </select>
+          </div>
+          
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', display: 'block', marginBottom: '4px' }}>
+              Output Language
+            </label>
+            <select 
+              value={outputLanguage} 
+              onChange={(e) => setOutputLanguage(e.target.value)}
+              disabled={hasSession}
+              style={{ 
+                width: '100%', 
+                padding: '6px 8px', 
+                borderRadius: '4px', 
+                border: '1px solid #ccc',
+                fontSize: '14px',
+                cursor: hasSession ? 'not-allowed' : 'pointer',
+                opacity: hasSession ? 0.6 : 1
+              }}
+            >
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="ja">Japanese</option>
+            </select>
+          </div>
+          
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', display: 'block', marginBottom: '4px' }}>
+              Context Languages
+            </label>
+            <select 
+              value={contextLanguages[0]} 
+              onChange={(e) => setContextLanguages([e.target.value])}
+              disabled={hasSession}
+              style={{ 
+                width: '100%', 
+                padding: '6px 8px', 
+                borderRadius: '4px', 
+                border: '1px solid #ccc',
+                fontSize: '14px',
+                cursor: hasSession ? 'not-allowed' : 'pointer',
+                opacity: hasSession ? 0.6 : 1
+              }}
+            >
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="ja">Japanese</option>
+            </select>
+          </div>
+        </div>
+        
+        <div style={{ marginTop: '12px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', display: 'block', marginBottom: '4px' }}>
+            Context
+          </label>
+          <input 
+            type="text"
+            value={context} 
+            onChange={(e) => setContext(e.target.value)}
+            placeholder="Additional context for summarization"
+            style={{ 
+              width: '100%', 
+              padding: '6px 8px', 
+              borderRadius: '4px', 
+              border: '1px solid #ccc',
+              fontSize: '14px',
+              boxSizing: 'border-box'
+            }}
+          />
+        </div>
+      </div>
+
       {/* Download Button for downloadable models */}
       {availability === 'downloadable' && !isApiReady && (
         <div style={{ marginBottom: '20px' }}>
           <button
-            onClick={downloadModel}
+            onClick={handleDownloadModel}
             disabled={isDownloading}
             style={{
               width: '100%',
@@ -157,6 +385,70 @@ export function Summarizer() {
         </div>
       )}
 
+      {/* Create Session Button */}
+      {isApiReady && !hasSession && (
+        <div style={{ marginBottom: '20px' }}>
+          <button
+            onClick={handleCreateSession}
+            style={{
+              width: '100%',
+              backgroundColor: '#1976D2',
+              color: 'white',
+              padding: '12px 20px',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}
+          >
+            ✨ Create Summarizer Session
+          </button>
+          <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '5px' }}>
+            Create a session with the selected configuration to start summarizing
+          </small>
+        </div>
+      )}
+
+      {/* Session Active Indicator */}
+      {hasSession && (
+        <div style={{
+          backgroundColor: '#e8f5e9',
+          border: '2px solid #4caf50',
+          borderRadius: '8px',
+          padding: '12px',
+          marginBottom: '20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <strong style={{ color: '#2e7d32' }}>✅ Session Active</strong>
+            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+              Type: {summarizerType}, Format: {summarizerFormat}, Length: {summarizerLength}
+            </div>
+            <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
+              Languages: {inputLanguages.join(', ')} → {outputLanguage} (context: {contextLanguages.join(', ')})
+            </div>
+          </div>
+          <button
+            onClick={handleReset}
+            style={{
+              backgroundColor: '#f44336',
+              color: 'white',
+              padding: '6px 12px',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 'bold'
+            }}
+          >
+            End Session
+          </button>
+        </div>
+      )}
+
       {/* File Upload Button */}
       <div style={{ marginBottom: '15px' }}>
         <input
@@ -168,14 +460,14 @@ export function Summarizer() {
         />
         <button
           onClick={handleUploadClick}
-          disabled={!isApiReady}
+          disabled={!hasSession}
           style={{
-            backgroundColor: isApiReady ? '#1976D2' : '#ccc',
+            backgroundColor: hasSession ? '#1976D2' : '#ccc',
             color: 'white',
             padding: '10px 20px',
             border: 'none',
             borderRadius: '4px',
-            cursor: isApiReady ? 'pointer' : 'not-allowed',
+            cursor: hasSession ? 'pointer' : 'not-allowed',
             fontSize: '14px',
             fontWeight: 'bold',
             display: 'flex',
@@ -196,7 +488,7 @@ export function Summarizer() {
         onSubmit={handleSubmit}
         onResetSession={handleReset}
         isLoading={isLoading}
-        isApiReady={isApiReady}
+        isApiReady={hasSession}
       />
 
       {summary && (
