@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useLanguageModel } from '../hooks/useLanguageModel';
+import { useStreamingText } from '../hooks/useStreamingText';
 import { StatusBar } from '../components/StatusBar';
 import { PromptForm } from '../components/PromptForm';
 import { ResponseDisplay } from '../components/ResponseDisplay';
 
 export function GeminiNano() {
   const [prompt, setPrompt] = useState('');
-  const [response, setResponse] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   
   const { 
     status, 
@@ -17,38 +16,26 @@ export function GeminiNano() {
     sendPrompt 
   } = useLanguageModel();
 
+  const { response, isLoading, processStream, resetResponse } = useStreamingText();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim()) return;
 
-    setIsLoading(true);
-    setResponse('Sending...');
-
     try {
       const stream = await sendPrompt(prompt);
-      let result = '';
-      let previousChunk = '';
-
-      for await (const chunk of stream) {
-        const newChunk = chunk.startsWith(previousChunk)
-          ? chunk.slice(previousChunk.length) : chunk;
-        result += newChunk;
-        setResponse(result);
-        previousChunk = chunk;
-      }
-
-      setPrompt('');
+      await processStream(stream, { 
+        initialMessage: 'Sending...',
+        onComplete: () => setPrompt('')
+      });
     } catch (error) {
       console.error('Error:', error);
-      setResponse('Error: ' + error.message);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleResetSession = async () => {
     await resetSession();
-    setResponse('');
+    resetResponse();
     setPrompt('');
   };
 

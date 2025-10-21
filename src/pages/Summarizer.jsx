@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useSummarizer } from '../hooks/useSummarizer';
+import { useStreamingText } from '../hooks/useStreamingText';
 import { StatusBar } from '../components/StatusBar';
 import { PromptForm } from '../components/PromptForm';
 import { ResponseDisplay } from '../components/ResponseDisplay';
 
 export function Summarizer() {
   const [inputText, setInputText] = useState('');
-  const [summary, setSummary] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef(null);
   
   // Summarizer creation options
@@ -34,6 +33,8 @@ export function Summarizer() {
     summarizeText,
     destroySummarizer
   } = useSummarizer();
+
+  const { response: summary, isLoading, processStream, resetResponse } = useStreamingText();
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -72,9 +73,6 @@ export function Summarizer() {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    setIsLoading(true);
-    setSummary('Summarizing...');
-
     try {
       const options = {
         context,
@@ -83,21 +81,9 @@ export function Summarizer() {
         length: summarizerLength
       };
       const stream = await summarizeText(inputText, options);
-      let result = '';
-      let previousChunk = '';
-
-      for await (const chunk of stream) {
-        const newChunk = chunk.startsWith(previousChunk)
-          ? chunk.slice(previousChunk.length) : chunk;
-        result += newChunk;
-        setSummary(result);
-        previousChunk = chunk;
-      }
+      await processStream(stream, { initialMessage: 'Summarizing...' });
     } catch (error) {
       console.error('Error:', error);
-      setSummary('Error: ' + error.message);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -165,7 +151,7 @@ export function Summarizer() {
               }}
             >
               <option value="key-points">Key Points</option>
-              <option value="tl;dr">TL;DR</option>
+              <option value="tldr">TL;DR</option>
               <option value="teaser">Teaser</option>
               <option value="headline">Headline</option>
             </select>
