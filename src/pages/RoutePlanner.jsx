@@ -97,19 +97,27 @@ export function RoutePlanner() {
     return poiCategory && selectedCategories.includes(poiCategory);
   });
 
-  // Auto-show cached POIs when map bounds or categories change
+  // UNIFIED POI DISPLAY: Always show POIs that are in the current map bounds
+  // This is the single source of truth for what POIs to display
   useEffect(() => {
-    if (mapBounds && poiCache.length > 0) {
-      // Show all cached POIs that are in the current visible area
-      const cachedPOIsInBbox = poiCache.filter(poi => isPoiInBbox(poi, mapBounds));
-      
-      // Only update if there are cached POIs to show and we're not currently loading
-      if (cachedPOIsInBbox.length > 0 && !isLoadingPOIs) {
-        setPois(cachedPOIsInBbox);
-        console.log(`Auto-showing ${cachedPOIsInBbox.length} cached POIs in visible area`);
-      }
+    if (!mapBounds) {
+      console.log('No map bounds - clearing POIs');
+      setPois([]);
+      return;
     }
-  }, [mapBounds, selectedCategories, poiCache, isLoadingPOIs]);
+    
+    if (poiCache.length === 0) {
+      console.log('Cache is empty - clearing POIs');
+      setPois([]);
+      return;
+    }
+    
+    // Show all cached POIs that are in the current visible area
+    const poisInView = poiCache.filter(poi => isPoiInBbox(poi, mapBounds));
+    setPois(poisInView);
+    console.log(`Map bounds updated - displaying ${poisInView.length} POIs in current view`);
+    console.log('Current bounds:', mapBounds);
+  }, [mapBounds, poiCache]); // Re-run whenever bounds or cache changes
 
   // Auto-scroll selected POI into view
   React.useEffect(() => {
@@ -122,6 +130,7 @@ export function RoutePlanner() {
   }, [selectedPoiId]);
 
   const handleBoundsChange = useCallback((bounds) => {
+    console.log('Map bounds changed:', bounds);
     setMapBounds(bounds);
   }, []);
 
@@ -161,36 +170,23 @@ export function RoutePlanner() {
     setPoiError(null);
 
     try {
-      // Step 1: Find cached POIs within the bbox
-      const cachedPOIsInBbox = poiCache.filter(poi => isPoiInBbox(poi, bbox));
-      console.log(`Found ${cachedPOIsInBbox.length} cached POIs in visible area`);
-
-      // Step 2: Show cached POIs immediately (for better UX)
-      setPois(cachedPOIsInBbox);
-
-      // Step 3: Fetch new POIs from API with selected categories
+      // Fetch new POIs from API with selected categories
       console.log(`Fetching POIs from API with categories:`, selectedCategories);
       console.log('Search area:', bbox);
       
       const newPOIs = await mapsAPI.getPOI(bbox, fetchLimit, selectedCategories);
       
-      // Step 4: Merge cached and new POIs (avoiding duplicates by ID)
+      // Merge with cache (avoiding duplicates by ID)
       const cachedIds = new Set(poiCache.map(p => p.id));
       const uniqueNewPOIs = newPOIs.filter(poi => !cachedIds.has(poi.id));
       
-      // Step 5: Update cache with new POIs
+      // Update cache with new POIs - the display effect will automatically update the view
       if (uniqueNewPOIs.length > 0) {
         setPoiCache(prev => [...prev, ...uniqueNewPOIs]);
         console.log(`Added ${uniqueNewPOIs.length} new POIs to cache`);
+      } else {
+        console.log('No new POIs found - all were already in cache');
       }
-
-      // Step 6: Show ALL POIs within bbox (cached + new)
-      // Get all cached POIs in bbox again (poiCache was just updated)
-      const updatedCache = [...poiCache, ...uniqueNewPOIs];
-      const allPOIsInBbox = updatedCache.filter(poi => isPoiInBbox(poi, bbox));
-      
-      setPois(allPOIsInBbox);
-      console.log(`Total POIs displayed: ${allPOIsInBbox.length} (${cachedPOIsInBbox.length} cached + ${uniqueNewPOIs.length} new)`);
 
     } catch (error) {
       console.error('Error fetching POIs:', error);

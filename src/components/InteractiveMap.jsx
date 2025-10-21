@@ -89,7 +89,7 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 // Component to handle map updates when bbox changes
-function MapUpdater({ bbox, onZoomChange }) {
+function MapUpdater({ bbox, onZoomChange, onBoundsChange }) {
   const map = useMap();
 
   useEffect(() => {
@@ -100,15 +100,26 @@ function MapUpdater({ bbox, onZoomChange }) {
       ];
       map.fitBounds(bounds, { padding: [50, 50] });
       
-      // Manually update zoom after fitBounds (it may not trigger zoomend immediately)
+      // Manually update zoom and bounds after fitBounds
       setTimeout(() => {
         const newZoom = map.getZoom();
+        const newBounds = map.getBounds();
+        
         if (onZoomChange) {
           onZoomChange(newZoom);
         }
-      }, 100);
+        
+        if (onBoundsChange) {
+          onBoundsChange({
+            minLat: newBounds.getSouth(),
+            maxLat: newBounds.getNorth(),
+            minLng: newBounds.getWest(),
+            maxLng: newBounds.getEast()
+          });
+        }
+      }, 150); // Slightly longer delay to ensure map has finished animating
     }
-  }, [bbox, map, onZoomChange]);
+  }, [bbox, map, onZoomChange, onBoundsChange]);
 
   return null;
 }
@@ -352,7 +363,7 @@ export function InteractiveMap({
         maxZoom={19}
       />
       
-      {bbox && <MapUpdater bbox={bbox} onZoomChange={onZoomChange} />}
+      {bbox && <MapUpdater bbox={bbox} onZoomChange={onZoomChange} onBoundsChange={onBoundsChange} />}
       
       <MapEventHandler 
         onBoundsChange={onBoundsChange} 
