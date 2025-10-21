@@ -281,6 +281,7 @@ export function InteractiveMap({
   onFindPOIs,
   isLoadingPOIs,
   currentZoom,
+  minZoomLevel = 11,
   poiError,
   hasPOIsInArea = false,
   selectedCategories = [],
@@ -294,7 +295,7 @@ export function InteractiveMap({
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
 
-  const canSearchPOIs = currentZoom >= 11;
+  const canSearchPOIs = currentZoom >= minZoomLevel;
   
   // Track if we're in the middle of an interaction to prevent event conflicts
   const isInteractingRef = React.useRef(false);
@@ -458,7 +459,7 @@ export function InteractiveMap({
             whiteSpace: 'nowrap',
             flexShrink: 0
           }}>
-            Zoom: <strong>{currentZoom}</strong> {currentZoom < 11 && '(≥11)'}
+            Zoom: <strong>{currentZoom}</strong> {currentZoom < minZoomLevel && `(≥${minZoomLevel})`}
           </div>
         </div>
 
@@ -466,7 +467,7 @@ export function InteractiveMap({
         <button
           onClick={onFindPOIs}
           disabled={!canSearchPOIs || isLoadingPOIs}
-          title={!canSearchPOIs ? 'Please zoom in to at least level 11' : 'Search for points of interest in visible area'}
+          title={!canSearchPOIs ? `Please zoom in to at least level ${minZoomLevel}` : 'Search for points of interest in visible area'}
           style={{
             padding: '10px 16px',
             backgroundColor: (!canSearchPOIs || isLoadingPOIs) ? '#ccc' : '#34a853',
@@ -494,7 +495,7 @@ export function InteractiveMap({
           }}
         >
           {isLoadingPOIs ? '🔄 Loading...' : 
-           !canSearchPOIs ? '🔍 Zoom in to search (min level 11)' :
+           !canSearchPOIs ? `🔍 Zoom in to search (min level ${minZoomLevel})` :
            hasPOIsInArea ? '🔍 Find more points of interest in visible area' :
            '🔍 Find points of interest in visible area'}
         </button>

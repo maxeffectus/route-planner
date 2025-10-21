@@ -5,6 +5,9 @@ import { Autocomplete } from '../components/Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
 import { getAllCategoryValues } from '../utils/categoryMapping';
 
+// Minimum zoom level required for POI search
+const MIN_ZOOM_LEVEL = 11;
+
 export function RoutePlanner() {
   const [pois, setPois] = useState([]);
   const [isLoadingPOIs, setIsLoadingPOIs] = useState(false);
@@ -16,6 +19,7 @@ export function RoutePlanner() {
   const [selectedCategories, setSelectedCategories] = useState(getAllCategoryValues());
   const [selectedPoiId, setSelectedPoiId] = useState(null);
   const mapsAPI = new OpenStreetAPI();
+  const citySelectionRef = React.useRef(null); // Track city selection for auto-search
 
   // Handler to update POI cache with resolved image URL
   const handleImageLoaded = useCallback((poiId, imageUrl) => {
@@ -129,17 +133,19 @@ export function RoutePlanner() {
     console.log('City selected:', city);
     if (city.boundingbox) {
       setSelectedCityBbox(city.boundingbox);
+      // Mark that we just selected a city, so we can auto-search after zoom updates
+      citySelectionRef.current = Date.now();
     }
   }, []);
 
-  const handleFindPOIs = async () => {
+  const handleFindPOIs = useCallback(async () => {
     if (!mapBounds) {
       setPoiError('Map bounds not available');
       return;
     }
 
-    if (currentZoom < 11) {
-      setPoiError('Please zoom in to at least level 11 to search for POIs');
+    if (currentZoom < MIN_ZOOM_LEVEL) {
+      setPoiError(`Please zoom in to at least level ${MIN_ZOOM_LEVEL} to search for POIs`);
       return;
     }
 
@@ -192,7 +198,33 @@ export function RoutePlanner() {
     } finally {
       setIsLoadingPOIs(false);
     }
-  };
+  }, [mapBounds, currentZoom, selectedCategories, poiCache, mapsAPI]);
+
+  // Auto-search for POIs when city is selected with appropriate zoom level
+  useEffect(() => {
+    // Only trigger if we recently selected a city (within last 3 seconds)
+    const timeSinceSelection = citySelectionRef.current ? Date.now() - citySelectionRef.current : Infinity;
+    if (timeSinceSelection > 3000) {
+      // Clear flag after timeout to prevent stale triggers
+      if (citySelectionRef.current) {
+        console.log('City selection timeout - clearing flag');
+        citySelectionRef.current = null;
+      }
+      return;
+    }
+    
+    if (!selectedCityBbox || !mapBounds) return;
+    
+    console.log(`Checking POI search conditions after city selection: zoom=${currentZoom}, categories=${selectedCategories.length}, bounds=${!!mapBounds}`);
+    
+    // Only trigger when zoom is appropriate
+    if (currentZoom >= MIN_ZOOM_LEVEL && selectedCategories.length > 0) {
+      console.log('Auto-triggering POI search after city selection');
+      handleFindPOIs();
+      citySelectionRef.current = null; // Clear the flag so we don't search again
+    }
+    // Don't clear the flag if zoom is too low - wait for it to increase
+  }, [currentZoom, mapBounds, selectedCityBbox, selectedCategories, handleFindPOIs]); // Trigger when zoom or bounds update after city selection
 
   return (
     <div style={{ 
@@ -232,7 +264,7 @@ export function RoutePlanner() {
         />
         
         <p style={{ color: '#666', fontSize: '14px', marginTop: '15px', marginBottom: '20px' }}>
-          Or use the map on the right to explore. Zoom in to level 11 or higher to search for points of interest in the visible area.
+          Or use the map on the right to explore. Zoom in to level {MIN_ZOOM_LEVEL} or higher to search for points of interest in the visible area.
         </p>
 
         {/* POI List */}
@@ -353,6 +385,7 @@ export function RoutePlanner() {
           onFindPOIs={handleFindPOIs}
           isLoadingPOIs={isLoadingPOIs}
           currentZoom={currentZoom}
+          minZoomLevel={MIN_ZOOM_LEVEL}
           poiError={poiError}
           hasPOIsInArea={filteredPois.length > 0}
           selectedCategories={selectedCategories}
