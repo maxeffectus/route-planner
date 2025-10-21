@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Autocomplete } from './Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks, POIDescription } from './POIComponents';
 import { getAllCategories } from '../utils/categoryMapping';
 
@@ -279,7 +278,6 @@ export function InteractiveMap({
   mapsAPI,
   onBoundsChange,
   onZoomChange,
-  onCitySelect,
   onFindPOIs,
   isLoadingPOIs,
   currentZoom,
@@ -384,79 +382,24 @@ export function InteractiveMap({
         flexDirection: 'column',
         gap: '8px'
       }}>
-        {/* Location Search with Zoom Level */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-          padding: '10px 12px'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '6px'
-          }}>
-            <label style={{
-              fontSize: '12px',
-              fontWeight: 'bold',
-              color: '#555'
-            }}>
-              📍 Where would you like to go?
-            </label>
-            <div style={{
-              fontSize: '11px',
-              color: '#666',
-              backgroundColor: '#f0f0f0',
-              padding: '3px 8px',
-              borderRadius: '4px',
-              border: '1px solid #ddd'
-            }}>
-              Zoom: <strong>{currentZoom}</strong> {currentZoom < 11 && '(need ≥11)'}
-            </div>
-          </div>
-          <Autocomplete
-            searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
-            onSelect={onCitySelect}
-            renderSuggestion={(city) => (
-              <>
-                <div style={{ fontWeight: '500', color: '#333' }}>
-                  {city.name}
-                </div>
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-                  {city.displayName}
-                </div>
-              </>
-            )}
-            placeholder="Type city name or use the map to zoom in to your destination..."
-            minChars={2}
-            maxResults={5}
-            debounceMs={300}
-          />
-        </div>
-
         {/* POI Category Filter - Compact Single Row */}
         <div style={{
           backgroundColor: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-          padding: '8px 12px'
+          borderRadius: '6px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          padding: '6px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px'
         }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: '6px'
+            gap: '6px',
+            flex: 1
           }}>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 'bold',
-              color: '#555',
-              marginRight: '4px',
-              whiteSpace: 'nowrap'
-            }}>
-              🏛️ POI:
-            </span>
             {categories.map(category => {
               const color = categoryColors[category.value] || '#999';
               
@@ -502,6 +445,20 @@ export function InteractiveMap({
                 </label>
               );
             })}
+          </div>
+          
+          {/* Zoom Level Indicator */}
+          <div style={{
+            fontSize: '11px',
+            color: '#666',
+            backgroundColor: '#f0f0f0',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            border: '1px solid #ddd',
+            whiteSpace: 'nowrap',
+            flexShrink: 0
+          }}>
+            Zoom: <strong>{currentZoom}</strong> {currentZoom < 11 && '(≥11)'}
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { InteractiveMap } from '../components/InteractiveMap';
+import { Autocomplete } from '../components/Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
 import { getAllCategoryValues } from '../utils/categoryMapping';
 
@@ -207,10 +208,31 @@ export function RoutePlanner() {
         overflowY: 'auto',
         borderRight: '2px solid #e0e0e0'
       }}>
-        <h2 style={{ marginTop: 0 }}>🗺️ Route Planner</h2>
+        <h2 style={{ marginTop: 0, marginBottom: '12px', fontSize: '20px', color: '#333' }}>
+          🗺️ Where would you like to go?
+        </h2>
         
-        <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
-          Use the map on the right to explore. Zoom in to level 11 or higher to search for points of interest in the visible area.
+        <Autocomplete
+          searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
+          onSelect={handleCitySelect}
+          renderSuggestion={(city) => (
+            <>
+              <div style={{ fontWeight: '500', color: '#333' }}>
+                {city.name}
+              </div>
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                {city.displayName}
+              </div>
+            </>
+          )}
+          placeholder="Search for a city or location..."
+          minChars={2}
+          maxResults={5}
+          debounceMs={300}
+        />
+        
+        <p style={{ color: '#666', fontSize: '14px', marginTop: '15px', marginBottom: '20px' }}>
+          Or use the map on the right to explore. Zoom in to level 11 or higher to search for points of interest in the visible area.
         </p>
 
         {/* POI List */}
@@ -328,7 +350,6 @@ export function RoutePlanner() {
           mapsAPI={mapsAPI}
           onBoundsChange={handleBoundsChange}
           onZoomChange={handleZoomChange}
-          onCitySelect={handleCitySelect}
           onFindPOIs={handleFindPOIs}
           isLoadingPOIs={isLoadingPOIs}
           currentZoom={currentZoom}
