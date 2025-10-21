@@ -22,6 +22,7 @@ export function MapsAPITester() {
   const [searchRadius, setSearchRadius] = useState('1000');
   const [selectedCity, setSelectedCity] = useState(null);
   const [poiLimit, setPoiLimit] = useState('20');
+  const [poiCategories, setPoiCategories] = useState('["museum", "attraction", "historic", "place_of_worship", "park", "viewpoint"]');
 
   const methods = [
     { value: 'geocodeAddress', label: 'Geocode Address' },
@@ -91,7 +92,8 @@ export function MapsAPITester() {
           if (!selectedCity || !selectedCity.boundingbox) {
             throw new Error('Please select a city first using Autocomplete Cities method');
           }
-          response = await api.getPOI(selectedCity.boundingbox, parseInt(poiLimit));
+          const categories = JSON.parse(poiCategories);
+          response = await api.getPOI(selectedCity.boundingbox, parseInt(poiLimit), categories);
           break;
 
         case 'validateApiKey':
@@ -325,6 +327,20 @@ export function MapsAPITester() {
                   </small>
                 </div>
                 
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={labelStyle}>Categories (JSON array):</label>
+                  <input
+                    type="text"
+                    value={poiCategories}
+                    onChange={(e) => setPoiCategories(e.target.value)}
+                    placeholder='["museum", "attraction", "historic", "place_of_worship", "park", "viewpoint"]'
+                    style={{ ...inputStyle, fontFamily: 'monospace' }}
+                  />
+                  <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '5px' }}>
+                    Available: museum, attraction, historic, place_of_worship, park, viewpoint
+                  </small>
+                </div>
+
                 <div style={{ marginBottom: '10px' }}>
                   <label style={labelStyle}>Max Results:</label>
                   <input
