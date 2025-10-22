@@ -16,7 +16,7 @@ export function GeminiNano() {
     checkAvailability, 
     createSession,
     resetSession, 
-    sendPrompt 
+    promptStreaming 
   } = usePromptAPI();
 
   const { response, isLoading, processStream, resetResponse } = useStreamingText();
@@ -31,7 +31,7 @@ export function GeminiNano() {
         await createSession();
       }
       
-      const stream = await sendPrompt(prompt);
+      const stream = await promptStreaming(prompt);
       await processStream(stream, { 
         initialMessage: 'Sending...',
         onComplete: () => setPrompt('')

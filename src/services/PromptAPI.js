@@ -57,7 +57,7 @@ export class PromptAPI {
    * @param {Object} options - Additional options for the prompt
    * @returns {Promise<AsyncIterable>} Streaming response
    */
-  async sendPrompt(prompt, options = {}) {
+  async promptStreaming(prompt, options = {}) {
     if (!this.session) {
       throw new Error('Language Model session not created. Please create a session first.');
     }
@@ -126,7 +126,7 @@ export class PromptAPI {
       await this.createSession(options);
     }
     
-    return await this.sendPrompt(prompt, options);
+    return await this.promptStreaming(prompt, options);
   }
 }
 

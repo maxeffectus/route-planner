@@ -66,9 +66,9 @@ export function usePromptAPI() {
   /**
    * Send a prompt and get streaming response
    */
-  const sendPrompt = useCallback(async (prompt, options = {}) => {
+  const promptStreaming = useCallback(async (prompt, options = {}) => {
     try {
-      const stream = await promptAPIRef.current.sendPrompt(prompt, options);
+      const stream = await promptAPIRef.current.promptStreaming(prompt, options);
       return stream;
     } catch (error) {
       console.error('Prompt sending error:', error);
@@ -128,7 +128,7 @@ export function usePromptAPI() {
     // Methods
     checkAvailability,
     createSession,
-    sendPrompt,
+    promptStreaming,
     promptWithAutoSession,
     destroySession,
     resetSession,
