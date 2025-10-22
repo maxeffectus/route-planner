@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { SummarizerAPI } from '../services/SummarizerAPI';
+import { PromptAPI } from '../services/PromptAPI';
 import { useStreamingText } from '../hooks/useStreamingText';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
@@ -29,6 +30,12 @@ export function RoutePlanner() {
   const [summarizerReady, setSummarizerReady] = useState(false);
   const [summarizerError, setSummarizerError] = useState(null);
   const summarizerAPIRef = React.useRef(new SummarizerAPI());
+  
+  // Prompt API state (for additional AI interactions)
+  const [promptReady, setPromptReady] = useState(false);
+  const [promptError, setPromptError] = useState(null);
+  const promptAPIRef = React.useRef(new PromptAPI());
+  
   const { response: summaryResult, isLoading: isSummarizing, processStream, resetResponse } = useStreamingText();
 
   // Handler to update POI cache with resolved image URL
@@ -206,48 +213,65 @@ export function RoutePlanner() {
     }
   }, [mapBounds, currentZoom, selectedCategories, poiCache, mapsAPI]);
 
-  // Initialize Summarizer API in the background
+  // Initialize APIs in the background
   useEffect(() => {
-    const initializeSummarizer = async () => {
+    const initializeAPIs = async () => {
+      // Initialize Summarizer API
       try {
-        const availability = await summarizerAPIRef.current.checkAvailability();
+        const summarizerAvailability = await summarizerAPIRef.current.checkAvailability();
         
-        if (availability === 'unavailable') {
+        if (summarizerAvailability === 'unavailable') {
           setSummarizerError('Summarizer API is not available in this browser');
           console.warn('Summarizer API not available');
-          return;
-        }
-        
-        if (availability === 'downloadable') {
-          console.log('Downloading Summarizer model in background...');
-          await summarizerAPIRef.current.downloadModel((progress) => {
-            console.log(`Summarizer model download: ${progress.toFixed(1)}%`);
+        } else {
+          if (summarizerAvailability === 'downloadable') {
+            console.log('Downloading Summarizer model in background...');
+            await summarizerAPIRef.current.downloadModel((progress) => {
+              console.log(`Summarizer model download: ${progress.toFixed(1)}%`);
+            });
+          }
+          
+          // Create session with explicit default options
+          await summarizerAPIRef.current.createSummarizer({
+            type: 'key-points',
+            format: 'markdown',
+            length: 'medium',
+            expectedInputLanguages: ['en'],
+            outputLanguage: 'en',
+            expectedContextLanguages: ['en'],
+            sharedContext: `These are requests to summarize the traveler's needs and special requirements \
+in order to create a custom-tailored route. Pay special attention to accessibility requests: \
+our user could be a mother with a stroller, a disabled person in a wheelchair, \
+an elderly person, a colorblind person, a bicycle rider, etc.`
           });
+          
+          setSummarizerReady(true);
+          console.log('Summarizer API initialized and ready');
         }
-        
-        // Create session with explicit default options
-        await summarizerAPIRef.current.createSummarizer({
-          type: 'key-points',
-          format: 'markdown',
-          length: 'medium',
-          expectedInputLanguages: ['en'],
-          outputLanguage: 'en',
-          expectedContextLanguages: ['en'],
-          sharedContext: `These are requests to summarize the traveler's needs and special requirements \
-            in order to create a custom-tailored route. Pay special attention to accessibility requests: \
-            our user could be a mother with a stroller, a disabled person in a wheelchair, \
-            an elderly person, a colorblind person, a bicycle rider, etc.`
-        });
-        
-        setSummarizerReady(true);
-        console.log('Summarizer API initialized and ready');
       } catch (error) {
         console.error('Failed to initialize Summarizer API:', error);
         setSummarizerError('Failed to initialize Summarizer API: ' + error.message);
       }
+
+      // Initialize Prompt API
+      try {
+        const promptAvailability = await promptAPIRef.current.checkAvailability();
+        
+        if (promptAvailability === 'available') {
+          await promptAPIRef.current.createSession();
+          setPromptReady(true);
+          console.log('Prompt API initialized and ready');
+        } else {
+          setPromptError('Prompt API is not available: ' + promptAvailability);
+          console.warn('Prompt API not available:', promptAvailability);
+        }
+      } catch (error) {
+        console.error('Failed to initialize Prompt API:', error);
+        setPromptError('Failed to initialize Prompt API: ' + error.message);
+      }
     };
     
-    initializeSummarizer();
+    initializeAPIs();
   }, []);
 
   // Handle user prompt summarization
@@ -270,7 +294,7 @@ export function RoutePlanner() {
   };
 
   // Show prompt input when POIs are searched or city is selected
-  const showPromptInput = pois.length > 0 || isLoadingPOIs;
+  const showPromptInput = (pois.length > 0 || isLoadingPOIs) && (summarizerReady || promptReady);
 
   // Auto-search for POIs when city is selected with appropriate zoom level
   useEffect(() => {

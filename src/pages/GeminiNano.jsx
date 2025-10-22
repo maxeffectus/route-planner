@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLanguageModel } from '../hooks/useLanguageModel';
+import { usePromptAPI } from '../hooks/usePromptAPI';
 import { useStreamingText } from '../hooks/useStreamingText';
 import { StatusBar } from '../components/StatusBar';
 import { PromptForm } from '../components/PromptForm';
@@ -11,10 +11,13 @@ export function GeminiNano() {
   const { 
     status, 
     isApiReady, 
+    availability,
+    hasSession,
     checkAvailability, 
+    createSession,
     resetSession, 
     sendPrompt 
-  } = useLanguageModel();
+  } = usePromptAPI();
 
   const { response, isLoading, processStream, resetResponse } = useStreamingText();
 
@@ -23,6 +26,11 @@ export function GeminiNano() {
     if (!prompt.trim()) return;
 
     try {
+      // Session should already be created after checkAvailability
+      if (!hasSession) {
+        await createSession();
+      }
+      
       const stream = await sendPrompt(prompt);
       await processStream(stream, { 
         initialMessage: 'Sending...',
@@ -54,7 +62,7 @@ export function GeminiNano() {
         onSubmit={handleSubmit}
         onResetSession={handleResetSession}
         isLoading={isLoading}
-        isApiReady={isApiReady}
+        isApiReady={hasSession}
       />
 
       <ResponseDisplay response={response} />
