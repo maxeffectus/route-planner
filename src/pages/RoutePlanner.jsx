@@ -241,6 +241,8 @@ export function RoutePlanner() {
           // Create session with UserProfile-specific options
           await promptAPIRef.current.createSession({
             ...userProfilePromptOptions,
+            temperature: 0.0,  // The most deterministic output
+            topK: 1,
             responseConstraint: responseSchema,
             initialPrompts: [
               {
