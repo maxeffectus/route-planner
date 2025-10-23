@@ -69,7 +69,7 @@ function ChatLoadingAnimation() {
  * Profile Setup Chat Component
  * Handles AI-driven user profile creation through conversational interface
  */
-export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete, onProfileUpdate }) {
+export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete, onProfileUpdate, autoStart = false }) {
   // UserProfile and chat state
   const [userProfile, setUserProfile] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
@@ -225,6 +225,13 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
     }
   }, [promptReady, sendProfileMessage]);
 
+  // Auto-start chat if autoStart is true
+  useEffect(() => {
+    if (autoStart && promptReady && !isProfileSetupActive && !isProfileComplete) {
+      initializeProfileChat();
+    }
+  }, [autoStart, promptReady, isProfileSetupActive, isProfileComplete, initializeProfileChat]);
+
   // Handle profile chat input
   const handleProfileChatSubmit = async (e) => {
     e.preventDefault();
@@ -248,33 +255,6 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
 
   return (
     <>
-      {/* UserProfile Setup */}
-      {promptReady && !isProfileSetupActive && !isProfileComplete && (
-        <div style={{ marginBottom: '20px' }}>
-          <h3 style={{ marginBottom: '10px', fontSize: '16px', fontWeight: 'bold' }}>
-            🧑‍💼 Travel Profile Setup
-          </h3>
-          <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-            Let AI help you create a personalized travel profile
-          </p>
-          <button 
-            onClick={initializeProfileChat}
-            disabled={!promptReady}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: !promptReady ? '#ccc' : '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: !promptReady ? 'not-allowed' : 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            {!promptReady ? 'AI Not Ready' : 'Start Profile Setup'}
-          </button>
-        </div>
-      )}
-
       {/* Profile Chat Interface */}
       {isProfileSetupActive && (
         <div style={{ marginBottom: '20px' }}>

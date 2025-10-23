@@ -9,6 +9,7 @@ import { ProfileSetupChat } from './ProfileSetupChat';
  */
 export function ProfileSetupModal({ isOpen, onClose, promptAPIRef, promptReady, promptError, onProfileUpdate }) {
   const [showWarning, setShowWarning] = useState(false);
+  const [autoStartChat, setAutoStartChat] = useState(false);
 
   const handleLaterClick = () => {
     setShowWarning(true);
@@ -22,6 +23,15 @@ export function ProfileSetupModal({ isOpen, onClose, promptAPIRef, promptReady, 
   const handleWarningCancel = () => {
     setShowWarning(false);
   };
+
+  // Auto-start chat when modal opens and PromptAPI is ready
+  React.useEffect(() => {
+    if (isOpen && promptReady && !promptError) {
+      setAutoStartChat(true);
+    } else {
+      setAutoStartChat(false);
+    }
+  }, [isOpen, promptReady, promptError]);
 
   return (
     <>
@@ -66,6 +76,7 @@ export function ProfileSetupModal({ isOpen, onClose, promptAPIRef, promptReady, 
             <ProfileSetupChat 
               promptAPIRef={promptAPIRef}
               promptReady={promptReady}
+              autoStart={autoStartChat}
               onProfileComplete={() => {
                 // Close modal when profile is completed
                 setTimeout(() => onClose(), 1000); // Small delay to show completion
