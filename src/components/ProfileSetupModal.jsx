@@ -1,77 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { WarningDialog } from './WarningDialog';
 import { ProfileSetupChat } from './ProfileSetupChat';
-
-/**
- * Loading Animation Component with jokes
- */
-function LoadingAnimation() {
-  const [currentJoke, setCurrentJoke] = useState(0);
-  
-  const jokes = [
-    "🤖 Preparing my AI brain...",
-    "🧠 Loading travel expertise...",
-    "🗺️ Mapping your preferences...",
-    "✈️ Packing my recommendations...",
-    "🎯 Aiming for perfect suggestions...",
-    "🌟 Polishing my crystal ball...",
-    "🎪 Setting up the magic show...",
-    "🎨 Painting your perfect trip..."
-  ];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentJoke(prev => (prev + 1) % jokes.length);
-    }, 2000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '40px 20px',
-      textAlign: 'center'
-    }}>
-      <div style={{
-        width: '60px',
-        height: '60px',
-        border: '4px solid #f3f3f3',
-        borderTop: '4px solid #28a745',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite',
-        marginBottom: '20px'
-      }} />
-      
-      <h3 style={{
-        margin: '0 0 10px 0',
-        fontSize: '18px',
-        color: '#333'
-      }}>
-        {jokes[currentJoke]}
-      </h3>
-      
-      <p style={{
-        margin: '0',
-        fontSize: '14px',
-        color: '#666'
-      }}>
-        This will only take a moment...
-      </p>
-      
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
-  );
-}
 
 /**
  * Profile Setup Modal Component
@@ -132,8 +62,6 @@ export function ProfileSetupModal({ isOpen, onClose, promptAPIRef, promptReady, 
                 You can still use the app, but recommendations may be less personalized.
               </p>
             </div>
-          ) : !promptReady ? (
-            <LoadingAnimation />
           ) : (
             <ProfileSetupChat 
               promptAPIRef={promptAPIRef}
@@ -146,7 +74,7 @@ export function ProfileSetupModal({ isOpen, onClose, promptAPIRef, promptReady, 
             />
           )}
           
-          {(promptReady || promptError) && (
+          {!promptError && (
             <div style={{
               marginTop: '20px',
               paddingTop: '15px',

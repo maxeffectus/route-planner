@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { UserProfile } from '../models/UserProfile';
 import { 
   userProfilePromptOptions, 
@@ -10,6 +10,62 @@ import {
 } from '../services/UserProfilePromptConfig';
 
 /**
+ * Chat Loading Animation Component
+ */
+function ChatLoadingAnimation() {
+  const [currentMessage, setCurrentMessage] = useState(0);
+  
+  const loadingMessages = [
+    "🤖 Preparing my AI brain...",
+    "🧠 Loading travel expertise...",
+    "🗺️ Mapping your preferences...",
+    "✈️ Packing my recommendations...",
+    "🎯 Aiming for perfect suggestions...",
+    "🌟 Polishing my crystal ball...",
+    "🎪 Setting up the magic show...",
+    "🎨 Painting your perfect trip...",
+    "💭 Thinking of the perfect questions...",
+    "🎭 Getting into character as your travel assistant..."
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentMessage(prev => (prev + 1) % loadingMessages.length);
+    }, 1500); // Change message every 1.5 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px',
+      color: '#666'
+    }}>
+      <div style={{
+        width: '20px',
+        height: '20px',
+        border: '2px solid #f3f3f3',
+        borderTop: '2px solid #28a745',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+        marginRight: '10px'
+      }} />
+      <span>{loadingMessages[currentMessage]}</span>
+      
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/**
  * Profile Setup Chat Component
  * Handles AI-driven user profile creation through conversational interface
  */
@@ -19,6 +75,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
   const [chatHistory, setChatHistory] = useState([]);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
   const [isProfileSetupActive, setIsProfileSetupActive] = useState(false);
+  const [isAiThinking, setIsAiThinking] = useState(false);
 
   // Send message to AI for profile setup
   const sendProfileMessage = useCallback(async (userMessage, profileToUse = null) => {
@@ -29,6 +86,9 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
     }
 
     try {
+      // Set AI thinking state
+      setIsAiThinking(true);
+      
       // Create structured prompt
       const structuredPrompt = createUserProfilePrompt(
         currentProfile.toJSON(),
@@ -123,6 +183,9 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
         role: 'ai', 
         message: `Sorry, there was an error processing your response. Please try again. (Error: ${error.message})` 
       }]);
+    } finally {
+      // Always reset AI thinking state
+      setIsAiThinking(false);
     }
   }, [userProfile, promptReady, isProfileComplete, chatHistory, onProfileUpdate]);
 
@@ -228,9 +291,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
             marginBottom: '10px'
           }}>
             {chatHistory.length === 0 ? (
-              <div style={{ color: '#666', fontStyle: 'italic' }}>
-                Starting conversation...
-              </div>
+              <ChatLoadingAnimation />
             ) : (
               <>
                 {console.log('Rendering chat history:', chatHistory)}
@@ -244,6 +305,14 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
                     </div>
                   </div>
                 ))}
+                {isAiThinking && (
+                  <div style={{ marginBottom: '10px' }}>
+                    <strong style={{ color: '#28a745' }}>AI:</strong>
+                    <div style={{ marginTop: '4px', fontSize: '14px' }}>
+                      <ChatLoadingAnimation />
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -252,7 +321,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
             <input
               type="text"
               placeholder="Type your answer here..."
-              disabled={isProfileComplete}
+              disabled={isProfileComplete || isAiThinking}
               style={{
                 width: '100%',
                 padding: '8px',
