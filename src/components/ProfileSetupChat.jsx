@@ -77,6 +77,39 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
   const [isProfileSetupActive, setIsProfileSetupActive] = useState(false);
   const [isAiThinking, setIsAiThinking] = useState(false);
 
+  // Load profile from localStorage on component mount
+  useEffect(() => {
+    const savedProfile = localStorage.getItem('userProfile');
+    if (savedProfile) {
+      try {
+        const profileData = JSON.parse(savedProfile);
+        const profile = new UserProfile(profileData.userId);
+        Object.assign(profile, profileData);
+        setUserProfile(profile);
+        setIsProfileComplete(profile.isComplete());
+        
+        // Notify parent component about loaded profile
+        if (onProfileUpdate) {
+          onProfileUpdate(profile);
+        }
+      } catch (error) {
+        console.error('Failed to load profile from localStorage:', error);
+        localStorage.removeItem('userProfile'); // Remove corrupted data
+      }
+    }
+  }, [onProfileUpdate]);
+
+  // Save profile to localStorage whenever it changes
+  useEffect(() => {
+    if (userProfile) {
+      try {
+        localStorage.setItem('userProfile', JSON.stringify(userProfile.toJSON()));
+      } catch (error) {
+        console.error('Failed to save profile to localStorage:', error);
+      }
+    }
+  }, [userProfile]);
+
   // Send message to AI for profile setup
   const sendProfileMessage = useCallback(async (userMessage, profileToUse = null) => {
     const currentProfile = profileToUse || userProfile;
@@ -196,9 +229,13 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
         throw new Error('Prompt API not ready');
       }
 
-      // Create new UserProfile
-      const profile = new UserProfile('user-123');
-      setUserProfile(profile);
+      // Use existing profile or create new one
+      let profile = userProfile;
+      if (!profile) {
+        profile = new UserProfile('user-123');
+        setUserProfile(profile);
+      }
+      
       setChatHistory([]);
       setIsProfileComplete(false);
       setIsProfileSetupActive(true);
@@ -223,9 +260,9 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
     } catch (error) {
       console.error('Profile chat initialization error:', error);
     }
-  }, [promptReady, sendProfileMessage]);
+  }, [promptReady, sendProfileMessage, userProfile]);
 
-  // Auto-start chat if autoStart is true
+  // Auto-start chat if autoStart is true and profile is not complete
   useEffect(() => {
     if (autoStart && promptReady && !isProfileSetupActive && !isProfileComplete) {
       initializeProfileChat();
@@ -356,6 +393,11 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
               setChatHistory([]);
               setIsProfileComplete(false);
               setIsProfileSetupActive(false);
+              localStorage.removeItem('userProfile');
+              // Notify parent component about profile reset
+              if (onProfileUpdate) {
+                onProfileUpdate(null);
+              }
             }}
             style={{
               marginTop: '10px',

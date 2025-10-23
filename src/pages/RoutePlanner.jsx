@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { PromptAPI } from '../services/PromptAPI';
+import { UserProfile } from '../models/UserProfile';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
@@ -37,6 +38,22 @@ export function RoutePlanner() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [hasVisitedBefore, setHasVisitedBefore] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+
+  // Load user profile from localStorage on component mount
+  useEffect(() => {
+    const savedProfile = localStorage.getItem('userProfile');
+    if (savedProfile) {
+      try {
+        const profileData = JSON.parse(savedProfile);
+        const profile = new UserProfile(profileData.userId);
+        Object.assign(profile, profileData);
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('Failed to load profile from localStorage:', error);
+        localStorage.removeItem('userProfile'); // Remove corrupted data
+      }
+    }
+  }, []);
 
   // Handler to update POI cache with resolved image URL
   const handleImageLoaded = useCallback((poiId, imageUrl) => {
