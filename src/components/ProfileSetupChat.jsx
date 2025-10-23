@@ -255,8 +255,8 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
 
   return (
     <>
-      {/* Profile Chat Interface */}
-      {isProfileSetupActive && (
+      {/* Profile Chat Interface - always show when autoStart is true */}
+      {autoStart && (
         <div style={{ marginBottom: '20px' }}>
           <h3 style={{ marginBottom: '10px', fontSize: '16px', fontWeight: 'bold' }}>
             💬 Profile Setup Chat
@@ -270,7 +270,14 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
             backgroundColor: '#f9f9f9',
             marginBottom: '10px'
           }}>
-            {chatHistory.length === 0 ? (
+            {!promptReady ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <ChatLoadingAnimation />
+                <p style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+                  Initializing AI model...
+                </p>
+              </div>
+            ) : chatHistory.length === 0 ? (
               <ChatLoadingAnimation />
             ) : (
               <>
@@ -300,8 +307,8 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
           <form onSubmit={handleProfileChatSubmit}>
             <input
               type="text"
-              placeholder="Type your answer here..."
-              disabled={isProfileComplete || isAiThinking}
+              placeholder={!promptReady ? "AI model is initializing..." : "Type your answer here..."}
+              disabled={isProfileComplete || isAiThinking || !promptReady}
               style={{
                 width: '100%',
                 padding: '8px',
@@ -312,7 +319,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
             />
           </form>
           
-          {userProfile && (
+          {userProfile && promptReady && (
             <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
               Profile completion: {userProfile.getCompletionPercentage()}%
             </div>
