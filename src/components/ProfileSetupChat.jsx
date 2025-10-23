@@ -13,7 +13,7 @@ import {
  * Profile Setup Chat Component
  * Handles AI-driven user profile creation through conversational interface
  */
-export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete }) {
+export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete, onProfileUpdate }) {
   // UserProfile and chat state
   const [userProfile, setUserProfile] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
@@ -84,6 +84,12 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete 
         setUserProfile(prevProfile => {
           const updated = new UserProfile(prevProfile.userId);
           Object.assign(updated, profileData);
+          
+          // Notify parent component about profile update
+          if (onProfileUpdate) {
+            onProfileUpdate(updated);
+          }
+          
           return updated;
         });
       } catch (extractError) {
@@ -118,7 +124,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete 
         message: `Sorry, there was an error processing your response. Please try again. (Error: ${error.message})` 
       }]);
     }
-  }, [userProfile, promptReady, isProfileComplete, chatHistory]);
+  }, [userProfile, promptReady, isProfileComplete, chatHistory, onProfileUpdate]);
 
   // Initialize UserProfile chat
   const initializeProfileChat = useCallback(async () => {

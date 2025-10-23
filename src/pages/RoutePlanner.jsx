@@ -35,6 +35,8 @@ export function RoutePlanner() {
   
   // Profile setup modal state
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [hasVisitedBefore, setHasVisitedBefore] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
 
   // Handler to update POI cache with resolved image URL
   const handleImageLoaded = useCallback((poiId, imageUrl) => {
@@ -245,17 +247,34 @@ export function RoutePlanner() {
     initializeAPIs();
   }, []);
 
-  // Show profile setup modal on first visit
+  // Show profile setup modal if profile is incomplete
   useEffect(() => {
-    const hasVisitedBefore = localStorage.getItem('routePlannerVisited');
-    if (!hasVisitedBefore && promptReady) {
-      setShowProfileModal(true);
+    const visited = localStorage.getItem('routePlannerVisited');
+    if (!visited) {
       localStorage.setItem('routePlannerVisited', 'true');
     }
-  }, [promptReady]);
+    setHasVisitedBefore(true);
+    
+    // Check if profile is incomplete and show modal
+    if (promptReady && (!userProfile || !userProfile.isComplete())) {
+      setShowProfileModal(true);
+    }
+  }, [promptReady, userProfile]);
 
   // Show prompt input when POIs are searched or city is selected
   const showPromptInput = (pois.length > 0 || isLoadingPOIs) && promptReady;
+
+  // Debug logging
+  console.log('RoutePlanner Debug:', {
+    hasVisitedBefore,
+    showProfileModal,
+    promptReady,
+    userProfile: userProfile ? {
+      isComplete: userProfile.isComplete(),
+      completionPercentage: userProfile.getCompletionPercentage()
+    } : null,
+    localStorage: localStorage.getItem('routePlannerVisited')
+  });
 
   // Auto-search for POIs when city is selected with appropriate zoom level
   useEffect(() => {
@@ -324,15 +343,15 @@ export function RoutePlanner() {
           Or use the map on the right to explore. Zoom in to level {MIN_ZOOM_LEVEL} or higher to search for points of interest in the visible area.
         </p>
 
-        {/* Profile Setup Button */}
-        {promptReady && (
+        {/* Profile Setup Button - show different states based on profile completion */}
+        {promptReady && hasVisitedBefore && (
           <div style={{ marginBottom: '20px' }}>
             <button
               onClick={() => setShowProfileModal(true)}
               style={{
                 padding: '10px 20px',
-                backgroundColor: '#28a745',
-                color: 'white',
+                backgroundColor: userProfile && userProfile.isComplete() ? '#28a745' : '#ffc107',
+                color: userProfile && userProfile.isComplete() ? 'white' : '#000',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
@@ -340,17 +359,43 @@ export function RoutePlanner() {
                 width: '100%'
               }}
             >
-              🧑‍💼 Set Up Travel Profile
+              {userProfile && userProfile.isComplete() ? '✅ Your travel profile is setup' : '⚠️ Continue with your travel profile setup'}
             </button>
             <p style={{ 
               fontSize: '12px', 
-            color: '#666', 
+              color: '#666', 
               marginTop: '5px',
               textAlign: 'center'
-          }}>
-              Get personalized recommendations
+            }}>
+              {userProfile && userProfile.isComplete() ? 'Profile completed successfully' : 'Complete your profile for better recommendations'}
             </p>
-        </div>
+          </div>
+        )}
+
+        {/* Debug button for testing - remove in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <div style={{ marginBottom: '20px' }}>
+            <button
+              onClick={() => {
+                localStorage.removeItem('routePlannerVisited');
+                setHasVisitedBefore(false);
+                setUserProfile(null);
+                setShowProfileModal(true);
+              }}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#ffc107',
+                color: '#000',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                width: '100%'
+              }}
+            >
+              🧪 Reset First Visit (Dev Only)
+            </button>
+          </div>
         )}
 
         <ProfileSetupModal 
@@ -358,6 +403,8 @@ export function RoutePlanner() {
           onClose={() => setShowProfileModal(false)}
           promptAPIRef={promptAPIRef}
           promptReady={promptReady}
+          promptError={promptError}
+          onProfileUpdate={setUserProfile}
         />
 
         {/* POI List */}
