@@ -13,7 +13,7 @@ import {
  * Profile Setup Chat Component
  * Handles AI-driven user profile creation through conversational interface
  */
-export function ProfileSetupChat({ promptAPIRef, promptReady }) {
+export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete }) {
   // UserProfile and chat state
   const [userProfile, setUserProfile] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
@@ -105,6 +105,10 @@ export function ProfileSetupChat({ promptAPIRef, promptReady }) {
 
       if (aiResponse.isComplete) {
         setIsProfileSetupActive(false);
+        // Call the completion callback if provided
+        if (onProfileComplete) {
+          onProfileComplete();
+        }
       }
 
     } catch (error) {
@@ -129,7 +133,6 @@ export function ProfileSetupChat({ promptAPIRef, promptReady }) {
       setChatHistory([]);
       setIsProfileComplete(false);
       setIsProfileSetupActive(true);
-      setProfileSummary(null);
 
       // Start conversation with initial prompt
       const initialPrompt = `Conversation started. currentProfile=${JSON.stringify(profile.toJSON())}`;

@@ -4,7 +4,7 @@ import { PromptAPI } from '../services/PromptAPI';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
-import { ProfileSetupChat } from '../components/ProfileSetupChat';
+import { ProfileSetupModal } from '../components/ProfileSetupModal';
 import { getAllCategoryValues } from '../utils/categoryMapping';
 import { 
   userProfilePromptOptions, 
@@ -32,6 +32,9 @@ export function RoutePlanner() {
   const [promptReady, setPromptReady] = useState(false);
   const [promptError, setPromptError] = useState(null);
   const promptAPIRef = React.useRef(new PromptAPI());
+  
+  // Profile setup modal state
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Handler to update POI cache with resolved image URL
   const handleImageLoaded = useCallback((poiId, imageUrl) => {
@@ -242,6 +245,15 @@ export function RoutePlanner() {
     initializeAPIs();
   }, []);
 
+  // Show profile setup modal on first visit
+  useEffect(() => {
+    const hasVisitedBefore = localStorage.getItem('routePlannerVisited');
+    if (!hasVisitedBefore && promptReady) {
+      setShowProfileModal(true);
+      localStorage.setItem('routePlannerVisited', 'true');
+    }
+  }, [promptReady]);
+
   // Show prompt input when POIs are searched or city is selected
   const showPromptInput = (pois.length > 0 || isLoadingPOIs) && promptReady;
 
@@ -312,7 +324,38 @@ export function RoutePlanner() {
           Or use the map on the right to explore. Zoom in to level {MIN_ZOOM_LEVEL} or higher to search for points of interest in the visible area.
         </p>
 
-        <ProfileSetupChat 
+        {/* Profile Setup Button */}
+        {promptReady && (
+          <div style={{ marginBottom: '20px' }}>
+            <button
+              onClick={() => setShowProfileModal(true)}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                width: '100%'
+              }}
+            >
+              🧑‍💼 Set Up Travel Profile
+            </button>
+            <p style={{ 
+              fontSize: '12px', 
+            color: '#666', 
+              marginTop: '5px',
+              textAlign: 'center'
+          }}>
+              Get personalized recommendations
+            </p>
+        </div>
+        )}
+
+        <ProfileSetupModal 
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
           promptAPIRef={promptAPIRef}
           promptReady={promptReady}
         />
