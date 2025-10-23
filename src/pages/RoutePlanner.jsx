@@ -1,11 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
-import { SummarizerAPI } from '../services/SummarizerAPI';
 import { PromptAPI } from '../services/PromptAPI';
-import { useStreamingText } from '../hooks/useStreamingText';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
-import { ResponseDisplay } from '../components/ResponseDisplay';
 import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
 import { ProfileSetupChat } from '../components/ProfileSetupChat';
 import { getAllCategoryValues } from '../utils/categoryMapping';
@@ -31,18 +28,10 @@ export function RoutePlanner() {
   const mapsAPI = new OpenStreetAPI();
   const citySelectionRef = React.useRef(null); // Track city selection for auto-search
   
-  // Summarizer API state
-  const [userPrompt, setUserPrompt] = useState('');
-  const [summarizerReady, setSummarizerReady] = useState(false);
-  const [summarizerError, setSummarizerError] = useState(null);
-  const summarizerAPIRef = React.useRef(new SummarizerAPI());
-  
   // Prompt API state (for additional AI interactions)
   const [promptReady, setPromptReady] = useState(false);
   const [promptError, setPromptError] = useState(null);
   const promptAPIRef = React.useRef(new PromptAPI());
-  
-  const { response: summaryResult, isLoading: isSummarizing, processStream, resetResponse } = useStreamingText();
 
   // Handler to update POI cache with resolved image URL
   const handleImageLoaded = useCallback((poiId, imageUrl) => {
@@ -222,43 +211,6 @@ export function RoutePlanner() {
   // Initialize APIs in the background
   useEffect(() => {
     const initializeAPIs = async () => {
-      // Initialize Summarizer API
-      try {
-        const summarizerAvailability = await summarizerAPIRef.current.checkAvailability();
-        
-        if (summarizerAvailability === 'unavailable') {
-          setSummarizerError('Summarizer API is not available in this browser');
-          console.warn('Summarizer API not available');
-        } else {
-          if (summarizerAvailability === 'downloadable') {
-            console.log('Downloading Summarizer model in background...');
-            await summarizerAPIRef.current.downloadModel((progress) => {
-              console.log(`Summarizer model download: ${progress.toFixed(1)}%`);
-            });
-          }
-          
-          // Create session with explicit default options
-          await summarizerAPIRef.current.createSummarizer({
-            type: 'key-points',
-            format: 'markdown',
-            length: 'medium',
-            expectedInputLanguages: ['en'],
-            outputLanguage: 'en',
-            expectedContextLanguages: ['en'],
-            sharedContext: `These are requests to summarize the traveler's needs and special requirements \
-in order to create a custom-tailored route. Pay special attention to accessibility requests: \
-our user could be a mother with a stroller, a disabled person in a wheelchair, \
-an elderly person, a colorblind person, a bicycle rider, etc.`
-          });
-          
-          setSummarizerReady(true);
-          console.log('Summarizer API initialized and ready');
-        }
-      } catch (error) {
-        console.error('Failed to initialize Summarizer API:', error);
-        setSummarizerError('Failed to initialize Summarizer API: ' + error.message);
-      }
-
       // Initialize Prompt API
       try {
         const promptAvailability = await promptAPIRef.current.checkAvailability();
@@ -290,27 +242,8 @@ an elderly person, a colorblind person, a bicycle rider, etc.`
     initializeAPIs();
   }, []);
 
-  // Handle user prompt summarization
-  const handleSummarizePrompt = async (e) => {
-    e.preventDefault();
-    if (!userPrompt.trim()) return;
-    
-    try {
-      const stream = await summarizerAPIRef.current.summarizeText(userPrompt, {
-        context: 'Clearly identify user\'s interests and needs for optimal recommendations regarding places to visit, activities, food, entertainment, etc.'
-      });
-      
-      await processStream(stream, { 
-        initialMessage: 'Analyzing...',
-        onComplete: (result) => console.log('Summary complete:', result)
-      });
-    } catch (error) {
-      console.error('Summarization error:', error);
-    }
-  };
-
   // Show prompt input when POIs are searched or city is selected
-  const showPromptInput = (pois.length > 0 || isLoadingPOIs) && (summarizerReady || promptReady);
+  const showPromptInput = (pois.length > 0 || isLoadingPOIs) && promptReady;
 
   // Auto-search for POIs when city is selected with appropriate zoom level
   useEffect(() => {
@@ -382,81 +315,7 @@ an elderly person, a colorblind person, a bicycle rider, etc.`
         <ProfileSetupChat 
           promptAPIRef={promptAPIRef}
           promptReady={promptReady}
-          summarizerAPIRef={summarizerAPIRef}
-          summarizerReady={summarizerReady}
         />
-
-        {/* User Prompt Input (shown after city selection or POI search) */}
-        {showPromptInput && (
-          <div style={{ marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '16px', color: '#333', marginTop: 0, marginBottom: '10px' }}>
-              ✨ Tell us what you would like to do
-            </h3>
-            
-            {summarizerError && (
-              <div style={{
-                backgroundColor: '#fff3cd',
-                border: '1px solid #ffc107',
-                borderRadius: '4px',
-                padding: '8px 12px',
-                fontSize: '12px',
-                color: '#856404',
-                marginBottom: '10px'
-              }}>
-                ⚠️ {summarizerError}
-              </div>
-            )}
-            
-            <form onSubmit={handleSummarizePrompt}>
-              <textarea
-                value={userPrompt}
-                onChange={(e) => setUserPrompt(e.target.value)}
-                placeholder="I would like to visit the most outstanding museums and ride attractions"
-                disabled={!summarizerReady || isSummarizing}
-                style={{
-                  width: '100%',
-                  minHeight: '80px',
-                  padding: '10px',
-                  borderRadius: '4px',
-                  border: '1px solid #ccc',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  resize: 'vertical',
-                  boxSizing: 'border-box',
-                  marginBottom: '8px',
-                  opacity: (!summarizerReady || isSummarizing) ? 0.6 : 1
-                }}
-              />
-              
-              <button
-                type="submit"
-                disabled={!summarizerReady || isSummarizing || !userPrompt.trim()}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  backgroundColor: (!summarizerReady || isSummarizing || !userPrompt.trim()) ? '#ccc' : '#1976D2',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  cursor: (!summarizerReady || isSummarizing || !userPrompt.trim()) ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {isSummarizing ? '🔄 Analyzing...' : '🔍 Analyze my interests'}
-              </button>
-            </form>
-            
-            {summaryResult && (
-              <div style={{ marginTop: '15px' }}>
-                <h4 style={{ fontSize: '14px', color: '#555', marginTop: 0, marginBottom: '8px' }}>
-                  Your Interests Summary:
-                </h4>
-                <ResponseDisplay response={summaryResult} />
-              </div>
-            )}
-          </div>
-        )}
 
         {/* POI List */}
         {filteredPois.length > 0 && (
@@ -479,11 +338,11 @@ an elderly person, a colorblind person, a bicycle rider, etc.`
                 </span>
               )}
             </h3>
-            <div style={{
+          <div style={{ 
               maxHeight: '600px',
               overflowY: 'auto',
               backgroundColor: '#fff',
-              borderRadius: '8px',
+            borderRadius: '8px',
               border: '1px solid #ddd'
             }}>
               {filteredPois.map((poi, index) => {

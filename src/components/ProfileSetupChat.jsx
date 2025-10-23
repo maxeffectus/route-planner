@@ -13,57 +13,12 @@ import {
  * Profile Setup Chat Component
  * Handles AI-driven user profile creation through conversational interface
  */
-export function ProfileSetupChat({ promptAPIRef, promptReady, summarizerAPIRef, summarizerReady }) {
+export function ProfileSetupChat({ promptAPIRef, promptReady }) {
   // UserProfile and chat state
   const [userProfile, setUserProfile] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
   const [isProfileSetupActive, setIsProfileSetupActive] = useState(false);
-  const [profileSummary, setProfileSummary] = useState(null);
-
-  // Generate profile summary using SummarizerAPI
-  const generateProfileSummary = useCallback(async () => {
-    try {
-      if (!summarizerReady || !userProfile) return;
-
-      // Create summarizer session
-      await summarizerAPIRef.current.createSummarizer({
-        type: "key-points",
-        format: "markdown", 
-        length: "medium",
-        expectedInputLanguages: ["en"],
-        outputLanguage: "en",
-        expectedContextLanguages: ["en"],
-        sharedContext: "Summarize the user's travel profile preferences for easy reference."
-      });
-
-      // Create profile description text
-      const profileText = [
-        "Travel Profile Summary:",
-        `- Mobility: ${userProfile.getMobilityDescription()}`,
-        `- Transport: ${userProfile.getTransportDescription()}`,
-        `- Budget: ${userProfile.budgetLevel !== null ? `Level ${userProfile.budgetLevel}` : 'Not specified'}`,
-        `- Pace: ${userProfile.travelPace || 'Not specified'}`,
-        `- Time Window: ${userProfile.getTimeWindowDescription()}`,
-        `- Dietary: ${userProfile.getDietaryDescription()}`,
-        `- Interests: ${Object.entries(userProfile.interests).map(([key, weight]) => `${key} (${weight})`).join(', ') || 'None specified'}`
-      ].join('\n');
-
-      // Summarize profile
-      const stream = await summarizerAPIRef.current.summarizeText(profileText, {
-        context: 'Create a concise summary of the user\'s travel preferences and requirements.'
-      });
-
-      let summary = '';
-      for await (const chunk of stream) {
-        summary += chunk;
-      }
-
-      setProfileSummary(summary);
-    } catch (error) {
-      console.error('Profile summary generation error:', error);
-    }
-  }, [summarizerReady, userProfile]);
 
   // Send message to AI for profile setup
   const sendProfileMessage = useCallback(async (userMessage, profileToUse = null) => {
@@ -150,8 +105,6 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, summarizerAPIRef, 
 
       if (aiResponse.isComplete) {
         setIsProfileSetupActive(false);
-        // Generate profile summary using SummarizerAPI
-        await generateProfileSummary();
       }
 
     } catch (error) {
@@ -161,7 +114,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, summarizerAPIRef, 
         message: `Sorry, there was an error processing your response. Please try again. (Error: ${error.message})` 
       }]);
     }
-  }, [userProfile, promptReady, isProfileComplete, chatHistory, generateProfileSummary]);
+  }, [userProfile, promptReady, isProfileComplete, chatHistory]);
 
   // Initialize UserProfile chat
   const initializeProfileChat = useCallback(async () => {
@@ -316,37 +269,21 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, summarizerAPIRef, 
             ✅ Your Travel Profile
           </h3>
           
-          {profileSummary ? (
-            <div style={{ 
-              border: '1px solid #ddd', 
-              borderRadius: '4px', 
-              padding: '10px',
-              backgroundColor: '#f9f9f9',
-              fontSize: '14px',
-              marginBottom: '10px'
-            }}>
-              <strong>Summary:</strong>
-              <div style={{ marginTop: '5px', whiteSpace: 'pre-wrap' }}>
-                {profileSummary}
-              </div>
-            </div>
-          ) : (
-            <div style={{ 
-              border: '1px solid #ddd', 
-              borderRadius: '4px', 
-              padding: '10px',
-              backgroundColor: '#f9f9f9',
-              fontSize: '14px',
-              marginBottom: '10px'
-            }}>
-              <div><strong>Mobility:</strong> {userProfile.getMobilityDescription()}</div>
-              <div><strong>Transport:</strong> {userProfile.getTransportDescription()}</div>
-              <div><strong>Budget:</strong> {userProfile.budgetLevel !== null ? `Level ${userProfile.budgetLevel}` : 'Not specified'}</div>
-              <div><strong>Pace:</strong> {userProfile.travelPace || 'Not specified'}</div>
-              <div><strong>Time Window:</strong> {userProfile.getTimeWindowDescription()}</div>
-              <div><strong>Dietary:</strong> {userProfile.getDietaryDescription()}</div>
-            </div>
-          )}
+          <div style={{ 
+            border: '1px solid #ddd', 
+            borderRadius: '4px', 
+            padding: '10px',
+            backgroundColor: '#f9f9f9',
+            fontSize: '14px',
+            marginBottom: '10px'
+          }}>
+            <div><strong>Mobility:</strong> {userProfile.getMobilityDescription()}</div>
+            <div><strong>Transport:</strong> {userProfile.getTransportDescription()}</div>
+            <div><strong>Budget:</strong> {userProfile.budgetLevel !== null ? `Level ${userProfile.budgetLevel}` : 'Not specified'}</div>
+            <div><strong>Pace:</strong> {userProfile.travelPace || 'Not specified'}</div>
+            <div><strong>Time Window:</strong> {userProfile.getTimeWindowDescription()}</div>
+            <div><strong>Dietary:</strong> {userProfile.getDietaryDescription()}</div>
+          </div>
           
           <button 
             onClick={() => {
@@ -354,7 +291,6 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, summarizerAPIRef, 
               setChatHistory([]);
               setIsProfileComplete(false);
               setIsProfileSetupActive(false);
-              setProfileSummary(null);
             }}
             style={{
               marginTop: '10px',
