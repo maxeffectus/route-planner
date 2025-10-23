@@ -134,8 +134,10 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
         setChatHistory(prev => [...prev, { role: 'user', message: userMessage }]);
       }
 
-      // Send to AI
-      const response = await promptAPIRef.current.prompt(structuredPrompt);
+      // Send to AI with response constraint
+      const response = await promptAPIRef.current.prompt(structuredPrompt, {
+        responseConstraint: responseSchema
+      });
       console.log('AI Response:', response);
       console.log('Response type:', typeof response);
       

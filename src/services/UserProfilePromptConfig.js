@@ -67,7 +67,7 @@ export const systemInstruction = [
   "2. **Question:** Formulate *one* clear, targeted, and conversational question to fill the *most important* missing field first. Use the available ENUM values for guidance.",
   "3. **Update:** Based on the user's 'lastMessage', update the 'updatedProfile' JSON object. Be strict with data types (e.g., use 'WHEELCHAIR' for mobility, numbers for budget, 0.0 to 1.0 for interest weights). If the user lists interests, map them to the closest InterestCategory and set the weight to 1.0.",
   "4. **Completion:** If all critical fields are filled, set 'isComplete' to true and use the 'nextQuestion' field to provide a final polite summary and confirmation.",
-  "5. **Output:** You MUST respond ONLY with a JSON object that strictly conforms to the provided schema. Do NOT include any commentary or chat text outside the 'nextQuestion' field of the JSON.",
+  "5. **Output:** You MUST respond ONLY with a JSON object that strictly conforms to the provided schema. Do NOT include any commentary or chat text outside the 'nextQuestion' field of the JSON. DO NOT omit any fields from the JSON including 'isComplete'.",
   "",
   "**Current ENUM Values:**",
   `MobilityType: ${Object.values(MobilityType).join(', ')}`,
