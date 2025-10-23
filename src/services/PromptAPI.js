@@ -52,6 +52,26 @@ export class PromptAPI {
   }
 
   /**
+   * Send a prompt to the Language Model and get a response
+   * @param {string} prompt - The prompt text to send
+   * @param {Object} options - Additional options for the prompt
+   * @returns {Promise<string>} - Response
+   */
+  async prompt(prompt, options = {}) {
+    if (!this.session) {
+      throw new Error('Language Model session not created. Please create a session first.');
+    }
+
+    try {
+      const response = await this.session.prompt(prompt);
+      return response;
+    } catch (error) {
+      console.error('Error sending prompt:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Send a prompt to the Language Model and get a streaming response
    * @param {string} prompt - The prompt text to send
    * @param {Object} options - Additional options for the prompt
@@ -126,7 +146,7 @@ export class PromptAPI {
       await this.createSession(options);
     }
     
-    return await this.promptStreaming(prompt, options);
+    return await this.prompt(prompt, options);
   }
 }
 

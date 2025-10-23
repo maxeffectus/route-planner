@@ -7,7 +7,13 @@ import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
 import { ResponseDisplay } from '../components/ResponseDisplay';
 import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
+import { ProfileSetupChat } from '../components/ProfileSetupChat';
 import { getAllCategoryValues } from '../utils/categoryMapping';
+import { 
+  userProfilePromptOptions, 
+  responseSchema,
+  systemInstruction
+} from '../services/UserProfilePromptConfig';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -258,7 +264,17 @@ an elderly person, a colorblind person, a bicycle rider, etc.`
         const promptAvailability = await promptAPIRef.current.checkAvailability();
         
         if (promptAvailability === 'available') {
-          await promptAPIRef.current.createSession();
+          // Create session with UserProfile-specific options
+          await promptAPIRef.current.createSession({
+            ...userProfilePromptOptions,
+            responseConstraint: responseSchema,
+            initialPrompts: [
+              {
+                role: 'system',
+                content: systemInstruction,
+              },
+            ],
+          });
           setPromptReady(true);
           console.log('Prompt API initialized and ready');
         } else {
@@ -340,28 +356,35 @@ an elderly person, a colorblind person, a bicycle rider, etc.`
           🗺️ Where would you like to go?
         </h2>
         
-        <Autocomplete
-          searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
+          <Autocomplete
+            searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
           onSelect={handleCitySelect}
-          renderSuggestion={(city) => (
-            <>
-              <div style={{ fontWeight: '500', color: '#333' }}>
-                {city.name}
-              </div>
-              <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-                {city.displayName}
-              </div>
-            </>
-          )}
+            renderSuggestion={(city) => (
+              <>
+                <div style={{ fontWeight: '500', color: '#333' }}>
+                  {city.name}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                  {city.displayName}
+                </div>
+              </>
+            )}
           placeholder="Search for a city or location..."
-          minChars={2}
-          maxResults={5}
-          debounceMs={300}
-        />
+            minChars={2}
+            maxResults={5}
+            debounceMs={300}
+          />
         
         <p style={{ color: '#666', fontSize: '14px', marginTop: '15px', marginBottom: '20px' }}>
           Or use the map on the right to explore. Zoom in to level {MIN_ZOOM_LEVEL} or higher to search for points of interest in the visible area.
         </p>
+
+        <ProfileSetupChat 
+          promptAPIRef={promptAPIRef}
+          promptReady={promptReady}
+          summarizerAPIRef={summarizerAPIRef}
+          summarizerReady={summarizerReady}
+        />
 
         {/* User Prompt Input (shown after city selection or POI search) */}
         {showPromptInput && (
@@ -511,8 +534,8 @@ an elderly person, a colorblind person, a bicycle rider, etc.`
                       <POITitle poi={poi} color={color} variant="default" />
                       <POIType poi={poi} getPoiCategory={getPoiCategory} />
                       <POILinks poi={poi} fontSize="11px" gap="8px" />
-                    </div>
-                  </div>
+            </div>
+            </div>
                 );
               })}
             </div>
@@ -520,12 +543,12 @@ an elderly person, a colorblind person, a bicycle rider, etc.`
         )}
 
         {filteredPois.length === 0 && !isLoadingPOIs && (
-          <div style={{
+        <div style={{ 
             padding: '40px 20px',
             textAlign: 'center',
             color: '#999',
-            backgroundColor: '#fff',
-            borderRadius: '8px',
+          backgroundColor: '#fff', 
+          borderRadius: '8px',
             border: '1px dashed #ddd'
           }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
@@ -535,7 +558,7 @@ an elderly person, a colorblind person, a bicycle rider, etc.`
             <p style={{ margin: 0, fontSize: '14px' }}>
               Zoom in on the map and click "Find points of interest"
             </p>
-          </div>
+        </div>
         )}
       </div>
 
