@@ -3,7 +3,24 @@
  * This data is used to create optimal and customized routes.
  */
 
-// --- 1. ENUMS for compactness and clarity ---
+// --- 1. ENUMS and CONSTANTS for compactness and clarity ---
+
+/**
+ * Special marker values that indicate a field has not been filled by AI yet.
+ * These values are clearly distinguishable from any valid user data.
+ */
+export const UNFILLED_MARKERS = {
+    // For string fields that can be null or have specific values
+    STRING: '__UNFILLED__',
+    // For numeric fields (budget level, hours)
+    NUMBER: -999,
+    // For boolean fields
+    BOOLEAN: null, // Keep null for boolean as it's clear enough
+    // For array fields
+    ARRAY: '__EMPTY_ARRAY__',
+    // For object fields
+    OBJECT: '__EMPTY_OBJECT__'
+};
 
 /**
  * Defines the user's main mobility factor,
@@ -123,38 +140,59 @@ export class UserProfile {
      */
     timeWindow;
 
-    constructor(userId, initialInterests = {}) {
+    constructor(userId) {
         this.userId = userId;
-        this.mobility = null; // Will be determined by AI questions
-        this.avoidStairs = null; // Will be determined by AI questions
-        this.preferredTransport = []; // Empty - will be filled based on user preferences
-        this.interests = initialInterests; // Can start with some interests if provided
-        this.budgetLevel = null; // Will be determined by AI questions
-        this.travelPace = null; // Will be determined by AI questions
-        this.dietary = new DietaryPreference(); // Starts with all false values
+        this.mobility = UNFILLED_MARKERS.STRING; // Will be determined by AI questions
+        this.avoidStairs = UNFILLED_MARKERS.BOOLEAN; // Will be determined by AI questions
+        this.preferredTransport = UNFILLED_MARKERS.ARRAY; // Will be filled based on user preferences
+        this.interests = UNFILLED_MARKERS.OBJECT; // Will be filled based on user preferences
+        this.budgetLevel = UNFILLED_MARKERS.NUMBER; // Will be determined by AI questions
+        this.travelPace = UNFILLED_MARKERS.STRING; // Will be determined by AI questions
+        this.dietary = UNFILLED_MARKERS.OBJECT; // Will be determined by AI questions
         this.timeWindow = {
-            startHour: null, // Will be determined by AI questions
-            endHour: null    // Will be determined by AI questions
+            startHour: UNFILLED_MARKERS.NUMBER, // Will be determined by AI questions
+            endHour: UNFILLED_MARKERS.NUMBER    // Will be determined by AI questions
         };
     }
 
     /**
      * Method for setting the interest weight.
+     * If interests is still using the unfilled marker, initialize it as an empty object first.
      */
     setInterestWeight(category, weight) {
+        if (this.interests === UNFILLED_MARKERS.OBJECT) {
+            this.interests = {};
+        }
         this.interests[category] = Math.max(0, Math.min(1, weight)); // Restrict weight between 0 and 1
+    }
+
+    /**
+     * Check if a field has been filled by AI (not using unfilled markers)
+     */
+    isFieldFilled(value) {
+        if (value === UNFILLED_MARKERS.STRING || 
+            value === UNFILLED_MARKERS.NUMBER || 
+            value === UNFILLED_MARKERS.BOOLEAN || 
+            value === UNFILLED_MARKERS.ARRAY || 
+            value === UNFILLED_MARKERS.OBJECT) {
+            return false;
+        }
+        return true;
     }
 
     /**
      * Check if profile is complete (all required fields filled)
      */
     isComplete() {
-        return this.mobility !== null &&
-               this.budgetLevel !== null &&
-               this.travelPace !== null &&
-               this.timeWindow.startHour !== null &&
-               this.timeWindow.endHour !== null &&
-               this.preferredTransport.length > 0;
+        return this.isFieldFilled(this.mobility) &&
+               this.isFieldFilled(this.budgetLevel) &&
+               this.isFieldFilled(this.travelPace) &&
+               this.isFieldFilled(this.timeWindow.startHour) &&
+               this.isFieldFilled(this.timeWindow.endHour) &&
+               this.preferredTransport !== UNFILLED_MARKERS.ARRAY && 
+               this.preferredTransport.length > 0 &&
+               this.interests !== UNFILLED_MARKERS.OBJECT &&
+               this.dietary !== UNFILLED_MARKERS.OBJECT;
     }
 
     /**
@@ -162,12 +200,14 @@ export class UserProfile {
      */
     getMissingFields() {
         const missing = [];
-        if (this.mobility === null) missing.push('mobility');
-        if (this.budgetLevel === null) missing.push('budgetLevel');
-        if (this.travelPace === null) missing.push('travelPace');
-        if (this.timeWindow.startHour === null) missing.push('timeWindow.startHour');
-        if (this.timeWindow.endHour === null) missing.push('timeWindow.endHour');
-        if (this.preferredTransport.length === 0) missing.push('preferredTransport');
+        if (!this.isFieldFilled(this.mobility)) missing.push('mobility');
+        if (!this.isFieldFilled(this.budgetLevel)) missing.push('budgetLevel');
+        if (!this.isFieldFilled(this.travelPace)) missing.push('travelPace');
+        if (!this.isFieldFilled(this.timeWindow.startHour)) missing.push('timeWindow.startHour');
+        if (!this.isFieldFilled(this.timeWindow.endHour)) missing.push('timeWindow.endHour');
+        if (this.preferredTransport === UNFILLED_MARKERS.ARRAY || this.preferredTransport.length === 0) missing.push('preferredTransport');
+        if (this.interests === UNFILLED_MARKERS.OBJECT) missing.push('interests');
+        if (this.dietary === UNFILLED_MARKERS.OBJECT) missing.push('dietary');
         return missing;
     }
 
@@ -175,7 +215,7 @@ export class UserProfile {
      * Get completion percentage (0-100)
      */
     getCompletionPercentage() {
-        const totalFields = 6; // mobility, budgetLevel, travelPace, timeWindow.startHour, timeWindow.endHour, preferredTransport
+        const totalFields = 8; // mobility, budgetLevel, travelPace, timeWindow.startHour, timeWindow.endHour, preferredTransport, interests, dietary
         const filledFields = totalFields - this.getMissingFields().length;
         return Math.round((filledFields / totalFields) * 100);
     }
@@ -186,7 +226,7 @@ export class UserProfile {
     getSuggestedQuestions() {
         const questions = [];
         
-        if (this.mobility === null) {
+        if (!this.isFieldFilled(this.mobility)) {
             questions.push({
                 field: 'mobility',
                 question: 'What is your mobility situation? Do you use a wheelchair, travel with a stroller, have limited endurance, or have standard mobility?',
@@ -199,7 +239,7 @@ export class UserProfile {
             });
         }
 
-        if (this.budgetLevel === null) {
+        if (!this.isFieldFilled(this.budgetLevel)) {
             questions.push({
                 field: 'budgetLevel',
                 question: 'What is your budget preference for attractions and activities?',
@@ -212,7 +252,7 @@ export class UserProfile {
             });
         }
 
-        if (this.travelPace === null) {
+        if (!this.isFieldFilled(this.travelPace)) {
             questions.push({
                 field: 'travelPace',
                 question: 'What pace do you prefer for your trip?',
@@ -224,7 +264,7 @@ export class UserProfile {
             });
         }
 
-        if (this.preferredTransport.length === 0) {
+        if (this.preferredTransport === UNFILLED_MARKERS.ARRAY || this.preferredTransport.length === 0) {
             questions.push({
                 field: 'preferredTransport',
                 question: 'How do you prefer to get around? (You can select multiple options)',
@@ -238,7 +278,7 @@ export class UserProfile {
             });
         }
 
-        if (this.timeWindow.startHour === null || this.timeWindow.endHour === null) {
+        if (!this.isFieldFilled(this.timeWindow.startHour) || !this.isFieldFilled(this.timeWindow.endHour)) {
             questions.push({
                 field: 'timeWindow',
                 question: 'What time do you prefer to start and end your daily activities?',
@@ -250,6 +290,43 @@ export class UserProfile {
             });
         }
 
+        if (this.interests === UNFILLED_MARKERS.OBJECT) {
+            questions.push({
+                field: 'interests',
+                question: 'What types of activities and attractions interest you most? (You can select multiple categories)',
+                options: [
+                    { value: InterestCategory.HISTORY_CULTURE, label: 'History & Culture' },
+                    { value: InterestCategory.ART_MUSEUMS, label: 'Art & Museums' },
+                    { value: InterestCategory.ARCHITECTURE, label: 'Architecture' },
+                    { value: InterestCategory.NATURE_PARKS, label: 'Nature & Parks' },
+                    { value: InterestCategory.ENTERTAINMENT, label: 'Entertainment' },
+                    { value: InterestCategory.NIGHTLIFE, label: 'Nightlife' },
+                    { value: InterestCategory.GASTRONOMY, label: 'Food & Dining' },
+                    { value: InterestCategory.SHOPPING, label: 'Shopping' },
+                    { value: InterestCategory.SPORT_FITNESS, label: 'Sports & Fitness' },
+                    { value: InterestCategory.TECHNOLOGY, label: 'Technology' }
+                ],
+                multiple: true
+            });
+        }
+
+        if (this.dietary === UNFILLED_MARKERS.OBJECT) {
+            questions.push({
+                field: 'dietary',
+                question: 'Do you have any dietary preferences or restrictions?',
+                options: [
+                    { value: 'none', label: 'No dietary restrictions' },
+                    { value: 'vegetarian', label: 'Vegetarian' },
+                    { value: 'vegan', label: 'Vegan' },
+                    { value: 'gluten_free', label: 'Gluten-free' },
+                    { value: 'halal', label: 'Halal' },
+                    { value: 'kosher', label: 'Kosher' },
+                    { value: 'allergies', label: 'Food allergies' }
+                ],
+                multiple: true
+            });
+        }
+
         return questions;
     }
 
@@ -257,6 +334,9 @@ export class UserProfile {
      * Get all interest categories with their weights
      */
     getInterests() {
+        if (this.interests === UNFILLED_MARKERS.OBJECT) {
+            return {};
+        }
         return { ...this.interests };
     }
 
@@ -264,7 +344,7 @@ export class UserProfile {
      * Get mobility requirements as a readable string
      */
     getMobilityDescription() {
-        if (this.mobility === null) return 'Not specified';
+        if (!this.isFieldFilled(this.mobility)) return 'Not specified';
         const descriptions = {
             [MobilityType.STANDARD]: 'Standard mobility',
             [MobilityType.WHEELCHAIR]: 'Wheelchair accessible',
@@ -278,7 +358,7 @@ export class UserProfile {
      * Get transport preferences as readable strings
      */
     getTransportDescription() {
-        if (this.preferredTransport.length === 0) return 'Not specified';
+        if (this.preferredTransport === UNFILLED_MARKERS.ARRAY || this.preferredTransport.length === 0) return 'Not specified';
         const descriptions = {
             [TransportMode.WALK]: 'Walking',
             [TransportMode.BIKE]: 'Cycling',
@@ -292,6 +372,9 @@ export class UserProfile {
      * Check if user has any dietary restrictions
      */
     hasDietaryRestrictions() {
+        if (this.dietary === UNFILLED_MARKERS.OBJECT) {
+            return false;
+        }
         return this.dietary.vegan || 
                this.dietary.vegetarian || 
                this.dietary.glutenFree || 
@@ -304,6 +387,9 @@ export class UserProfile {
      * Get dietary restrictions as a readable string
      */
     getDietaryDescription() {
+        if (this.dietary === UNFILLED_MARKERS.OBJECT) {
+            return 'Not specified';
+        }
         const restrictions = [];
         if (this.dietary.vegan) restrictions.push('Vegan');
         if (this.dietary.vegetarian) restrictions.push('Vegetarian');
@@ -320,7 +406,7 @@ export class UserProfile {
      * Get time window as a readable string
      */
     getTimeWindowDescription() {
-        if (this.timeWindow.startHour === null || this.timeWindow.endHour === null) {
+        if (!this.isFieldFilled(this.timeWindow.startHour) || !this.isFieldFilled(this.timeWindow.endHour)) {
             return 'Not specified';
         }
         const formatHour = (hour) => {
@@ -334,6 +420,7 @@ export class UserProfile {
 
     /**
      * Convert profile to JSON for storage/transmission
+     * Note: Unfilled markers are preserved in JSON to maintain state
      */
     toJSON() {
         return {
@@ -344,7 +431,7 @@ export class UserProfile {
             interests: this.interests,
             budgetLevel: this.budgetLevel,
             travelPace: this.travelPace,
-            dietary: {
+            dietary: this.dietary === UNFILLED_MARKERS.OBJECT ? UNFILLED_MARKERS.OBJECT : {
                 vegan: this.dietary.vegan,
                 vegetarian: this.dietary.vegetarian,
                 glutenFree: this.dietary.glutenFree,
@@ -361,16 +448,25 @@ export class UserProfile {
 
     /**
      * Create UserProfile from JSON data
+     * Note: Unfilled markers are preserved when loading from JSON
      */
     static fromJSON(data) {
-        const profile = new UserProfile(data.userId, data.interests);
+        const profile = new UserProfile(data.userId);
         profile.mobility = data.mobility;
         profile.avoidStairs = data.avoidStairs;
         profile.preferredTransport = data.preferredTransport;
+        profile.interests = data.interests;
         profile.budgetLevel = data.budgetLevel;
         profile.travelPace = data.travelPace;
-        profile.dietary = new DietaryPreference();
-        Object.assign(profile.dietary, data.dietary);
+        
+        // Handle dietary field - if it's the unfilled marker, keep it; otherwise create DietaryPreference
+        if (data.dietary === UNFILLED_MARKERS.OBJECT) {
+            profile.dietary = UNFILLED_MARKERS.OBJECT;
+        } else {
+            profile.dietary = new DietaryPreference();
+            Object.assign(profile.dietary, data.dietary);
+        }
+        
         profile.timeWindow = data.timeWindow;
         return profile;
     }
@@ -398,6 +494,8 @@ export function createExampleProfile() {
     travellerProfile.setInterestWeight(InterestCategory.ART_MUSEUMS, 0.4);     // Low priority
     travellerProfile.setInterestWeight(InterestCategory.NIGHTLIFE, 0.0);       // Zero priority
 
+    // Setting dietary preferences
+    travellerProfile.dietary = new DietaryPreference();
     travellerProfile.dietary.vegetarian = true;
     travellerProfile.timeWindow.startHour = 11; // Starts later
     travellerProfile.timeWindow.endHour = 20;

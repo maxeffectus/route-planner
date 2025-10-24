@@ -1,4 +1,4 @@
-import { MobilityType, TransportMode, InterestCategory } from '../models/UserProfile';
+import { MobilityType, TransportMode, InterestCategory, UNFILLED_MARKERS } from '../models/UserProfile';
 
 /**
  * Structured Output Schema for Gemini API
@@ -59,9 +59,9 @@ export const systemInstruction = [
   "You are an AI travel profile assistant. Your goal is to fill the user's UserProfile data using a friendly, conversational interview process.",
   "",
   "**Your core steps for every turn:**",
-  "1. **Analyze:** Check the 'profileState' JSON for missing or default values (especially mobility, transport, pace, timeWindow, and interests).",
-  "2. **Question:** Formulate *one* clear, targeted, and conversational question to fill the *most important* missing field first. Use the available ENUM values for guidance. Any enums, constants, or other non-textual information should be replaced with their human-readable equivalents.",
-  "3. **Update:** Based on the user's 'lastMessage', update the provided 'profileState' JSON object and save the updated JSON object to 'updatedProfile'. Be strict with data types (e.g., use 'WHEELCHAIR' for mobility, numbers for budget, 0.0 to 1.0 for interest weights). If the user lists interests, map them to the closest InterestCategory and set the weight to 1.0. If the user provides a time window, convert it to the startHour and endHour fields in the timeWindow object. ALWAYS include the complete updatedProfile object in your response.",
+  "1. **Analyze:** Check the 'profileState' JSON for unfilled fields (fields with values like '__UNFILLED__', -999, '__EMPTY_ARRAY__', '__EMPTY_OBJECT__', or null for boolean fields). These indicate fields that haven't been filled by AI yet.",
+  "2. **Question:** Formulate *one* clear, targeted, and conversational question to fill the *most important* unfilled field first. Use the available ENUM values for guidance. Any enums, constants, or other non-textual information should be replaced with their human-readable equivalents.",
+  "3. **Update:** Based on the user's 'lastMessage', update the provided 'profileState' JSON object and save the updated JSON object to 'updatedProfile'. Be strict with data types (e.g., use 'WHEELCHAIR' for mobility, numbers for budget, 0.0 to 1.0 for interest weights). If the user lists interests, map them to the closest InterestCategory and set the weight to 1.0. If the user provides a time window, convert it to the startHour and endHour fields in the timeWindow object. For dietary preferences, create a proper DietaryPreference object with boolean flags. ALWAYS include the complete updatedProfile object in your response.",
   "4. **Output:** You MUST respond ONLY with a JSON object that strictly conforms to the provided schema. Do NOT include any commentary or chat text outside the 'nextQuestion' field of the JSON. The response MUST contain BOTH 'updatedProfile' and 'nextQuestion' fields.",
   "",
   "**Current ENUM Values:**",
@@ -69,7 +69,19 @@ export const systemInstruction = [
   `TransportMode: ${Object.values(TransportMode).join(', ')}`,
   `InterestCategory: ${Object.keys(InterestCategory).join(', ')}`,
   "TravelPace: LOW, MEDIUM, HIGH",
-  "BudgetLevel: 0 (Free), 1 (Low), 2 (Medium), 3 (High)"
+  "BudgetLevel: 0 (Free), 1 (Low), 2 (Medium), 3 (High)",
+  "",
+  "**Unfilled Field Markers:**",
+  `String fields: ${UNFILLED_MARKERS.STRING}`,
+  `Number fields: ${UNFILLED_MARKERS.NUMBER}`,
+  `Boolean fields: ${UNFILLED_MARKERS.BOOLEAN}`,
+  `Array fields: ${UNFILLED_MARKERS.ARRAY}`,
+  `Object fields: ${UNFILLED_MARKERS.OBJECT}`,
+  "",
+  "**Important Notes:**",
+  "- When filling interests, create an object with InterestCategory keys and weight values (0.0 to 1.0)",
+  "- When filling dietary preferences, create a DietaryPreference object with boolean flags for vegan, vegetarian, glutenFree, halal, kosher, and an allergies array",
+  "- All fields must be filled for the profile to be considered complete"
 ].join('\n');
 
 
@@ -103,20 +115,20 @@ export function validateUserProfileResponse(response) {
         }
         
         // Check budget level
-        if (profile.budgetLevel !== null && ![0, 1, 2, 3].includes(profile.budgetLevel)) {
+        if (profile.budgetLevel !== null && profile.budgetLevel !== UNFILLED_MARKERS.NUMBER && ![0, 1, 2, 3].includes(profile.budgetLevel)) {
             return false;
         }
         
         // Check travel pace
-        if (profile.travelPace && !['LOW', 'MEDIUM', 'HIGH'].includes(profile.travelPace)) {
+        if (profile.travelPace && profile.travelPace !== UNFILLED_MARKERS.STRING && !['LOW', 'MEDIUM', 'HIGH'].includes(profile.travelPace)) {
             return false;
         }
         
         // Check time window
         if (profile.timeWindow) {
             const { startHour, endHour } = profile.timeWindow;
-            if ((startHour !== null && (startHour < 0 || startHour > 23)) ||
-                (endHour !== null && (endHour < 0 || endHour > 23))) {
+            if ((startHour !== null && startHour !== UNFILLED_MARKERS.NUMBER && (startHour < 0 || startHour > 23)) ||
+                (endHour !== null && endHour !== UNFILLED_MARKERS.NUMBER && (endHour < 0 || endHour > 23))) {
                 return false;
             }
         }
