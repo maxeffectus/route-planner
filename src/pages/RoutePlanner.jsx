@@ -45,8 +45,7 @@ export function RoutePlanner() {
     if (savedProfile) {
       try {
         const profileData = JSON.parse(savedProfile);
-        const profile = new UserProfile(profileData.userId);
-        Object.assign(profile, profileData);
+        const profile = UserProfile.fromJSON(profileData);
         setUserProfile(profile);
       } catch (error) {
         console.error('Failed to load profile from localStorage:', error);
@@ -397,6 +396,7 @@ export function RoutePlanner() {
             <button
               onClick={() => {
                 localStorage.removeItem('routePlannerVisited');
+                localStorage.removeItem('userProfile');
                 setHasVisitedBefore(false);
                 setUserProfile(null);
                 setShowProfileModal(true);
