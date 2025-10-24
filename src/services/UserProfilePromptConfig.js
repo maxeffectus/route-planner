@@ -47,10 +47,6 @@ export const responseSchema = {
         nextQuestion: {
             type: "STRING",
             description: "The next targeted question to ask the user, based on missing data."
-        },
-        isComplete: {
-            type: "BOOLEAN",
-            description: "True if all critical fields of the profile have been filled."
         }
     }
 };
@@ -64,10 +60,9 @@ export const systemInstruction = [
   "",
   "**Your core steps for every turn:**",
   "1. **Analyze:** Check the 'profileState' JSON for missing or default values (especially mobility, transport, pace, timeWindow, and interests).",
-  "2. **Question:** Formulate *one* clear, targeted, and conversational question to fill the *most important* missing field first. Use the available ENUM values for guidance.",
-  "3. **Update:** Based on the user's 'lastMessage', update the 'updatedProfile' JSON object. Be strict with data types (e.g., use 'WHEELCHAIR' for mobility, numbers for budget, 0.0 to 1.0 for interest weights). If the user lists interests, map them to the closest InterestCategory and set the weight to 1.0.",
-  "4. **Completion:** If all critical fields are filled, set 'isComplete' to true and use the 'nextQuestion' field to provide a final polite summary and confirmation.",
-  "5. **Output:** You MUST respond ONLY with a JSON object that strictly conforms to the provided schema. Do NOT include any commentary or chat text outside the 'nextQuestion' field of the JSON. DO NOT omit any fields from the JSON including 'isComplete'.",
+  "2. **Question:** Formulate *one* clear, targeted, and conversational question to fill the *most important* missing field first. Use the available ENUM values for guidance. Any enums, constants, or other non-textual information should be replaced with their human-readable equivalents.",
+  "3. **Update:** Based on the user's 'lastMessage', update the provided 'profileState' JSON object and save the updated JSON object to 'updatedProfile'. Be strict with data types (e.g., use 'WHEELCHAIR' for mobility, numbers for budget, 0.0 to 1.0 for interest weights). If the user lists interests, map them to the closest InterestCategory and set the weight to 1.0. If the user provides a time window, convert it to the startHour and endHour fields in the timeWindow object. ALWAYS include the complete updatedProfile object in your response.",
+  "4. **Output:** You MUST respond ONLY with a JSON object that strictly conforms to the provided schema. Do NOT include any commentary or chat text outside the 'nextQuestion' field of the JSON. The response MUST contain BOTH 'updatedProfile' and 'nextQuestion' fields.",
   "",
   "**Current ENUM Values:**",
   `MobilityType: ${Object.values(MobilityType).join(', ')}`,
@@ -86,7 +81,7 @@ export const systemInstruction = [
 export function validateUserProfileResponse(response) {
     try {
         // Basic validation - check required fields
-        if (!response.updatedProfile || !response.nextQuestion || typeof response.isComplete !== 'boolean') {
+        if (!response.updatedProfile || !response.nextQuestion) {
             return false;
         }
         
@@ -150,8 +145,8 @@ export function extractUserProfileData(response) {
  * Default options for PromptAPI when working with UserProfile
  */
 export const userProfilePromptOptions = {
-    temperature: 0.7,
-    topK: 40,
+    temperature: 0.0,
+    topK: 1,
     maxOutputTokens: 1000
 };
 
@@ -163,11 +158,33 @@ export const userProfilePromptOptions = {
  * @returns {string} Formatted prompt
  */
 export function createUserProfilePrompt(profileState, lastMessage, chatHistory = []) {
-    return `**Context for Model:**
+    return `
 - profileState: ${JSON.stringify(profileState)}
 - lastMessage: "${lastMessage}"
 - chatHistory: ${JSON.stringify(chatHistory)}
-**GOAL:** Generate the next JSON response.`;
+**GOAL:** Generate the next JSON response according to the response schema.`;
+}
+
+/**
+ * Create a prompt for generating profile summary
+ * @param {Object} profileData - Complete UserProfile data
+ * @returns {string} Formatted prompt for summary generation
+ */
+export function createProfileSummaryPrompt(profileData) {
+    return `Please create a brief, human-readable summary of this travel profile:
+
+${JSON.stringify(profileData, null, 2)}
+
+The summary should be:
+- Friendly and conversational
+- Highlight the key preferences and needs
+- Mention any special requirements (mobility, dietary, etc.)
+- Be concise but informative
+- Written in third person (as if describing the traveler)
+
+Example format: "You are a [mobility] traveler who prefers [transport] and enjoys [interests]. You have [dietary] dietary requirements and typically travel during [time window]. Your budget level is [budget] and you prefer a [pace] travel pace."
+
+Please respond with ONLY the summary text, no additional formatting or commentary. Any enums, constants, or other non-textual information should be replaced with their human-readable equivalents.`;
 }
 
 // Export default configuration
@@ -176,6 +193,7 @@ export default {
     systemInstruction,
     userProfilePromptOptions,
     createUserProfilePrompt,
+    createProfileSummaryPrompt,
     validateUserProfileResponse,
     extractUserProfileData
 };

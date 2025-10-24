@@ -175,7 +175,7 @@ export class UserProfile {
      * Get completion percentage (0-100)
      */
     getCompletionPercentage() {
-        const totalFields = 6; // mobility, budgetLevel, travelPace, startHour, endHour, preferredTransport
+        const totalFields = 6; // mobility, budgetLevel, travelPace, timeWindow.startHour, timeWindow.endHour, preferredTransport
         const filledFields = totalFields - this.getMissingFields().length;
         return Math.round((filledFields / totalFields) * 100);
     }

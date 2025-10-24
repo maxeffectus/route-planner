@@ -3,6 +3,7 @@ import { UserProfile } from '../models/UserProfile';
 import { 
   userProfilePromptOptions, 
   createUserProfilePrompt, 
+  createProfileSummaryPrompt,
   validateUserProfileResponse, 
   extractUserProfileData,
   responseSchema,
@@ -76,6 +77,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
   const [isProfileComplete, setIsProfileComplete] = useState(false);
   const [isProfileSetupActive, setIsProfileSetupActive] = useState(false);
   const [isAiThinking, setIsAiThinking] = useState(false);
+  const [profileSummary, setProfileSummary] = useState(null);
 
   // Load profile from localStorage on component mount
   useEffect(() => {
@@ -110,6 +112,22 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
     }
   }, [userProfile]);
 
+  // Generate profile summary when profile is complete
+  const generateProfileSummary = useCallback(async (profile) => {
+    try {
+      if (!promptReady) return;
+      
+      const summaryPrompt = createProfileSummaryPrompt(profile.toJSON());
+      const summary = await promptAPIRef.current.prompt(summaryPrompt);
+      setProfileSummary(summary);
+      
+      console.log('Generated profile summary:', summary);
+    } catch (error) {
+      console.error('Failed to generate profile summary:', error);
+      setProfileSummary('Profile completed successfully!');
+    }
+  }, [promptReady, promptAPIRef]);
+
   // Send message to AI for profile setup
   const sendProfileMessage = useCallback(async (userMessage, profileToUse = null) => {
     const currentProfile = profileToUse || userProfile;
@@ -129,6 +147,14 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
         chatHistory
       );
       
+      // Debug logging
+      console.log('Sending prompt to AI:', {
+        profileState: currentProfile.toJSON(),
+        userMessage: userMessage,
+        chatHistoryLength: chatHistory.length,
+        structuredPrompt: structuredPrompt
+      });
+      
       // Add to chat history only if it's a real user message (not technical initialization)
       if (userMessage !== `Conversation started. currentProfile=${JSON.stringify(currentProfile.toJSON())}`) {
         setChatHistory(prev => [...prev, { role: 'user', message: userMessage }]);
@@ -144,19 +170,46 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
       // Parse JSON response
       let aiResponse;
       try {
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : response;
-        console.log('Extracted JSON string:', jsonString);
-        aiResponse = JSON.parse(jsonString);
-        console.log('Parsed AI response:', aiResponse);
-      } catch (parseError) {
-        console.error('Failed to parse AI response:', parseError);
-        console.error('Raw response:', response);
-        aiResponse = {
-          updatedProfile: currentProfile.toJSON(),
-          nextQuestion: "I understand. Could you tell me more about your travel preferences?",
-          isComplete: false
-        };
+        // Try to parse the entire response first
+        aiResponse = JSON.parse(response);
+        console.log('Parsed AI response directly:', aiResponse);
+      } catch (directParseError) {
+        console.log('Direct parse failed, trying to extract JSON:', directParseError.message);
+        try {
+          // If direct parsing fails, try to find JSON object boundaries more precisely
+          const startIndex = response.indexOf('{');
+          if (startIndex === -1) {
+            throw new Error('No JSON object found in response');
+          }
+          
+          // Find the matching closing brace by counting braces
+          let braceCount = 0;
+          let endIndex = startIndex;
+          for (let i = startIndex; i < response.length; i++) {
+            if (response[i] === '{') {
+              braceCount++;
+            } else if (response[i] === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                endIndex = i;
+                break;
+              }
+            }
+          }
+          
+          const jsonString = response.substring(startIndex, endIndex + 1);
+          console.log('Extracted JSON string:', jsonString);
+          aiResponse = JSON.parse(jsonString);
+          console.log('Parsed AI response from extracted string:', aiResponse);
+        } catch (extractParseError) {
+          console.error('Failed to parse AI response:', extractParseError);
+          console.error('Raw response:', response);
+          aiResponse = {
+            updatedProfile: currentProfile.toJSON(),
+            nextQuestion: "I understand. Could you tell me more about your travel preferences?",
+            isComplete: false
+          };
+        }
       }
 
       // Validate response
@@ -180,6 +233,27 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
           const updated = new UserProfile(prevProfile.userId);
           Object.assign(updated, profileData);
           
+          // Debug logging
+          console.log('Profile updated:', {
+            completionPercentage: updated.getCompletionPercentage(),
+            missingFields: updated.getMissingFields(),
+            profileData: profileData
+          });
+          
+          // Check completion status based on updated profile
+          const isComplete = updated.isComplete();
+          setIsProfileComplete(isComplete);
+
+          if (isComplete) {
+            setIsProfileSetupActive(false);
+            // Generate profile summary
+            generateProfileSummary(updated);
+            // Call the completion callback if provided
+            if (onProfileComplete) {
+              onProfileComplete();
+            }
+          }
+          
           // Notify parent component about profile update
           if (onProfileUpdate) {
             onProfileUpdate(updated);
@@ -200,17 +274,6 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
         console.log('Full new history:', newHistory);
         return newHistory;
       });
-      
-      // Check completion status
-      setIsProfileComplete(aiResponse.isComplete);
-
-      if (aiResponse.isComplete) {
-        setIsProfileSetupActive(false);
-        // Call the completion callback if provided
-        if (onProfileComplete) {
-          onProfileComplete();
-        }
-      }
 
     } catch (error) {
       console.error('Profile message error:', error);
@@ -361,6 +424,10 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
           {userProfile && promptReady && (
             <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
               Profile completion: {userProfile.getCompletionPercentage()}%
+              <br />
+              <small style={{ color: '#999' }}>
+                Missing: {userProfile.getMissingFields().join(', ') || 'None'}
+              </small>
             </div>
           )}
         </div>
@@ -373,21 +440,38 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
             ✅ Your Travel Profile
           </h3>
           
-          <div style={{ 
-            border: '1px solid #ddd', 
-            borderRadius: '4px', 
-            padding: '10px',
-            backgroundColor: '#f9f9f9',
-            fontSize: '14px',
-            marginBottom: '10px'
-          }}>
-            <div><strong>Mobility:</strong> {userProfile.getMobilityDescription()}</div>
-            <div><strong>Transport:</strong> {userProfile.getTransportDescription()}</div>
-            <div><strong>Budget:</strong> {userProfile.budgetLevel !== null ? `Level ${userProfile.budgetLevel}` : 'Not specified'}</div>
-            <div><strong>Pace:</strong> {userProfile.travelPace || 'Not specified'}</div>
-            <div><strong>Time Window:</strong> {userProfile.getTimeWindowDescription()}</div>
-            <div><strong>Dietary:</strong> {userProfile.getDietaryDescription()}</div>
-          </div>
+          {profileSummary ? (
+            <div style={{ 
+              border: '1px solid #ddd', 
+              borderRadius: '4px', 
+              padding: '15px',
+              backgroundColor: '#f9f9f9',
+              fontSize: '14px',
+              marginBottom: '10px',
+              lineHeight: '1.5'
+            }}>
+              <strong>Profile Summary:</strong>
+              <p style={{ margin: '10px 0 0 0', fontStyle: 'italic' }}>
+                {profileSummary}
+              </p>
+            </div>
+          ) : (
+            <div style={{ 
+              border: '1px solid #ddd', 
+              borderRadius: '4px', 
+              padding: '10px',
+              backgroundColor: '#f9f9f9',
+              fontSize: '14px',
+              marginBottom: '10px'
+            }}>
+              <div><strong>Mobility:</strong> {userProfile.getMobilityDescription()}</div>
+              <div><strong>Transport:</strong> {userProfile.getTransportDescription()}</div>
+              <div><strong>Budget:</strong> {userProfile.budgetLevel !== null ? `Level ${userProfile.budgetLevel}` : 'Not specified'}</div>
+              <div><strong>Pace:</strong> {userProfile.travelPace || 'Not specified'}</div>
+              <div><strong>Time Window:</strong> {userProfile.getTimeWindowDescription()}</div>
+              <div><strong>Dietary:</strong> {userProfile.getDietaryDescription()}</div>
+            </div>
+          )}
           
           <button 
             onClick={() => {
@@ -395,6 +479,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
               setChatHistory([]);
               setIsProfileComplete(false);
               setIsProfileSetupActive(false);
+              setProfileSummary(null);
               localStorage.removeItem('userProfile');
               // Notify parent component about profile reset
               if (onProfileUpdate) {
