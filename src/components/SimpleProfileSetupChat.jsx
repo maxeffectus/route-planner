@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../models/UserProfile.js';
 import { 
     getNextQuestion, 
+    getAllQuestions,
+    getCurrentFieldValue,
     processAnswer, 
     getCompletionPercentage 
 } from '../services/SimpleProfileConfig.js';
+import { ProfileQuestionUtils } from '../utils/ProfileQuestionUtils.js';
 
 /**
  * Simple profile setup chat component with predefined questions and answers
@@ -15,6 +18,8 @@ export default function SimpleProfileSetupChat({
     onComplete 
 }) {
     const [currentQuestion, setCurrentQuestion] = useState(null);
+    const [questionHistory, setQuestionHistory] = useState([]);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [selectedAnswers, setSelectedAnswers] = useState([]);
     const [dietaryAnswers, setDietaryAnswers] = useState({
         vegan: false,
@@ -33,164 +38,48 @@ export default function SimpleProfileSetupChat({
 
     // Helper function to reset all answer states
     const resetAnswerStates = () => {
-        setSelectedAnswers([]);
-        setDietaryAnswers({
-            vegan: false,
-            vegetarian: false,
-            glutenFree: false,
-            halal: false,
-            kosher: false,
-            allergies: ''
-        });
-        setTimeWindowAnswers({
-            startHour: 9,
-            endHour: 18
-        });
+        ProfileQuestionUtils.resetAnswerStates(setSelectedAnswers, setDietaryAnswers, setTimeWindowAnswers);
+    };
+
+    // Load current values from profile when question changes
+    const loadCurrentValues = () => {
+        ProfileQuestionUtils.loadCurrentValues(
+            currentQuestion, 
+            userProfile, 
+            setSelectedAnswers, 
+            setDietaryAnswers, 
+            setTimeWindowAnswers
+        );
     };
 
     // Initialize with first question
     useEffect(() => {
         if (userProfile) {
-            const nextQuestion = getNextQuestion(userProfile);
-            setCurrentQuestion(nextQuestion);
+            // Get all questions for editing mode
+            const history = getAllQuestions(userProfile);
+            setQuestionHistory(history);
+            
+            // Set current question based on index
+            if (history.length > 0) {
+                setCurrentQuestion(history[currentQuestionIndex]);
+            } else {
+                setCurrentQuestion(null);
+            }
+            
             setCompletionPercentage(getCompletionPercentage(userProfile));
             // Reset all answer states when moving to new question
             resetAnswerStates();
         }
-    }, [userProfile]);
+    }, [userProfile, currentQuestionIndex]);
 
     const handleSingleChoice = (value) => {
         if (isProcessing) return;
-        
-        setIsProcessing(true);
-        
-        // Process the answer
-        const success = processAnswer(userProfile, currentQuestion.field, value);
-        
-        if (success) {
-            // Update profile
-            onProfileUpdate(userProfile);
-            
-            // Move to next question
-            const nextQuestion = getNextQuestion(userProfile);
-            if (nextQuestion) {
-                setCurrentQuestion(nextQuestion);
-                setCompletionPercentage(getCompletionPercentage(userProfile));
-                // Reset all answer states for next question
-                resetAnswerStates();
-            } else {
-                // Profile is complete
-                onComplete(userProfile);
-            }
-        } else {
-            console.error('Failed to process answer');
-        }
-        
-        setIsProcessing(false);
-    };
-
-    const handleMultiChoice = () => {
-        if (isProcessing || selectedAnswers.length === 0) return;
-        
-        setIsProcessing(true);
-        
-        // Process the answer
-        const success = processAnswer(userProfile, currentQuestion.field, selectedAnswers);
-        
-        if (success) {
-            // Update profile
-            onProfileUpdate(userProfile);
-            
-            // Move to next question
-            const nextQuestion = getNextQuestion(userProfile);
-            if (nextQuestion) {
-                setCurrentQuestion(nextQuestion);
-                setCompletionPercentage(getCompletionPercentage(userProfile));
-                // Reset all answer states for next question
-                resetAnswerStates();
-            } else {
-                // Profile is complete
-                onComplete(userProfile);
-            }
-        } else {
-            console.error('Failed to process answer');
-        }
-        
-        setIsProcessing(false);
-    };
-
-    const handleDietarySubmit = () => {
-        if (isProcessing) return;
-        
-        setIsProcessing(true);
-        
-        // Process allergies
-        const allergies = dietaryAnswers.allergies
-            .split(',')
-            .map(allergy => allergy.trim())
-            .filter(allergy => allergy.length > 0);
-        
-        const dietaryData = {
-            ...dietaryAnswers,
-            allergies
-        };
-        
-        // Process the answer
-        const success = processAnswer(userProfile, currentQuestion.field, dietaryData);
-        
-        if (success) {
-            // Update profile
-            onProfileUpdate(userProfile);
-            
-            // Move to next question
-            const nextQuestion = getNextQuestion(userProfile);
-            if (nextQuestion) {
-                setCurrentQuestion(nextQuestion);
-                setCompletionPercentage(getCompletionPercentage(userProfile));
-                // Reset all answer states for next question
-                resetAnswerStates();
-            } else {
-                // Profile is complete
-                onComplete(userProfile);
-            }
-        } else {
-            console.error('Failed to process dietary answer');
-        }
-        
-        setIsProcessing(false);
-    };
-
-    const handleTimeWindowSubmit = () => {
-        if (isProcessing) return;
-        
-        setIsProcessing(true);
-        
-        // Process the answer
-        const success = processAnswer(userProfile, currentQuestion.field, timeWindowAnswers);
-        
-        if (success) {
-            // Update profile
-            onProfileUpdate(userProfile);
-            
-            // Move to next question
-            const nextQuestion = getNextQuestion(userProfile);
-            if (nextQuestion) {
-                setCurrentQuestion(nextQuestion);
-                setCompletionPercentage(getCompletionPercentage(userProfile));
-                // Reset all answer states for next question
-                resetAnswerStates();
-            } else {
-                // Profile is complete
-                onComplete(userProfile);
-            }
-        } else {
-            console.error('Failed to process time window answer');
-        }
-        
-        setIsProcessing(false);
+        setSelectedAnswers([value]);
     };
 
     const handleMultiChoiceToggle = (value) => {
+        if (isProcessing) return;
+        
         setSelectedAnswers(prev => {
             if (prev.includes(value)) {
                 return prev.filter(item => item !== value);
@@ -200,17 +89,83 @@ export default function SimpleProfileSetupChat({
         });
     };
 
+    const handleDietaryChange = (field, value) => {
+        if (isProcessing) return;
+        setDietaryAnswers(prev => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+
+    const handleTimeWindowChange = (field, value) => {
+        if (isProcessing) return;
+        setTimeWindowAnswers(prev => ({
+            ...prev,
+            [field]: parseInt(value)
+        }));
+    };
+
+    const saveCurrentAnswer = () => {
+        if (isProcessing || !currentQuestion) return;
+        
+        setIsProcessing(true);
+        
+        // Get answer value using utility class
+        const answer = ProfileQuestionUtils.getAnswerValue(
+            currentQuestion, 
+            selectedAnswers, 
+            dietaryAnswers, 
+            timeWindowAnswers
+        );
+        
+        // Process the answer
+        const success = processAnswer(userProfile, currentQuestion.field, answer);
+        
+        if (success) {
+            // Update profile
+            onProfileUpdate(userProfile);
+            setCompletionPercentage(getCompletionPercentage(userProfile));
+            
+            // Load current values from updated profile instead of resetting
+            loadCurrentValues();
+        }
+        
+        setIsProcessing(false);
+    };
+
+    const handleNext = () => {
+        if (isProcessing || currentQuestionIndex >= questionHistory.length - 1) return;
+        
+        // Save current answer before moving to next question
+        saveCurrentAnswer();
+        
+        // Move to next question after a short delay to allow save to complete
+        setTimeout(() => {
+            setCurrentQuestionIndex(prev => prev + 1);
+        }, 100);
+    };
+
+    const handlePrevious = () => {
+        if (isProcessing || currentQuestionIndex === 0) return;
+        
+        // Save current answer before moving to previous question
+        saveCurrentAnswer();
+        
+        // Move to previous question after a short delay to allow save to complete
+        setTimeout(() => {
+            setCurrentQuestionIndex(prev => prev - 1);
+        }, 100);
+    };
+
+    // Load values when question changes
+    useEffect(() => {
+        loadCurrentValues();
+    }, [currentQuestion]);
+
     const handleDietaryToggle = (key) => {
         setDietaryAnswers(prev => ({
             ...prev,
             [key]: !prev[key]
-        }));
-    };
-
-    const handleTimeWindowChange = (key, value) => {
-        setTimeWindowAnswers(prev => ({
-            ...prev,
-            [key]: parseInt(value) || 0
         }));
     };
 
@@ -274,7 +229,7 @@ export default function SimpleProfileSetupChat({
                             {currentQuestion.options.map((option, index) => (
                                 <button
                                     key={index}
-                                    className="option-button"
+                                    className={`option-button ${selectedAnswers.includes(option.value) ? 'selected' : ''}`}
                                     onClick={() => handleSingleChoice(option.value)}
                                     disabled={isProcessing}
                                 >
@@ -297,13 +252,6 @@ export default function SimpleProfileSetupChat({
                                     <span className="checkbox-label">{option.label}</span>
                                 </label>
                             ))}
-                            <button
-                                className="submit-button"
-                                onClick={handleMultiChoice}
-                                disabled={isProcessing || selectedAnswers.length === 0}
-                            >
-                                Continue
-                            </button>
                         </div>
                     )}
 
@@ -337,13 +285,6 @@ export default function SimpleProfileSetupChat({
                                     disabled={isProcessing}
                                 />
                             </div>
-                            <button
-                                className="submit-button"
-                                onClick={handleDietarySubmit}
-                                disabled={isProcessing}
-                            >
-                                Continue
-                            </button>
                         </div>
                     )}
 
@@ -377,13 +318,6 @@ export default function SimpleProfileSetupChat({
                                     />
                                 </div>
                             </div>
-                            <button
-                                className="submit-button"
-                                onClick={handleTimeWindowSubmit}
-                                disabled={isProcessing}
-                            >
-                                Continue
-                            </button>
                         </div>
                     )}
                 </div>
@@ -396,20 +330,35 @@ export default function SimpleProfileSetupChat({
                     </div>
                 )}
 
-                {/* Action buttons */}
-                <div className="action-buttons">
+                {/* Navigation buttons */}
+                <div className="navigation-buttons">
                     <button
-                        className="save-exit-button"
-                        onClick={() => {
-                            // Save current progress and exit
-                            onProfileUpdate(userProfile);
-                            onComplete(userProfile);
-                        }}
-                        disabled={isProcessing}
+                        className="nav-button prev-button"
+                        onClick={handlePrevious}
+                        disabled={isProcessing || currentQuestionIndex === 0}
                     >
-                        💾 Save & Exit
+                        ← Previous
                     </button>
                     
+                    <button
+                        className="nav-button next-button"
+                        onClick={handleNext}
+                        disabled={isProcessing || currentQuestionIndex >= questionHistory.length - 1}
+                    >
+                        Next →
+                    </button>
+                </div>
+
+                {/* Progress info */}
+                <div className="progress-info">
+                    <small>
+                        Question {currentQuestionIndex + 1} of {questionHistory.length}
+                        {completionPercentage > 0 && ` • ${completionPercentage}% complete`}
+                    </small>
+                </div>
+
+                {/* Action buttons */}
+                <div className="action-buttons">
                     {completionPercentage > 0 && (
                         <div className="progress-info">
                             <small>

@@ -380,3 +380,61 @@ body.modal-open {
   font-style: italic;
 }
 
+/* Navigation buttons */
+.navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0;
+  padding: 0 10px;
+}
+
+.nav-button {
+  padding: 10px 20px !important;
+  border: none !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  pointer-events: auto !important;
+  min-width: 120px;
+}
+
+.prev-button {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+.prev-button:hover:not(:disabled) {
+  background-color: #5a6268 !important;
+}
+
+
+.next-button {
+  background-color: #007bff !important;
+  color: white !important;
+}
+
+.next-button:hover:not(:disabled) {
+  background-color: #0056b3 !important;
+}
+
+.nav-button:disabled {
+  background-color: #ccc !important;
+  cursor: not-allowed !important;
+  opacity: 0.6 !important;
+}
+
+/* Option button styles */
+.option-button.selected {
+  background-color: #007bff !important;
+  color: white !important;
+  border: 2px solid #0056b3 !important;
+}
+
+.option-button.selected:hover {
+  background-color: #0056b3 !important;
+}
+

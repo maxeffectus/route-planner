@@ -97,6 +97,79 @@ export const profileQuestions = [
 ];
 
 /**
+ * Get current value for a field from profile
+ * @param {UserProfile} profile - User profile
+ * @param {string} fieldName - Name of the field
+ * @returns {*} Current value of the field
+ */
+export function getCurrentFieldValue(profile, fieldName) {
+    switch (fieldName) {
+        case 'mobility':
+        case 'avoidStairs':
+        case 'budgetLevel':
+        case 'travelPace':
+            return profile.isFieldFilled(profile[fieldName]) ? profile[fieldName] : null;
+            
+        case 'preferredTransport':
+            return (profile.preferredTransport !== UNFILLED_MARKERS.ARRAY && profile.preferredTransport.length > 0) 
+                ? [...profile.preferredTransport] : [];
+                   
+        case 'interests':
+            return (profile.interests !== UNFILLED_MARKERS.OBJECT && Object.keys(profile.interests).length > 0) 
+                ? Object.keys(profile.interests) : [];
+                   
+        case 'dietary':
+            if (profile.dietary !== UNFILLED_MARKERS.OBJECT && Object.keys(profile.dietary).length > 0) {
+                return {
+                    vegan: profile.dietary.vegan || false,
+                    vegetarian: profile.dietary.vegetarian || false,
+                    glutenFree: profile.dietary.glutenFree || false,
+                    halal: profile.dietary.halal || false,
+                    kosher: profile.dietary.kosher || false,
+                    allergies: profile.dietary.allergies ? profile.dietary.allergies.join(', ') : ''
+                };
+            }
+            return {
+                vegan: false,
+                vegetarian: false,
+                glutenFree: false,
+                halal: false,
+                kosher: false,
+                allergies: ''
+            };
+                   
+        case 'timeWindow':
+            if (profile.isFieldFilled(profile.timeWindow.startHour) && profile.isFieldFilled(profile.timeWindow.endHour)) {
+                return {
+                    startHour: profile.timeWindow.startHour,
+                    endHour: profile.timeWindow.endHour
+                };
+            }
+            return { startHour: 9, endHour: 18 };
+                   
+        default:
+            return null;
+    }
+}
+
+/**
+ * Get all questions for profile setup (including filled ones for editing)
+ * @param {UserProfile} profile - Current user profile
+ * @returns {Array} Array of question configurations
+ */
+export function getAllQuestions(profile) {
+    return profileQuestions.filter(questionConfig => {
+        // Always include questions that have conditions (like avoidStairs)
+        if (questionConfig.condition) {
+            return true;
+        }
+        
+        // For other questions, include them if the field is unfilled OR if we're editing
+        return true; // Always include for editing mode
+    });
+}
+
+/**
  * Get the next question based on current profile state
  * @param {UserProfile} profile - Current user profile
  * @returns {Object|null} Next question configuration or null if all filled
@@ -168,8 +241,8 @@ export function processAnswer(profile, fieldName, answer) {
                 if (answer !== MobilityType.STANDARD) {
                     profile.avoidStairs = true;
                 } else {
-                    // For standard mobility, keep avoidStairs unfilled so user can choose
-                    profile.avoidStairs = UNFILLED_MARKERS.STRING;
+                    // For standard mobility, set to false by default (user can change later)
+                    profile.avoidStairs = false;
                 }
                 break;
             case 'avoidStairs':
@@ -186,6 +259,8 @@ export function processAnswer(profile, fieldName, answer) {
                 if (profile.interests === UNFILLED_MARKERS.OBJECT) {
                     profile.interests = {};
                 }
+                // Clear existing interests first
+                profile.interests = {};
                 // Handle both array and object answers
                 if (Array.isArray(answer)) {
                     answer.forEach(interest => {
