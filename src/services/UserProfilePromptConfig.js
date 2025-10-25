@@ -1,4 +1,4 @@
-import { MobilityType, TransportMode, InterestCategory, UNFILLED_MARKERS } from '../models/UserProfile';
+import { MobilityType, TransportMode, InterestCategory, UNFILLED_MARKERS } from '../models/UserProfile.js';
 
 /**
  * Structured Output Schema for Gemini API
@@ -199,6 +199,221 @@ Example format: "You are a [mobility] traveler who prefers [transport] and enjoy
 Please respond with ONLY the summary text, no additional formatting or commentary. Any enums, constants, or other non-textual information should be replaced with their human-readable equivalents.`;
 }
 
+/**
+ * Field-specific schemas for individual field processing
+ */
+export const fieldSchemas = {
+    mobility: {
+        type: "string",
+        enum: Object.values(MobilityType),
+        description: "User's mobility type"
+    },
+    avoidStairs: {
+        type: "boolean",
+        description: "Whether user wants to avoid stairs"
+    },
+    preferredTransport: {
+        type: "array",
+        items: { type: "string", enum: Object.values(TransportMode) },
+        description: "Preferred transportation modes"
+    },
+    interests: {
+        type: "object",
+        additionalProperties: { type: "number" },
+        description: "Map of InterestCategory to weight (0.0 to 1.0)"
+    },
+    budgetLevel: {
+        type: "number",
+        enum: [0, 1, 2, 3],
+        description: "Budget level: 0=Free, 1=Low, 2=Medium, 3=High"
+    },
+    travelPace: {
+        type: "string",
+        enum: ['LOW', 'MEDIUM', 'HIGH'],
+        description: "Travel pace preference"
+    },
+    dietary: {
+        type: "object",
+        properties: {
+            vegan: { type: "boolean" },
+            vegetarian: { type: "boolean" },
+            glutenFree: { type: "boolean" },
+            halal: { type: "boolean" },
+            kosher: { type: "boolean" },
+            allergies: { type: "array", items: { type: "string" } }
+        },
+        description: "Dietary preferences and restrictions"
+    },
+    timeWindow: {
+        type: "object",
+        properties: {
+            startHour: { type: "number" },
+            endHour: { type: "number" }
+        },
+        description: "Preferred time window for activities"
+    }
+};
+
+/**
+ * Create a prompt for generating a question for a specific field
+ * @param {string} fieldName - Name of the field to fill
+ * @param {Array} conversationHistory - Previous conversation history
+ * @returns {string} Formatted prompt for question generation
+ */
+export function createFieldQuestionPrompt(fieldName, conversationHistory = []) {
+    const fieldSchema = fieldSchemas[fieldName];
+    if (!fieldSchema) {
+        throw new Error(`Unknown field: ${fieldName}`);
+    }
+
+    return `You are a travel assistant helping to fill out a user profile.
+I need to get information from the user for the field "${fieldName}".
+Field schema: ${JSON.stringify(fieldSchema)}.
+
+Please ask the user *one* simple and friendly question to get the needed information.
+The question should be clear and specific.
+
+Available values for reference:
+${getFieldValueHints(fieldName)}
+
+IMPORTANT: Respond with ONLY the question text, no JSON, no additional comments, no formatting. Just the question itself.`;
+}
+
+/**
+ * Create a prompt for parsing user's answer into JSON for a specific field
+ * @param {string} fieldName - Name of the field being filled
+ * @param {Array} conversationHistory - Full conversation history including the question and answer
+ * @returns {string} Formatted prompt for answer parsing
+ */
+export function createFieldParsingPrompt(fieldName, conversationHistory = []) {
+    const fieldSchema = fieldSchemas[fieldName];
+    if (!fieldSchema) {
+        throw new Error(`Unknown field: ${fieldName}`);
+    }
+
+    return `Analyze the *last user response* in the conversation history.
+The user is answering a question about the field "${fieldName}".
+
+Field schema: ${JSON.stringify(fieldSchema)}
+
+Your task: Return a JSON object containing *only* this field and its value, strictly following the schema.
+Your response must be *only* valid JSON and nothing else.
+
+Examples:
+- For field 'mobility': { "mobility": "WHEELCHAIR" }
+- For field 'avoidStairs': { "avoidStairs": true }
+- For field 'budgetLevel': { "budgetLevel": 2 }
+- For field 'travelPace': { "travelPace": "MEDIUM" }
+- For field 'preferredTransport': { "preferredTransport": ["walk", "public_transit"] }
+- For field 'interests': { "interests": { "nature_parks": 1.0, "gastronomy": 0.7 } }
+- For field 'dietary': { "dietary": { "vegan": false, "vegetarian": true, "glutenFree": false, "halal": false, "kosher": false, "allergies": [] } }
+- For field 'timeWindow': { "timeWindow": { "startHour": 9, "endHour": 18 } }
+
+Respond with ONLY JSON, no additional comments.`;
+}
+
+/**
+ * Get helpful hints for field values
+ * @param {string} fieldName - Name of the field
+ * @returns {string} Formatted hints
+ */
+function getFieldValueHints(fieldName) {
+    switch (fieldName) {
+        case 'mobility':
+            return `MobilityType: ${Object.values(MobilityType).join(', ')}`;
+        case 'preferredTransport':
+            return `TransportMode: ${Object.values(TransportMode).join(', ')}`;
+        case 'interests':
+            return `InterestCategory: ${Object.keys(InterestCategory).join(', ')}`;
+        case 'budgetLevel':
+            return 'BudgetLevel: 0 (Free), 1 (Low), 2 (Medium), 3 (High)';
+        case 'travelPace':
+            return 'TravelPace: LOW, MEDIUM, HIGH';
+        case 'dietary':
+            return 'Dietary options: vegan, vegetarian, glutenFree, halal, kosher, allergies';
+        case 'timeWindow':
+            return 'Time format: hours from 0 to 23 (e.g., 9 for 9:00 AM, 18 for 6:00 PM)';
+        default:
+            return '';
+    }
+}
+
+/**
+ * Create a response constraint schema for a specific field
+ * @param {string} fieldName - Name of the field
+ * @returns {Object} Response constraint schema
+ */
+export function createFieldResponseConstraint(fieldName) {
+    const fieldSchema = fieldSchemas[fieldName];
+    if (!fieldSchema) {
+        throw new Error(`Unknown field: ${fieldName}`);
+    }
+
+    return {
+        type: "object",
+        properties: {
+            [fieldName]: fieldSchema
+        },
+        required: [fieldName],
+        additionalProperties: false
+    };
+}
+
+/**
+ * Validate parsed field data against its schema
+ * @param {string} fieldName - Name of the field
+ * @param {Object} data - Parsed data to validate
+ * @returns {boolean} True if data is valid
+ */
+export function validateFieldData(fieldName, data) {
+    const fieldSchema = fieldSchemas[fieldName];
+    if (!fieldSchema) {
+        return false;
+    }
+
+    try {
+        // Basic validation based on field type
+        switch (fieldName) {
+            case 'mobility':
+                return Object.values(MobilityType).includes(data[fieldName]);
+            case 'avoidStairs':
+                return typeof data[fieldName] === 'boolean';
+            case 'preferredTransport':
+                return Array.isArray(data[fieldName]) && 
+                       data[fieldName].every(mode => Object.values(TransportMode).includes(mode));
+            case 'budgetLevel':
+                return [0, 1, 2, 3].includes(data[fieldName]);
+            case 'travelPace':
+                return ['LOW', 'MEDIUM', 'HIGH'].includes(data[fieldName]);
+            case 'interests':
+                return typeof data[fieldName] === 'object' && 
+                       Object.values(data[fieldName]).every(weight => 
+                           typeof weight === 'number' && weight >= 0 && weight <= 1);
+            case 'dietary':
+                const dietary = data[fieldName];
+                return typeof dietary === 'object' &&
+                       typeof dietary.vegan === 'boolean' &&
+                       typeof dietary.vegetarian === 'boolean' &&
+                       typeof dietary.glutenFree === 'boolean' &&
+                       typeof dietary.halal === 'boolean' &&
+                       typeof dietary.kosher === 'boolean' &&
+                       Array.isArray(dietary.allergies);
+            case 'timeWindow':
+                const timeWindow = data[fieldName];
+                return typeof timeWindow === 'object' &&
+                       typeof timeWindow.startHour === 'number' &&
+                       typeof timeWindow.endHour === 'number' &&
+                       timeWindow.startHour >= 0 && timeWindow.startHour <= 23 &&
+                       timeWindow.endHour >= 0 && timeWindow.endHour <= 23;
+            default:
+                return false;
+        }
+    } catch (error) {
+        console.error('Validation error:', error);
+        return false;
+    }
+}
+
 // Export default configuration
 export default {
     responseSchema,
@@ -207,5 +422,10 @@ export default {
     createUserProfilePrompt,
     createProfileSummaryPrompt,
     validateUserProfileResponse,
-    extractUserProfileData
+    extractUserProfileData,
+    fieldSchemas,
+    createFieldQuestionPrompt,
+    createFieldParsingPrompt,
+    createFieldResponseConstraint,
+    validateFieldData
 };

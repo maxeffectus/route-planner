@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { WarningDialog } from './WarningDialog';
-import { ProfileSetupChat } from './ProfileSetupChat';
+import { ProfileSetupChat } from './IterativeProfileSetupChat';
 
 /**
  * Profile Setup Modal Component

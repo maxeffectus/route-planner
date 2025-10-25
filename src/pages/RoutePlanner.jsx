@@ -1,17 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
-import { PromptAPI } from '../services/PromptAPI';
 import { UserProfile } from '../models/UserProfile';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
-import { ProfileSetupModal } from '../components/ProfileSetupModal';
+import SimpleProfileSetupChat from '../components/SimpleProfileSetupChat';
 import { getAllCategoryValues } from '../utils/categoryMapping';
-import { 
-  userProfilePromptOptions, 
-  responseSchema,
-  systemInstruction
-} from '../services/UserProfilePromptConfig';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -29,15 +23,13 @@ export function RoutePlanner() {
   const mapsAPI = new OpenStreetAPI();
   const citySelectionRef = React.useRef(null); // Track city selection for auto-search
   
-  // Prompt API state (for additional AI interactions)
-  const [promptReady, setPromptReady] = useState(false);
-  const [promptError, setPromptError] = useState(null);
-  const promptAPIRef = React.useRef(new PromptAPI());
+  // Prompt API is no longer used for profile setup
   
   // Profile setup modal state
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [hasVisitedBefore, setHasVisitedBefore] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+  // Simple chat is now the only option
 
   // Load user profile from localStorage on component mount
   useEffect(() => {
@@ -230,40 +222,7 @@ export function RoutePlanner() {
   }, [mapBounds, currentZoom, selectedCategories, poiCache, mapsAPI]);
 
   // Initialize APIs in the background
-  useEffect(() => {
-    const initializeAPIs = async () => {
-      // Initialize Prompt API
-      try {
-        const promptAvailability = await promptAPIRef.current.checkAvailability();
-        
-        if (promptAvailability === 'available') {
-          // Create session with UserProfile-specific options
-          await promptAPIRef.current.createSession({
-            ...userProfilePromptOptions,
-            temperature: 0.0,  // The most deterministic output
-            topK: 1,
-            responseConstraint: responseSchema,
-            initialPrompts: [
-              {
-                role: 'system',
-                content: systemInstruction,
-              },
-            ],
-          });
-          setPromptReady(true);
-          console.log('Prompt API initialized and ready');
-        } else {
-          setPromptError('Prompt API is not available: ' + promptAvailability);
-          console.warn('Prompt API not available:', promptAvailability);
-        }
-      } catch (error) {
-        console.error('Failed to initialize Prompt API:', error);
-        setPromptError('Failed to initialize Prompt API: ' + error.message);
-      }
-    };
-    
-    initializeAPIs();
-  }, []);
+  // Prompt API initialization removed - using simple chat only
 
   // Show profile setup modal if profile is incomplete
   useEffect(() => {
@@ -274,19 +233,23 @@ export function RoutePlanner() {
     setHasVisitedBefore(true);
     
     // Check if profile is incomplete and show modal
-    if (promptReady && (!userProfile || !userProfile.isComplete())) {
+    if (!userProfile || !userProfile.isComplete()) {
+      // If no profile exists, create a new empty one
+      if (!userProfile) {
+        const newProfile = new UserProfile();
+        setUserProfile(newProfile);
+      }
       setShowProfileModal(true);
     }
-  }, [promptReady, userProfile]);
+  }, [userProfile]);
 
   // Show prompt input when POIs are searched or city is selected
-  const showPromptInput = (pois.length > 0 || isLoadingPOIs) && promptReady;
+  const showPromptInput = (pois.length > 0 || isLoadingPOIs);
 
   // Debug logging
   console.log('RoutePlanner Debug:', {
     hasVisitedBefore,
     showProfileModal,
-    promptReady,
     userProfile: userProfile ? {
       isComplete: userProfile.isComplete(),
       completionPercentage: userProfile.getCompletionPercentage()
@@ -362,7 +325,7 @@ export function RoutePlanner() {
         </p>
 
         {/* Profile Setup Button - show different states based on profile completion */}
-        {promptReady && hasVisitedBefore && (
+        {hasVisitedBefore && (
           <div style={{ marginBottom: '20px' }}>
             <button
               onClick={() => setShowProfileModal(true)}
@@ -417,14 +380,60 @@ export function RoutePlanner() {
           </div>
         )}
 
-        <ProfileSetupModal 
-          isOpen={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-          promptAPIRef={promptAPIRef}
-          promptReady={promptReady}
-          promptError={promptError}
-          onProfileUpdate={setUserProfile}
-        />
+        {/* Simple Profile Setup Modal */}
+        {showProfileModal && (
+          <div className="modal-overlay" style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div className="modal-content" style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              padding: '20px',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              position: 'relative'
+            }}>
+              {/* Close button */}
+              <button
+                onClick={() => setShowProfileModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+
+              {/* Simple Profile Setup Chat */}
+              <SimpleProfileSetupChat
+                userProfile={userProfile}
+                onProfileUpdate={setUserProfile}
+                onComplete={(profile) => {
+                  setUserProfile(profile);
+                  setShowProfileModal(false);
+                  // Save to localStorage
+                  localStorage.setItem('userProfile', JSON.stringify(profile.toJSON()));
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* POI List */}
         {filteredPois.length > 0 && (

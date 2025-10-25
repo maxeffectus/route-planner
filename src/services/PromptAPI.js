@@ -63,10 +63,22 @@ export class PromptAPI {
     }
 
     try {
-      const response = await this.session.prompt(prompt);
+      console.log('🚀 [PromptAPI] Sending prompt with options:', options);
+      console.log('📤 [PromptAPI] Prompt text:', prompt);
+      
+      const response = await this.session.prompt(prompt, options);
+      
+      console.log('📥 [PromptAPI] Received response:', response);
+      
       return response;
     } catch (error) {
-      console.error('Error sending prompt:', error);
+      console.error('❌ [PromptAPI] Error sending prompt:', error);
+      console.error('❌ [PromptAPI] Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        options: options
+      });
       throw error;
     }
   }

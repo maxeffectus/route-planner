@@ -1,14 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { UserProfile } from '../models/UserProfile';
-import { 
-  userProfilePromptOptions, 
-  createUserProfilePrompt, 
-  createProfileSummaryPrompt,
-  validateUserProfileResponse, 
-  extractUserProfileData,
-  responseSchema,
-  systemInstruction
-} from '../services/UserProfilePromptConfig';
+import { createProfileSummaryPrompt } from '../services/UserProfilePromptConfig';
+import { IterativeProfileService } from '../services/IterativeProfileService';
 
 /**
  * Chat Loading Animation Component
@@ -32,7 +25,7 @@ function ChatLoadingAnimation() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentMessage(prev => (prev + 1) % loadingMessages.length);
-    }, 1500); // Change message every 1.5 seconds
+    }, 1500);
     
     return () => clearInterval(interval);
   }, []);
@@ -67,17 +60,22 @@ function ChatLoadingAnimation() {
 }
 
 /**
- * Profile Setup Chat Component
- * Handles AI-driven user profile creation through conversational interface
+ * Iterative Profile Setup Chat Component
+ * Uses the new two-step API approach: generate question -> parse answer
  */
 export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete, onProfileUpdate, autoStart = false }) {
-  // UserProfile and chat state
+  // State management
   const [userProfile, setUserProfile] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
   const [isProfileSetupActive, setIsProfileSetupActive] = useState(false);
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [profileSummary, setProfileSummary] = useState(null);
+  const [currentField, setCurrentField] = useState(null);
+  const [error, setError] = useState(null);
+  
+  // Iterative profile service
+  const [profileService] = useState(() => new IterativeProfileService(promptAPIRef.current));
 
   // Load profile from localStorage on component mount
   useEffect(() => {
@@ -85,8 +83,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
     if (savedProfile) {
       try {
         const profileData = JSON.parse(savedProfile);
-        const profile = new UserProfile(profileData.userId);
-        Object.assign(profile, profileData);
+        const profile = UserProfile.fromJSON(profileData);
         setUserProfile(profile);
         setIsProfileComplete(profile.isComplete());
         
@@ -96,7 +93,7 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
         }
       } catch (error) {
         console.error('Failed to load profile from localStorage:', error);
-        localStorage.removeItem('userProfile'); // Remove corrupted data
+        localStorage.removeItem('userProfile');
       }
     }
   }, [onProfileUpdate]);
@@ -128,167 +125,8 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
     }
   }, [promptReady, promptAPIRef]);
 
-  // Send message to AI for profile setup
-  const sendProfileMessage = useCallback(async (userMessage, profileToUse = null) => {
-    const currentProfile = profileToUse || userProfile;
-    
-    if (!currentProfile || !promptReady || isProfileComplete) {
-      return;
-    }
-
-    try {
-      // Set AI thinking state
-      setIsAiThinking(true);
-      
-      // Create structured prompt
-      const structuredPrompt = createUserProfilePrompt(
-        currentProfile.toJSON(),
-        userMessage,
-        chatHistory
-      );
-      
-      // Debug logging
-      console.log('Sending prompt to AI:', {
-        profileState: currentProfile.toJSON(),
-        userMessage: userMessage,
-        chatHistoryLength: chatHistory.length,
-        structuredPrompt: structuredPrompt
-      });
-      
-      // Add to chat history only if it's a real user message (not technical initialization)
-      if (userMessage !== `Conversation started. currentProfile=${JSON.stringify(currentProfile.toJSON())}`) {
-        setChatHistory(prev => [...prev, { role: 'user', message: userMessage }]);
-      }
-
-      // Send to AI with response constraint
-      const response = await promptAPIRef.current.prompt(structuredPrompt, {
-        responseConstraint: responseSchema
-      });
-      console.log('AI Response:', response);
-      console.log('Response type:', typeof response);
-      
-      // Parse JSON response
-      let aiResponse;
-      try {
-        // Try to parse the entire response first
-        aiResponse = JSON.parse(response);
-        console.log('Parsed AI response directly:', aiResponse);
-      } catch (directParseError) {
-        console.log('Direct parse failed, trying to extract JSON:', directParseError.message);
-        try {
-          // If direct parsing fails, try to find JSON object boundaries more precisely
-          const startIndex = response.indexOf('{');
-          if (startIndex === -1) {
-            throw new Error('No JSON object found in response');
-          }
-          
-          // Find the matching closing brace by counting braces
-          let braceCount = 0;
-          let endIndex = startIndex;
-          for (let i = startIndex; i < response.length; i++) {
-            if (response[i] === '{') {
-              braceCount++;
-            } else if (response[i] === '}') {
-              braceCount--;
-              if (braceCount === 0) {
-                endIndex = i;
-                break;
-              }
-            }
-          }
-          
-          const jsonString = response.substring(startIndex, endIndex + 1);
-          console.log('Extracted JSON string:', jsonString);
-          aiResponse = JSON.parse(jsonString);
-          console.log('Parsed AI response from extracted string:', aiResponse);
-        } catch (extractParseError) {
-          console.error('Failed to parse AI response:', extractParseError);
-          console.error('Raw response:', response);
-          aiResponse = {
-            updatedProfile: currentProfile.toJSON(),
-            nextQuestion: "I understand. Could you tell me more about your travel preferences?",
-            isComplete: false
-          };
-        }
-      }
-
-      // Validate response
-      if (!validateUserProfileResponse(aiResponse)) {
-        console.warn('AI response validation failed, using fallback');
-        if (!aiResponse.nextQuestion) {
-          aiResponse.nextQuestion = "I understand. Could you tell me more about your travel preferences?";
-        }
-        if (typeof aiResponse.isComplete !== 'boolean') {
-          aiResponse.isComplete = false;
-        }
-        if (!aiResponse.updatedProfile) {
-          aiResponse.updatedProfile = currentProfile.toJSON();
-        }
-      }
-
-      // Update profile with AI response
-      try {
-        const profileData = extractUserProfileData(aiResponse);
-        setUserProfile(prevProfile => {
-          const updated = new UserProfile(prevProfile.userId);
-          Object.assign(updated, profileData);
-          
-          // Debug logging
-          console.log('Profile updated:', {
-            completionPercentage: updated.getCompletionPercentage(),
-            missingFields: updated.getMissingFields(),
-            profileData: profileData
-          });
-          
-          // Check completion status based on updated profile
-          const isComplete = updated.isComplete();
-          setIsProfileComplete(isComplete);
-
-          if (isComplete) {
-            setIsProfileSetupActive(false);
-            // Generate profile summary
-            generateProfileSummary(updated);
-            // Call the completion callback if provided
-            if (onProfileComplete) {
-              onProfileComplete();
-            }
-          }
-          
-          // Notify parent component about profile update
-          if (onProfileUpdate) {
-            onProfileUpdate(updated);
-          }
-          
-          return updated;
-        });
-      } catch (extractError) {
-        console.warn('Failed to extract profile data, keeping current profile:', extractError);
-      }
-
-      // Update chat history
-      setChatHistory(prev => {
-        const newHistory = [...prev, { role: 'ai', message: aiResponse.nextQuestion }];
-        console.log('Added AI response to chat:', aiResponse.nextQuestion);
-        console.log('AI response object:', aiResponse);
-        console.log('Chat history length:', newHistory.length);
-        console.log('Full new history:', newHistory);
-        return newHistory;
-      });
-
-    } catch (error) {
-      console.error('Profile message error:', error);
-      setChatHistory(prev => [...prev, { 
-        role: 'ai', 
-        message: `Sorry, there was an error processing your response. Please try again. (Error: ${error.message})` 
-      }]);
-    } finally {
-      // Always reset AI thinking state
-      setIsAiThinking(false);
-    }
-  }, [userProfile, promptReady, isProfileComplete, chatHistory, onProfileUpdate]);
-
-  // Initialize UserProfile chat
-  const initializeProfileChat = useCallback(async () => {
+  // Initialize iterative profile filling
+  const initializeProfileFilling = useCallback(async () => {
     try {
       if (!promptReady) {
         throw new Error('Prompt API not ready');
@@ -301,38 +139,117 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
         setUserProfile(profile);
       }
       
+      // Initialize the service
+      profileService.initialize(profile);
+      
       setChatHistory([]);
       setIsProfileComplete(false);
       setIsProfileSetupActive(true);
+      setError(null);
 
-      // Start conversation with initial prompt
-      const initialPrompt = `Conversation started. currentProfile=${JSON.stringify(profile.toJSON())}`;
-      await sendProfileMessage(initialPrompt, profile);
+      // Start the iterative filling process
+      const result = await profileService.startFilling();
       
-      // Fallback: if no AI response after 3 seconds, add a default question
-      setTimeout(() => {
-        setChatHistory(prev => {
-          if (prev.length === 0) {
-            return [{ 
-              role: 'ai', 
-              message: 'Hello! I\'d be happy to help you set up your travel profile. What type of mobility do you have? (Standard, wheelchair, stroller, or limited endurance?)' 
-            }];
-          }
-          return prev;
-        });
-      }, 3000);
+      if (result.isComplete) {
+        setIsProfileComplete(true);
+        setIsProfileSetupActive(false);
+        generateProfileSummary(profile);
+        if (onProfileComplete) {
+          onProfileComplete();
+        }
+        return;
+      }
+
+      // Add the first question to chat history
+      setChatHistory(prev => [...prev, { 
+        role: 'ai', 
+        message: result.question,
+        fieldName: result.fieldName 
+      }]);
+      setCurrentField(result.fieldName);
       
     } catch (error) {
-      console.error('Profile chat initialization error:', error);
+      console.error('Profile filling initialization error:', error);
+      setError(`Failed to initialize profile filling: ${error.message}`);
     }
-  }, [promptReady, sendProfileMessage, userProfile]);
+  }, [promptReady, userProfile, profileService, onProfileComplete, generateProfileSummary]);
+
+  // Process user's answer
+  const processUserAnswer = useCallback(async (userMessage) => {
+    if (!profileService.isCurrentlyProcessing()) {
+      setError('No field is currently being processed');
+      return;
+    }
+
+    try {
+      setIsAiThinking(true);
+      setError(null);
+
+      // Process the answer
+      const result = await profileService.processAnswer(userMessage);
+      
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      // Update the profile
+      const updatedProfile = profileService.getCurrentProfile();
+      setUserProfile(updatedProfile);
+      
+      // Notify parent component
+      if (onProfileUpdate) {
+        onProfileUpdate(updatedProfile);
+      }
+
+      // Check if profile is complete
+      if (result.isComplete) {
+        setIsProfileComplete(true);
+        setIsProfileSetupActive(false);
+        generateProfileSummary(updatedProfile);
+        if (onProfileComplete) {
+          onProfileComplete();
+        }
+        return;
+      }
+
+      // Generate next question if there are more fields
+      if (result.nextField) {
+        const nextResult = await profileService.startFilling();
+        
+        if (nextResult.isComplete) {
+          setIsProfileComplete(true);
+          setIsProfileSetupActive(false);
+          generateProfileSummary(updatedProfile);
+          if (onProfileComplete) {
+            onProfileComplete();
+          }
+          return;
+        }
+
+        // Add next question to chat history
+        setChatHistory(prev => [...prev, { 
+          role: 'ai', 
+          message: nextResult.question,
+          fieldName: nextResult.fieldName 
+        }]);
+        setCurrentField(nextResult.fieldName);
+      }
+
+    } catch (error) {
+      console.error('Error processing user answer:', error);
+      setError(`Failed to process answer: ${error.message}`);
+    } finally {
+      setIsAiThinking(false);
+    }
+  }, [profileService, onProfileUpdate, onProfileComplete, generateProfileSummary]);
 
   // Auto-start chat if autoStart is true and profile is not complete
   useEffect(() => {
     if (autoStart && promptReady && !isProfileSetupActive && !isProfileComplete) {
-      initializeProfileChat();
+      initializeProfileFilling();
     }
-  }, [autoStart, promptReady, isProfileSetupActive, isProfileComplete, initializeProfileChat]);
+  }, [autoStart, promptReady, isProfileSetupActive, isProfileComplete, initializeProfileFilling]);
 
   // Handle profile chat input
   const handleProfileChatSubmit = async (e) => {
@@ -343,16 +260,24 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
     const message = input.value.trim();
     input.value = '';
     
-    await sendProfileMessage(message);
+    // Add user message to chat history
+    setChatHistory(prev => [...prev, { 
+      role: 'user', 
+      message: message 
+    }]);
+    
+    await processUserAnswer(message);
   };
 
   // Debug logging
-  console.log('Profile Setup Debug:', {
+  console.log('Iterative Profile Setup Debug:', {
     promptReady,
     isProfileSetupActive,
     isProfileComplete,
     chatHistoryLength: chatHistory.length,
-    userProfile: !!userProfile
+    userProfile: !!userProfile,
+    currentField,
+    isProcessing: profileService.isCurrentlyProcessing()
   });
 
   return (
@@ -362,7 +287,26 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
         <div style={{ marginBottom: '20px' }}>
           <h3 style={{ marginBottom: '10px', fontSize: '16px', fontWeight: 'bold' }}>
             💬 Profile Setup Chat
+            {currentField && (
+              <span style={{ fontSize: '12px', color: '#666', marginLeft: '10px' }}>
+                (Filling: {currentField})
+              </span>
+            )}
           </h3>
+          
+          {error && (
+            <div style={{
+              backgroundColor: '#f8d7da',
+              color: '#721c24',
+              padding: '10px',
+              borderRadius: '4px',
+              marginBottom: '10px',
+              fontSize: '14px'
+            }}>
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+          
           <div style={{ 
             maxHeight: '300px', 
             overflowY: 'auto', 
@@ -383,12 +327,16 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
               <ChatLoadingAnimation />
             ) : (
               <>
-                {console.log('Rendering chat history:', chatHistory)}
                 {chatHistory.map((msg, index) => (
                   <div key={index} style={{ marginBottom: '10px' }}>
                     <strong style={{ color: msg.role === 'user' ? '#007bff' : '#28a745' }}>
                       {msg.role === 'user' ? 'You:' : 'AI:'}
                     </strong>
+                    {msg.fieldName && (
+                      <span style={{ fontSize: '10px', color: '#999', marginLeft: '5px' }}>
+                        ({msg.fieldName})
+                      </span>
+                    )}
                     <div style={{ marginTop: '4px', fontSize: '14px' }}>
                       {msg.message}
                     </div>
@@ -480,6 +428,9 @@ export function ProfileSetupChat({ promptAPIRef, promptReady, onProfileComplete,
               setIsProfileComplete(false);
               setIsProfileSetupActive(false);
               setProfileSummary(null);
+              setCurrentField(null);
+              setError(null);
+              profileService.reset();
               localStorage.removeItem('userProfile');
               // Notify parent component about profile reset
               if (onProfileUpdate) {
