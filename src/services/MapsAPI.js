@@ -417,6 +417,9 @@ export class OpenStreetAPI extends MapsAPI {
         node["tourism"="museum"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
         way["tourism"="museum"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
         relation["tourism"="museum"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        node["tourism"="gallery"]["name"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        way["tourism"="gallery"]["name"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        relation["tourism"="gallery"]["name"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
         node["amenity"="arts_centre"](${bboxStr});
         way["amenity"="arts_centre"](${bboxStr});
         relation["amenity"="arts_centre"](${bboxStr});
@@ -583,7 +586,9 @@ export class OpenStreetAPI extends MapsAPI {
           
           // Map OSM tags to InterestCategory
           let interestCategory = InterestCategory.HISTORY_CULTURE; // default
-          if (element.tags?.tourism === 'museum' || element.tags?.amenity === 'arts_centre') {
+          if (element.tags?.tourism === 'museum' || 
+              element.tags?.tourism === 'gallery' || 
+              element.tags?.amenity === 'arts_centre') {
             interestCategory = InterestCategory.ART_MUSEUMS;
           } else if (element.tags?.amenity === 'place_of_worship' || 
                      element.tags?.building?.match(/cathedral|church|mosque|temple|castle|palace/)) {
