@@ -1,6 +1,9 @@
 // Jest setup file
 // This file runs before each test file
 
+// Import jest-dom matchers
+import '@testing-library/jest-dom';
+
 // Mock localStorage
 const localStorageMock = {
   getItem: jest.fn(),

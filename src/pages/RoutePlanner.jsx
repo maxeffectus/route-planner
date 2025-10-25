@@ -243,6 +243,37 @@ export function RoutePlanner() {
     }
   }, [userProfile]);
 
+  // Manage body scroll when modal is open
+  useEffect(() => {
+    if (showProfileModal) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showProfileModal]);
+
+  // Handle Escape key to close modal (only if profile is complete)
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && showProfileModal && userProfile && userProfile.isComplete()) {
+        setShowProfileModal(false);
+      }
+    };
+
+    if (showProfileModal) {
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showProfileModal, userProfile]);
+
   // Show prompt input when POIs are searched or city is selected
   const showPromptInput = (pois.length > 0 || isLoadingPOIs);
 
@@ -382,18 +413,28 @@ export function RoutePlanner() {
 
         {/* Simple Profile Setup Modal */}
         {showProfileModal && (
-          <div className="modal-overlay" style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}>
+          <div 
+            className="modal-overlay" 
+            onClick={(e) => {
+              // Close modal when clicking on overlay (but not on content)
+              // Only allow closing if profile is complete
+              if (e.target === e.currentTarget && userProfile && userProfile.isComplete()) {
+                setShowProfileModal(false);
+              }
+            }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              pointerEvents: 'auto'
+            }}>
             <div className="modal-content" style={{
               backgroundColor: 'white',
               borderRadius: '12px',
@@ -405,7 +446,12 @@ export function RoutePlanner() {
             }}>
               {/* Close button */}
               <button
-                onClick={() => setShowProfileModal(false)}
+                onClick={() => {
+                  // Only allow closing if profile is complete
+                  if (userProfile && userProfile.isComplete()) {
+                    setShowProfileModal(false);
+                  }
+                }}
                 style={{
                   position: 'absolute',
                   top: '10px',
@@ -413,8 +459,9 @@ export function RoutePlanner() {
                   background: 'none',
                   border: 'none',
                   fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#666'
+                  cursor: userProfile && userProfile.isComplete() ? 'pointer' : 'not-allowed',
+                  color: userProfile && userProfile.isComplete() ? '#666' : '#ccc',
+                  opacity: userProfile && userProfile.isComplete() ? 1 : 0.5
                 }}
               >
                 ×
