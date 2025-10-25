@@ -291,6 +291,11 @@ export function processAnswer(profile, fieldName, answer) {
                 
             case 'timeWindow':
                 if (typeof answer === 'object' && answer.startHour !== undefined && answer.endHour !== undefined) {
+                    // Validate that endHour > startHour
+                    if (answer.endHour <= answer.startHour) {
+                        console.warn('Invalid time window: endHour must be greater than startHour');
+                        return false;
+                    }
                     profile.timeWindow.startHour = answer.startHour;
                     profile.timeWindow.endHour = answer.endHour;
                 }

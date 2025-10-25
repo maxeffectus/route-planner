@@ -438,3 +438,14 @@ body.modal-open {
   background-color: #0056b3 !important;
 }
 
+/* Validation error styles */
+.validation-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-top: 10px;
+  font-size: 14px;
+  border: 1px solid #f5c6cb;
+}
+

@@ -72,6 +72,14 @@ export default function SimpleProfileSetupChat({
         }
     }, [userProfile, currentQuestionIndex]);
 
+    // Helper function to check if time window is invalid
+    const isTimeWindowInvalid = () => {
+        return currentQuestion?.type === 'time-range' && 
+               timeWindowAnswers.startHour !== undefined && 
+               timeWindowAnswers.endHour !== undefined && 
+               timeWindowAnswers.endHour <= timeWindowAnswers.startHour;
+    };
+
     const handleSingleChoice = (value) => {
         if (isProcessing) return;
         setSelectedAnswers([value]);
@@ -99,10 +107,26 @@ export default function SimpleProfileSetupChat({
 
     const handleTimeWindowChange = (field, value) => {
         if (isProcessing) return;
-        setTimeWindowAnswers(prev => ({
-            ...prev,
-            [field]: parseInt(value)
-        }));
+        
+        const newValue = parseInt(value);
+        
+        setTimeWindowAnswers(prev => {
+            const newAnswers = {
+                ...prev,
+                [field]: newValue
+            };
+            
+            // Validate that endHour > startHour
+            if (newAnswers.startHour !== undefined && newAnswers.endHour !== undefined) {
+                if (newAnswers.endHour <= newAnswers.startHour) {
+                    // If validation fails, don't update the state
+                    console.warn('Invalid time window: endHour must be greater than startHour');
+                    return prev;
+                }
+            }
+            
+            return newAnswers;
+        });
     };
 
     const saveCurrentAnswer = () => {
@@ -133,28 +157,43 @@ export default function SimpleProfileSetupChat({
         setIsProcessing(false);
     };
 
+    // Helper function to navigate to a question after saving
+    const navigateToQuestion = (direction) => {
+        setTimeout(() => {
+            setCurrentQuestionIndex(prev => direction === 'next' ? prev + 1 : prev - 1);
+        }, 100);
+    };
+
     const handleNext = () => {
         if (isProcessing || currentQuestionIndex >= questionHistory.length - 1) return;
+        
+        // Check for validation errors before saving
+        if (isTimeWindowInvalid()) {
+            console.warn('Cannot proceed: invalid time window');
+            return;
+        }
         
         // Save current answer before moving to next question
         saveCurrentAnswer();
         
         // Move to next question after a short delay to allow save to complete
-        setTimeout(() => {
-            setCurrentQuestionIndex(prev => prev + 1);
-        }, 100);
+        navigateToQuestion('next');
     };
 
     const handlePrevious = () => {
         if (isProcessing || currentQuestionIndex === 0) return;
         
+        // Check for validation errors before saving
+        if (isTimeWindowInvalid()) {
+            console.warn('Cannot proceed: invalid time window');
+            return;
+        }
+        
         // Save current answer before moving to previous question
         saveCurrentAnswer();
         
         // Move to previous question after a short delay to allow save to complete
-        setTimeout(() => {
-            setCurrentQuestionIndex(prev => prev - 1);
-        }, 100);
+        navigateToQuestion('previous');
     };
 
     // Load values when question changes
@@ -310,7 +349,7 @@ export default function SimpleProfileSetupChat({
                                     </label>
                                     <input
                                         type="number"
-                                        min="0"
+                                        min={timeWindowAnswers.startHour ? timeWindowAnswers.startHour + 1 : 0}
                                         max="23"
                                         value={timeWindowAnswers.endHour}
                                         onChange={(e) => handleTimeWindowChange('endHour', e.target.value)}
@@ -318,6 +357,11 @@ export default function SimpleProfileSetupChat({
                                     />
                                 </div>
                             </div>
+                            {isTimeWindowInvalid() && (
+                                <div className="validation-error">
+                                    ⚠️ End time must be after start time
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -335,7 +379,7 @@ export default function SimpleProfileSetupChat({
                     <button
                         className="nav-button prev-button"
                         onClick={handlePrevious}
-                        disabled={isProcessing || currentQuestionIndex === 0}
+                        disabled={isProcessing || currentQuestionIndex === 0 || isTimeWindowInvalid()}
                     >
                         ← Previous
                     </button>
@@ -343,7 +387,7 @@ export default function SimpleProfileSetupChat({
                     <button
                         className="nav-button next-button"
                         onClick={handleNext}
-                        disabled={isProcessing || currentQuestionIndex >= questionHistory.length - 1}
+                        disabled={isProcessing || currentQuestionIndex >= questionHistory.length - 1 || isTimeWindowInvalid()}
                     >
                         Next →
                     </button>
