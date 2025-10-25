@@ -452,21 +452,38 @@ export function RoutePlanner() {
               overflow: 'auto',
               position: 'relative'
             }}>
-              {/* Close button */}
+              {/* Save and Close button */}
               <button
-                onClick={() => setShowProfileModal(false)}
+                onClick={() => {
+                  // Save current profile and close modal
+                  if (userProfile) {
+                    localStorage.setItem('userProfile', JSON.stringify(userProfile));
+                  }
+                  setShowProfileModal(false);
+                }}
                 style={{
                   position: 'absolute',
                   top: '10px',
                   right: '10px',
-                  background: 'none',
+                  background: '#28a745',
                   border: 'none',
-                  fontSize: '24px',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: '500',
                   cursor: 'pointer',
-                  color: '#666'
+                  color: 'white',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#218838';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#28a745';
                 }}
               >
-                ×
+                💾 Save and Close
               </button>
 
               {/* Simple Profile Setup Chat */}
