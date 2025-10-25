@@ -12,10 +12,7 @@ export const CATEGORY_CONFIG = [
   { value: InterestCategory.NATURE_PARKS, label: 'Nature & Parks' },
   { value: InterestCategory.ENTERTAINMENT, label: 'Entertainment' },
   { value: InterestCategory.GASTRONOMY, label: 'Food & Dining' },
-  { value: InterestCategory.SHOPPING, label: 'Shopping' },
-  { value: InterestCategory.NIGHTLIFE, label: 'Nightlife' },
-  { value: InterestCategory.SPORT_FITNESS, label: 'Sports & Fitness' },
-  { value: InterestCategory.TECHNOLOGY, label: 'Technology' }
+  { value: InterestCategory.NIGHTLIFE, label: 'Nightlife' }
 ];
 
 // Create a map for quick lookups

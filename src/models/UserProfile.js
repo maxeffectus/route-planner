@@ -64,10 +64,6 @@ export const InterestCategory = {
     ENTERTAINMENT: 'entertainment', // Entertainment, attractions, cinema
     NIGHTLIFE: 'nightlife',
     GASTRONOMY: 'gastronomy', // Restaurants, cafes, street food
-    SHOPPING: 'shopping',
-    // Additional interests:
-    SPORT_FITNESS: 'sport_fitness',
-    TECHNOLOGY: 'technology',
 };
 
 /**
@@ -314,10 +310,7 @@ export class UserProfile {
                     { value: InterestCategory.NATURE_PARKS, label: 'Nature & Parks' },
                     { value: InterestCategory.ENTERTAINMENT, label: 'Entertainment' },
                     { value: InterestCategory.NIGHTLIFE, label: 'Nightlife' },
-                    { value: InterestCategory.GASTRONOMY, label: 'Food & Dining' },
-                    { value: InterestCategory.SHOPPING, label: 'Shopping' },
-                    { value: InterestCategory.SPORT_FITNESS, label: 'Sports & Fitness' },
-                    { value: InterestCategory.TECHNOLOGY, label: 'Technology' }
+                    { value: InterestCategory.GASTRONOMY, label: 'Food & Dining' }
                 ],
                 multiple: true
             });

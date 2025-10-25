@@ -52,12 +52,11 @@ describe('Enum Values Tests', () => {
     test('should have all required values', () => {
       const expectedValues = [
         InterestCategory.NATURE_PARKS,
+        InterestCategory.ENTERTAINMENT,
         InterestCategory.ART_MUSEUMS,
         InterestCategory.HISTORY_CULTURE,
         InterestCategory.GASTRONOMY,
-        InterestCategory.SHOPPING,
         InterestCategory.NIGHTLIFE,
-        InterestCategory.SPORT_FITNESS,
         InterestCategory.ARCHITECTURE
       ];
       

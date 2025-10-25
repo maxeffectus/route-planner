@@ -465,16 +465,6 @@ export class OpenStreetAPI extends MapsAPI {
         relation["shop"~"bakery|butcher|seafood|wine|alcohol"]["name"](${bboxStr});
     `;
     
-    // Shopping: shops, markets, malls
-    const shopping_query = `
-        node["shop"]["name"](${bboxStr});
-        way["shop"]["name"](${bboxStr});
-        relation["shop"]["name"](${bboxStr});
-        node["amenity"="marketplace"]["name"](${bboxStr});
-        way["amenity"="marketplace"]["name"](${bboxStr});
-        relation["amenity"="marketplace"]["name"](${bboxStr});
-    `;
-    
     // Nightlife: bars, clubs, nightlife venues
     const nightlife_query = `
         node["amenity"~"bar|pub|nightclub"]["name"](${bboxStr});
@@ -483,26 +473,6 @@ export class OpenStreetAPI extends MapsAPI {
         node["leisure"~"adult_gaming_centre|casino"](${bboxStr});
         way["leisure"~"adult_gaming_centre|casino"](${bboxStr});
         relation["leisure"~"adult_gaming_centre|casino"](${bboxStr});
-    `;
-    
-    // Sports & Fitness: sports facilities, gyms
-    const sport_fitness_query = `
-        node["leisure"~"sports_centre|fitness_centre|swimming_pool|stadium"](${bboxStr});
-        way["leisure"~"sports_centre|fitness_centre|swimming_pool|stadium"](${bboxStr});
-        relation["leisure"~"sports_centre|fitness_centre|swimming_pool|stadium"](${bboxStr});
-        node["amenity"~"gym|sports_centre"](${bboxStr});
-        way["amenity"~"gym|sports_centre"](${bboxStr});
-        relation["amenity"~"gym|sports_centre"](${bboxStr});
-    `;
-    
-    // Technology: tech museums, science centers
-    const technology_query = `
-        node["tourism"="museum"]["tourism:type"~"science|technology"](${bboxStr});
-        way["tourism"="museum"]["tourism:type"~"science|technology"](${bboxStr});
-        relation["tourism"="museum"]["tourism:type"~"science|technology"](${bboxStr});
-        node["amenity"~"planetarium|observatory"](${bboxStr});
-        way["amenity"~"planetarium|observatory"](${bboxStr});
-        relation["amenity"~"planetarium|observatory"](${bboxStr});
     `;
 
     const query = `
@@ -515,10 +485,7 @@ export class OpenStreetAPI extends MapsAPI {
         ${categories.includes(InterestCategory.NATURE_PARKS) ? nature_parks_query : ''}
         ${categories.includes(InterestCategory.ENTERTAINMENT) ? entertainment_query : ''}
         ${categories.includes(InterestCategory.GASTRONOMY) ? gastronomy_query : ''}
-        ${categories.includes(InterestCategory.SHOPPING) ? shopping_query : ''}
         ${categories.includes(InterestCategory.NIGHTLIFE) ? nightlife_query : ''}
-        ${categories.includes(InterestCategory.SPORT_FITNESS) ? sport_fitness_query : ''}
-        ${categories.includes(InterestCategory.TECHNOLOGY) ? technology_query : ''}
       )->.pois;
 
       // 2. Get noise items
@@ -631,17 +598,9 @@ export class OpenStreetAPI extends MapsAPI {
           } else if (element.tags?.amenity?.match(/restaurant|cafe|bar|pub|food_court/) ||
                      element.tags?.shop?.match(/bakery|butcher|seafood|wine|alcohol/)) {
             interestCategory = InterestCategory.GASTRONOMY;
-          } else if (element.tags?.shop || element.tags?.amenity === 'marketplace') {
-            interestCategory = InterestCategory.SHOPPING;
           } else if (element.tags?.amenity?.match(/bar|pub|nightclub/) ||
                      element.tags?.leisure?.match(/adult_gaming_centre|casino/)) {
             interestCategory = InterestCategory.NIGHTLIFE;
-          } else if (element.tags?.leisure?.match(/sports_centre|fitness_centre|swimming_pool|stadium/) ||
-                     element.tags?.amenity?.match(/gym|sports_centre/)) {
-            interestCategory = InterestCategory.SPORT_FITNESS;
-          } else if (element.tags?.tourism === 'museum' && element.tags?.['tourism:type']?.match(/science|technology/) ||
-                     element.tags?.amenity?.match(/planetarium|observatory/)) {
-            interestCategory = InterestCategory.TECHNOLOGY;
           } else if (element.tags?.historic) {
             interestCategory = InterestCategory.HISTORY_CULTURE;
           }
