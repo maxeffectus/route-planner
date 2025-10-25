@@ -168,8 +168,8 @@ export function processAnswer(profile, fieldName, answer) {
                 if (answer !== MobilityType.STANDARD) {
                     profile.avoidStairs = true;
                 } else {
-                    // Reset avoidStairs to false for standard mobility so user can choose
-                    profile.avoidStairs = false;
+                    // For standard mobility, keep avoidStairs unfilled so user can choose
+                    profile.avoidStairs = UNFILLED_MARKERS.STRING;
                 }
                 break;
             case 'avoidStairs':
@@ -186,11 +186,14 @@ export function processAnswer(profile, fieldName, answer) {
                 if (profile.interests === UNFILLED_MARKERS.OBJECT) {
                     profile.interests = {};
                 }
-                // Set all selected interests to weight 1.0
+                // Handle both array and object answers
                 if (Array.isArray(answer)) {
                     answer.forEach(interest => {
                         profile.interests[interest] = 1.0;
                     });
+                } else if (typeof answer === 'object') {
+                    // Direct object assignment
+                    Object.assign(profile.interests, answer);
                 }
                 break;
                 
