@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
-import { UserProfile } from '../models/UserProfile';
+import { UserProfile, InterestCategory } from '../models/UserProfile';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
@@ -72,12 +72,16 @@ export function RoutePlanner() {
 
   // Colorblind-friendly color mapping for POI categories
   const categoryColors = {
-    'museum': '#1976D2',        // Blue
-    'attraction': '#FF6F00',    // Orange
-    'historic': '#795548',      // Brown
-    'place_of_worship': '#7B1FA2', // Purple
-    'park': '#388E3C',          // Green
-    'viewpoint': '#00897B'      // Teal
+    [InterestCategory.HISTORY_CULTURE]: '#795548',    // Brown - исторические места
+    [InterestCategory.ART_MUSEUMS]: '#1976D2',         // Blue - музеи и искусство
+    [InterestCategory.ARCHITECTURE]: '#7B1FA2',        // Purple - архитектура
+    [InterestCategory.NATURE_PARKS]: '#388E3C',        // Green - природа и парки
+    [InterestCategory.ENTERTAINMENT]: '#FF6F00',       // Orange - развлечения
+    [InterestCategory.GASTRONOMY]: '#D32F2F',          // Red - гастрономия
+    [InterestCategory.SHOPPING]: '#F57C00',            // Deep Orange - шопинг
+    [InterestCategory.NIGHTLIFE]: '#8E24AA',           // Deep Purple - ночная жизнь
+    [InterestCategory.SPORT_FITNESS]: '#00796B',       // Teal - спорт и фитнес
+    [InterestCategory.TECHNOLOGY]: '#5D4037'           // Dark Brown - технологии
   };
 
   // Helper: Check if a POI is within a bounding box
@@ -103,13 +107,13 @@ export function RoutePlanner() {
     const lowerType = type.toLowerCase();
     
     // Map POI types to our category system
-    if (lowerType.includes('museum')) return 'museum';
-    if (lowerType.includes('attraction')) return 'attraction';
+    if (lowerType.includes('museum')) return InterestCategory.ART_MUSEUMS;
+    if (lowerType.includes('attraction')) return InterestCategory.ENTERTAINMENT;
     if (lowerType.includes('historic') || lowerType.includes('castle') || 
-        lowerType.includes('monument') || lowerType.includes('ruins')) return 'historic';
-    if (lowerType.includes('place_of_worship') || lowerType.includes('worship')) return 'place_of_worship';
-    if (lowerType.includes('park') || lowerType.includes('garden')) return 'park';
-    if (lowerType.includes('viewpoint')) return 'viewpoint';
+        lowerType.includes('monument') || lowerType.includes('ruins')) return InterestCategory.HISTORY_CULTURE;
+    if (lowerType.includes('place_of_worship') || lowerType.includes('worship')) return InterestCategory.ARCHITECTURE;
+    if (lowerType.includes('park') || lowerType.includes('garden')) return InterestCategory.NATURE_PARKS;
+    if (lowerType.includes('viewpoint')) return InterestCategory.NATURE_PARKS;
     
     // Default: return the original category if it matches one of ours
     if (selectedCategories.includes(lowerType)) return lowerType;

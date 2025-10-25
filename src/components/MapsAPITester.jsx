@@ -1,8 +1,19 @@
 import React, { useState } from 'react';
 import { OpenStreetAPI, GoogleMapsAPI } from '../services/MapsAPI';
 import { Autocomplete } from './Autocomplete';
+import { InterestCategory } from '../models/UserProfile';
 
 export function MapsAPITester() {
+  // Default categories using InterestCategory constants
+  const defaultCategories = [
+    InterestCategory.HISTORY_CULTURE,
+    InterestCategory.ART_MUSEUMS,
+    InterestCategory.ARCHITECTURE,
+    InterestCategory.NATURE_PARKS,
+    InterestCategory.ENTERTAINMENT,
+    InterestCategory.GASTRONOMY
+  ];
+  
   const [provider, setProvider] = useState('openstreet');
   const [method, setMethod] = useState('geocodeAddress');
   const [googleApiKey, setGoogleApiKey] = useState('');
@@ -22,7 +33,7 @@ export function MapsAPITester() {
   const [searchRadius, setSearchRadius] = useState('1000');
   const [selectedCity, setSelectedCity] = useState(null);
   const [poiLimit, setPoiLimit] = useState('20');
-  const [poiCategories, setPoiCategories] = useState('["museum", "attraction", "historic", "place_of_worship", "park", "viewpoint"]');
+  const [poiCategories, setPoiCategories] = useState(JSON.stringify(defaultCategories));
 
   const methods = [
     { value: 'geocodeAddress', label: 'Geocode Address' },
@@ -333,11 +344,11 @@ export function MapsAPITester() {
                     type="text"
                     value={poiCategories}
                     onChange={(e) => setPoiCategories(e.target.value)}
-                    placeholder='["museum", "attraction", "historic", "place_of_worship", "park", "viewpoint"]'
+                    placeholder={JSON.stringify(defaultCategories)}
                     style={{ ...inputStyle, fontFamily: 'monospace' }}
                   />
                   <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '5px' }}>
-                    Available: museum, attraction, historic, place_of_worship, park, viewpoint
+                    Available: {Object.values(InterestCategory).join(', ')}
                   </small>
                 </div>
 

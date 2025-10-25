@@ -1,5 +1,6 @@
 import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
 import { POI } from '../models/POI';
+import { InterestCategory } from '../models/UserProfile';
 
 /**
  * Base class for Maps API integrations
@@ -111,7 +112,7 @@ export class MapsAPI {
    * @param {Array<string>} categories - POI categories to search for
    * @returns {Promise<Array>} Array of POIs with name, type, location, etc.
    */
-  async getPOI(bbox, limit = 50, categories = ['museum', 'attraction', 'historic', 'place_of_worship', 'park', 'viewpoint']) {
+  async getPOI(bbox, limit = 50, categories = [InterestCategory.HISTORY_CULTURE, InterestCategory.ART_MUSEUMS, InterestCategory.ARCHITECTURE, InterestCategory.NATURE_PARKS, InterestCategory.ENTERTAINMENT, InterestCategory.GASTRONOMY]) {
     throw new Error('getPOI() must be implemented by subclass');
   }
 }
@@ -399,57 +400,125 @@ export class OpenStreetAPI extends MapsAPI {
    * @param {Array<string>} categories - POI categories to search for
    * @returns {Promise<Array>} Array of POIs
    */
-  async getPOI(bbox, limit = 50, categories = ['museum', 'attraction', 'historic', 'place_of_worship', 'park', 'viewpoint']) {
+  async getPOI(bbox, limit = 50, categories = [InterestCategory.HISTORY_CULTURE, InterestCategory.ART_MUSEUMS, InterestCategory.ARCHITECTURE, InterestCategory.NATURE_PARKS, InterestCategory.ENTERTAINMENT, InterestCategory.GASTRONOMY]) {
     // Build smart Overpass query that filters for significant POIs only
     // Based on Wikipedia presence, landmark status, and type    
     const bboxStr = `${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng}`;
     console.log('Getting POIs for bbox:', bboxStr, 'limit:', limit);
-    // Museums and attractions: require landmark tag OR Wikipedia page
-    const museums_query = `
+    // History & Culture: historic sites, monuments, castles
+    const history_culture_query = `
+        node["historic"~"castle|monument|ruins|memorial"]["historic"!~"memorial"](${bboxStr});
+        way["historic"~"castle|monument|ruins|memorial"]["historic"!~"memorial"](${bboxStr});
+        relation["historic"~"castle|monument|ruins|memorial"]["historic"!~"memorial"](${bboxStr});
+    `;
+    
+    // Art & Museums: museums, galleries, art centers
+    const art_museums_query = `
         node["tourism"="museum"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
         way["tourism"="museum"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
         relation["tourism"="museum"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        node["amenity"="arts_centre"](${bboxStr});
+        way["amenity"="arts_centre"](${bboxStr});
+        relation["amenity"="arts_centre"](${bboxStr});
     `;
-    const attractions_query = `
-        node["tourism"="attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
-        way["tourism"="attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
-        relation["tourism"="attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
-    `;
-    // Historic sites: castles, monuments, ruins (exclude small memorials)
-    const historic_sites_query = `
-        node["historic"~"castle|monument|ruins"]["historic"!~"memorial"](${bboxStr});
-        way["historic"~"castle|monument|ruins"]["historic"!~"memorial"](${bboxStr});
-        relation["historic"~"castle|monument|ruins"]["historic"!~"memorial"](${bboxStr});
-    `;
-    // Places of worship: only major buildings (cathedrals, churches, mosques, temples)
-    const places_of_worship_query = `
+    
+    // Architecture: significant buildings, landmarks
+    const architecture_query = `
         node["amenity"="place_of_worship"]["building"~"cathedral|church|mosque|temple"](${bboxStr});
         way["amenity"="place_of_worship"]["building"~"cathedral|church|mosque|temple"](${bboxStr});
         relation["amenity"="place_of_worship"]["building"~"cathedral|church|mosque|temple"](${bboxStr});
+        node["building"~"cathedral|church|mosque|temple|castle|palace"]["name"](${bboxStr});
+        way["building"~"cathedral|church|mosque|temple|castle|palace"]["name"](${bboxStr});
+        relation["building"~"cathedral|church|mosque|temple|castle|palace"]["name"](${bboxStr});
     `;
-    // Significant parks and gardens (must have name)
-    const parks_and_gardens_query = `
+    
+    // Nature & Parks: parks, gardens, viewpoints
+    const nature_parks_query = `
         node["leisure"~"park|garden"]["name"](${bboxStr});
         way["leisure"~"park|garden"]["name"](${bboxStr});
         relation["leisure"~"park|garden"]["name"](${bboxStr});
-    `;
-    // Viewpoints with names (scenic overlooks)
-    const viewpoints_query = `
         node["tourism"="viewpoint"]["name"](${bboxStr});
         way["tourism"="viewpoint"]["name"](${bboxStr});
         relation["tourism"="viewpoint"]["name"](${bboxStr});
+        node["natural"~"beach|cave|peak"]["name"](${bboxStr});
+        way["natural"~"beach|cave|peak"]["name"](${bboxStr});
+        relation["natural"~"beach|cave|peak"]["name"](${bboxStr});
+    `;
+    
+    // Entertainment: attractions, theaters, cinemas
+    const entertainment_query = `
+        node["tourism"="attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        way["tourism"="attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        relation["tourism"="attraction"](${bboxStr})(if:t["landmark"]=="yes" || is_tag("wikipedia"));
+        node["amenity"~"cinema|theatre|casino"](${bboxStr});
+        way["amenity"~"cinema|theatre|casino"](${bboxStr});
+        relation["amenity"~"cinema|theatre|casino"](${bboxStr});
+    `;
+    
+    // Gastronomy: restaurants, cafes, food markets
+    const gastronomy_query = `
+        node["amenity"~"restaurant|cafe|bar|pub|food_court"]["name"](${bboxStr});
+        way["amenity"~"restaurant|cafe|bar|pub|food_court"]["name"](${bboxStr});
+        relation["amenity"~"restaurant|cafe|bar|pub|food_court"]["name"](${bboxStr});
+        node["shop"~"bakery|butcher|seafood|wine|alcohol"]["name"](${bboxStr});
+        way["shop"~"bakery|butcher|seafood|wine|alcohol"]["name"](${bboxStr});
+        relation["shop"~"bakery|butcher|seafood|wine|alcohol"]["name"](${bboxStr});
+    `;
+    
+    // Shopping: shops, markets, malls
+    const shopping_query = `
+        node["shop"]["name"](${bboxStr});
+        way["shop"]["name"](${bboxStr});
+        relation["shop"]["name"](${bboxStr});
+        node["amenity"="marketplace"]["name"](${bboxStr});
+        way["amenity"="marketplace"]["name"](${bboxStr});
+        relation["amenity"="marketplace"]["name"](${bboxStr});
+    `;
+    
+    // Nightlife: bars, clubs, nightlife venues
+    const nightlife_query = `
+        node["amenity"~"bar|pub|nightclub"]["name"](${bboxStr});
+        way["amenity"~"bar|pub|nightclub"]["name"](${bboxStr});
+        relation["amenity"~"bar|pub|nightclub"]["name"](${bboxStr});
+        node["leisure"~"adult_gaming_centre|casino"](${bboxStr});
+        way["leisure"~"adult_gaming_centre|casino"](${bboxStr});
+        relation["leisure"~"adult_gaming_centre|casino"](${bboxStr});
+    `;
+    
+    // Sports & Fitness: sports facilities, gyms
+    const sport_fitness_query = `
+        node["leisure"~"sports_centre|fitness_centre|swimming_pool|stadium"](${bboxStr});
+        way["leisure"~"sports_centre|fitness_centre|swimming_pool|stadium"](${bboxStr});
+        relation["leisure"~"sports_centre|fitness_centre|swimming_pool|stadium"](${bboxStr});
+        node["amenity"~"gym|sports_centre"](${bboxStr});
+        way["amenity"~"gym|sports_centre"](${bboxStr});
+        relation["amenity"~"gym|sports_centre"](${bboxStr});
+    `;
+    
+    // Technology: tech museums, science centers
+    const technology_query = `
+        node["tourism"="museum"]["tourism:type"~"science|technology"](${bboxStr});
+        way["tourism"="museum"]["tourism:type"~"science|technology"](${bboxStr});
+        relation["tourism"="museum"]["tourism:type"~"science|technology"](${bboxStr});
+        node["amenity"~"planetarium|observatory"](${bboxStr});
+        way["amenity"~"planetarium|observatory"](${bboxStr});
+        relation["amenity"~"planetarium|observatory"](${bboxStr});
     `;
 
     const query = `
       [out:json][timeout:90];
       // 1. Significant POIs only
       (
-        ${categories.includes('museum') ? museums_query : ''}
-        ${categories.includes('attraction') ? attractions_query : ''}
-        ${categories.includes('historic') ? historic_sites_query : ''}
-        ${categories.includes('place_of_worship') ? places_of_worship_query : ''}
-        ${categories.includes('park') ? parks_and_gardens_query : ''}
-        ${categories.includes('viewpoint') ? viewpoints_query : ''}
+        ${categories.includes(InterestCategory.HISTORY_CULTURE) ? history_culture_query : ''}
+        ${categories.includes(InterestCategory.ART_MUSEUMS) ? art_museums_query : ''}
+        ${categories.includes(InterestCategory.ARCHITECTURE) ? architecture_query : ''}
+        ${categories.includes(InterestCategory.NATURE_PARKS) ? nature_parks_query : ''}
+        ${categories.includes(InterestCategory.ENTERTAINMENT) ? entertainment_query : ''}
+        ${categories.includes(InterestCategory.GASTRONOMY) ? gastronomy_query : ''}
+        ${categories.includes(InterestCategory.SHOPPING) ? shopping_query : ''}
+        ${categories.includes(InterestCategory.NIGHTLIFE) ? nightlife_query : ''}
+        ${categories.includes(InterestCategory.SPORT_FITNESS) ? sport_fitness_query : ''}
+        ${categories.includes(InterestCategory.TECHNOLOGY) ? technology_query : ''}
       )->.pois;
 
       // 2. Get noise items
@@ -465,8 +534,6 @@ export class OpenStreetAPI extends MapsAPI {
       out center;
     `.trim();
 
-    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-
     // Retry logic for 504 Gateway Timeout errors
     const maxRetries = 3;
     let lastError = null;
@@ -475,7 +542,13 @@ export class OpenStreetAPI extends MapsAPI {
       try {
         console.log(`Fetching POIs (attempt ${attempt}/${maxRetries})...`);
         
-        const response = await fetch(url);
+        const response = await fetch('https://overpass-api.de/api/interpreter', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `data=${encodeURIComponent(query)}`
+        });
         
         // Check for 504 Gateway Timeout
         if (response.status === 504) {
@@ -496,6 +569,14 @@ export class OpenStreetAPI extends MapsAPI {
               `or try zooming in to a smaller area.`
             );
           }
+        }
+        
+        // Check for 414 Request-URI Too Long (should not happen with POST, but just in case)
+        if (response.status === 414) {
+          throw new Error(
+            `Overpass API request too long (414). This should not happen with POST requests. ` +
+            `Please try reducing the search area or number of categories.`
+          );
         }
         
         // Check for other HTTP errors
@@ -533,11 +614,43 @@ export class OpenStreetAPI extends MapsAPI {
           }
           // Note: If imageUrl is null, getPOIImage() will try Wikidata next
           
+          // Map OSM tags to InterestCategory
+          let interestCategory = InterestCategory.HISTORY_CULTURE; // default
+          if (element.tags?.tourism === 'museum' || element.tags?.amenity === 'arts_centre') {
+            interestCategory = InterestCategory.ART_MUSEUMS;
+          } else if (element.tags?.amenity === 'place_of_worship' || 
+                     element.tags?.building?.match(/cathedral|church|mosque|temple|castle|palace/)) {
+            interestCategory = InterestCategory.ARCHITECTURE;
+          } else if (element.tags?.leisure?.match(/park|garden/) || 
+                     element.tags?.tourism === 'viewpoint' ||
+                     element.tags?.natural?.match(/beach|cave|peak/)) {
+            interestCategory = InterestCategory.NATURE_PARKS;
+          } else if (element.tags?.tourism === 'attraction' || 
+                     element.tags?.amenity?.match(/cinema|theatre|casino/)) {
+            interestCategory = InterestCategory.ENTERTAINMENT;
+          } else if (element.tags?.amenity?.match(/restaurant|cafe|bar|pub|food_court/) ||
+                     element.tags?.shop?.match(/bakery|butcher|seafood|wine|alcohol/)) {
+            interestCategory = InterestCategory.GASTRONOMY;
+          } else if (element.tags?.shop || element.tags?.amenity === 'marketplace') {
+            interestCategory = InterestCategory.SHOPPING;
+          } else if (element.tags?.amenity?.match(/bar|pub|nightclub/) ||
+                     element.tags?.leisure?.match(/adult_gaming_centre|casino/)) {
+            interestCategory = InterestCategory.NIGHTLIFE;
+          } else if (element.tags?.leisure?.match(/sports_centre|fitness_centre|swimming_pool|stadium/) ||
+                     element.tags?.amenity?.match(/gym|sports_centre/)) {
+            interestCategory = InterestCategory.SPORT_FITNESS;
+          } else if (element.tags?.tourism === 'museum' && element.tags?.['tourism:type']?.match(/science|technology/) ||
+                     element.tags?.amenity?.match(/planetarium|observatory/)) {
+            interestCategory = InterestCategory.TECHNOLOGY;
+          } else if (element.tags?.historic) {
+            interestCategory = InterestCategory.HISTORY_CULTURE;
+          }
+          
           return new POI({
             id: element.id,
             name: element.tags?.name || 'Unnamed',
             type: element.tags?.tourism || element.tags?.historic || element.tags?.amenity || element.tags?.leisure,
-            category: element.tags?.tourism ? 'tourism' : (element.tags?.historic ? 'historic' : 'other'),
+            category: interestCategory,
             location: {
               lat: lat,
               lng: lon
@@ -1029,7 +1142,7 @@ export class GoogleMapsAPI extends MapsAPI {
    * @param {Array<string>} categories - POI categories to search for
    * @returns {Promise<Array>} Array of POIs
    */
-  async getPOI(bbox, limit = 50, categories = ['museum', 'attraction', 'historic', 'place_of_worship', 'park', 'viewpoint']) {
+  async getPOI(bbox, limit = 50, categories = [InterestCategory.HISTORY_CULTURE, InterestCategory.ART_MUSEUMS, InterestCategory.ARCHITECTURE, InterestCategory.NATURE_PARKS, InterestCategory.ENTERTAINMENT, InterestCategory.GASTRONOMY]) {
     // Google Places doesn't support bbox directly, so we search from center
     const centerLat = (bbox.minLat + bbox.maxLat) / 2;
     const centerLng = (bbox.minLng + bbox.maxLng) / 2;

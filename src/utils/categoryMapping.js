@@ -3,13 +3,19 @@
  * Single source of truth for POI categories
  */
 
+import { InterestCategory } from '../models/UserProfile';
+
 export const CATEGORY_CONFIG = [
-  { value: 'museum', label: 'Museum' },
-  { value: 'attraction', label: 'Attraction' },
-  { value: 'historic', label: 'Historic' },
-  { value: 'place_of_worship', label: 'Place Of Worship' },
-  { value: 'park', label: 'Park' },
-  { value: 'viewpoint', label: 'Viewpoint' }
+  { value: InterestCategory.HISTORY_CULTURE, label: 'History & Culture' },
+  { value: InterestCategory.ART_MUSEUMS, label: 'Art & Museums' },
+  { value: InterestCategory.ARCHITECTURE, label: 'Architecture' },
+  { value: InterestCategory.NATURE_PARKS, label: 'Nature & Parks' },
+  { value: InterestCategory.ENTERTAINMENT, label: 'Entertainment' },
+  { value: InterestCategory.GASTRONOMY, label: 'Food & Dining' },
+  { value: InterestCategory.SHOPPING, label: 'Shopping' },
+  { value: InterestCategory.NIGHTLIFE, label: 'Nightlife' },
+  { value: InterestCategory.SPORT_FITNESS, label: 'Sports & Fitness' },
+  { value: InterestCategory.TECHNOLOGY, label: 'Technology' }
 ];
 
 // Create a map for quick lookups
@@ -20,20 +26,19 @@ const CATEGORY_LABEL_MAP = CATEGORY_CONFIG.reduce((acc, cat) => {
 
 /**
  * Get display label for a category value
- * @param {string} categoryValue - Category value (e.g., 'museum', 'place_of_worship')
- * @returns {string} Display label (e.g., 'Museum', 'Place Of Worship')
+ * @param {string} categoryValue - Category value (e.g., 'history_culture', 'art_museums')
+ * @returns {string} Display label (e.g., 'History & Culture', 'Art & Museums')
  */
 export function getCategoryLabel(categoryValue) {
   if (!categoryValue) return '';
   
-  const lowerValue = categoryValue.toLowerCase();
-  
-  // Direct match
-  if (CATEGORY_LABEL_MAP[lowerValue]) {
-    return CATEGORY_LABEL_MAP[lowerValue];
+  // Direct match for InterestCategory values
+  if (CATEGORY_LABEL_MAP[categoryValue]) {
+    return CATEGORY_LABEL_MAP[categoryValue];
   }
   
-  // Try to match partial strings for OSM types
+  // Try to match partial strings for OSM types (legacy support)
+  const lowerValue = categoryValue.toLowerCase();
   for (const [value, label] of Object.entries(CATEGORY_LABEL_MAP)) {
     if (lowerValue.includes(value) || value.includes(lowerValue)) {
       return label;

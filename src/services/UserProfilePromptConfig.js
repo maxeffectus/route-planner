@@ -266,12 +266,24 @@ export function createFieldQuestionPrompt(fieldName, conversationHistory = []) {
         throw new Error(`Unknown field: ${fieldName}`);
     }
 
-    return `You are a travel assistant helping to fill out a user profile.
-I need to get information from the user for the field "${fieldName}".
+    return `You are a friendly and joyful travel assistant helping to fill out a user profile.
+You need to get information from the user for the field "${fieldName}".
 Field schema: ${JSON.stringify(fieldSchema)}.
 
 Please ask the user *one* simple and friendly question to get the needed information.
-The question should be clear and specific.
+The question should be clear and specific. Ask it in a way that is easy for the user to understand and answer.
+
+If you need to fill the field with enum values, come up with a human-readable representation of the enum values.
+For example, if the field is "mobility" and the enum values are "WHEELCHAIR", "WALKER", "STROLLER", you can ask: "Do you have any mobility restrictions? For example, do you use a wheelchair, walk with a walker, or carry a baby in a stroller?" // TODO: Avoid stairs -> set automatically if the user is using a wheelchair
+
+If you need to fill the field with a boolean value, ask a question that is easy for the user to understand and answer.
+For example, if the field is "avoidStairs" and the value is boolean, you can ask: "Would you prefer to avoid stairs if possible?"
+
+If you need to fill the field with a number value, ask a question that is easy for the user to understand and answer.
+For example, if the field is "budgetLevel" and the number options are 0, 1, 2, 3, you can ask: "What's your spending limit for the trip? Are you on a budget, moderate, or luxury? Or looking for free activities?".
+
+If you need to fill the field with a string value, ask a question that is easy for the user to understand and answer.
+For example, if the field is "travelPace" and the string options are "HIGH", "MEDIUM", "LOW", you can ask: "Let's talk about your travel pace. Do you want to see everything and have a packed schedule, visit just the main attractions and have a balanced pace, or you want to travel in a relaxed mode and visit just the highlights?"
 
 Available values for reference:
 ${getFieldValueHints(fieldName)}
@@ -305,7 +317,7 @@ Examples:
 - For field 'budgetLevel': { "budgetLevel": 2 }
 - For field 'travelPace': { "travelPace": "MEDIUM" }
 - For field 'preferredTransport': { "preferredTransport": ["walk", "public_transit"] }
-- For field 'interests': { "interests": { "nature_parks": 1.0, "gastronomy": 0.7 } }
+- For field 'interests': { "interests": { "${InterestCategory.NATURE_PARKS}": 1.0, "${InterestCategory.GASTRONOMY}": 0.7 } }
 - For field 'dietary': { "dietary": { "vegan": false, "vegetarian": true, "glutenFree": false, "halal": false, "kosher": false, "allergies": [] } }
 - For field 'timeWindow': { "timeWindow": { "startHour": 9, "endHour": 18 } }
 
