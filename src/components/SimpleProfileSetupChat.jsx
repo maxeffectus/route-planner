@@ -12,11 +12,12 @@ import { ProfileQuestionUtils } from '../utils/ProfileQuestionUtils.js';
 /**
  * Simple profile setup chat component with predefined questions and answers
  */
-export default function SimpleProfileSetupChat({ 
+const SimpleProfileSetupChat = React.forwardRef(({ 
     userProfile, 
     onProfileUpdate, 
-    onComplete 
-}) {
+    onComplete,
+    onSaveRef 
+}, ref) => {
     const [currentQuestion, setCurrentQuestion] = useState(null);
     const [questionHistory, setQuestionHistory] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -110,25 +111,13 @@ export default function SimpleProfileSetupChat({
         
         const newValue = parseInt(value);
         
-        setTimeWindowAnswers(prev => {
-            const newAnswers = {
-                ...prev,
-                [field]: newValue
-            };
-            
-            // Validate that endHour > startHour
-            if (newAnswers.startHour !== undefined && newAnswers.endHour !== undefined) {
-                if (newAnswers.endHour <= newAnswers.startHour) {
-                    // If validation fails, don't update the state
-                    console.warn('Invalid time window: endHour must be greater than startHour');
-                    return prev;
-                }
-            }
-            
-            return newAnswers;
-        });
+        setTimeWindowAnswers(prev => ({
+            ...prev,
+            [field]: newValue
+        }));
     };
 
+    // Expose saveCurrentAnswer to parent component
     const saveCurrentAnswer = () => {
         if (isProcessing || !currentQuestion) return;
         
@@ -155,7 +144,13 @@ export default function SimpleProfileSetupChat({
         }
         
         setIsProcessing(false);
+        return success;
     };
+
+    // Expose saveCurrentAnswer to parent via ref
+    React.useImperativeHandle(ref, () => ({
+        saveCurrentAnswer
+    }));
 
     // Helper function to navigate to a question after saving
     const navigateToQuestion = (direction) => {
@@ -414,4 +409,6 @@ export default function SimpleProfileSetupChat({
             </div>
         </div>
     );
-}
+});
+
+export default SimpleProfileSetupChat;

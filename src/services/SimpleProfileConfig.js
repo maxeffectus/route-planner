@@ -159,13 +159,13 @@ export function getCurrentFieldValue(profile, fieldName) {
  */
 export function getAllQuestions(profile) {
     return profileQuestions.filter(questionConfig => {
-        // Always include questions that have conditions (like avoidStairs)
+        // For questions with conditions, only include if condition is met
         if (questionConfig.condition) {
-            return true;
+            return questionConfig.condition(profile);
         }
         
-        // For other questions, include them if the field is unfilled OR if we're editing
-        return true; // Always include for editing mode
+        // For other questions, always include for editing mode
+        return true;
     });
 }
 

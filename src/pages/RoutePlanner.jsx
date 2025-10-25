@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { UserProfile } from '../models/UserProfile';
 import { InteractiveMap } from '../components/InteractiveMap';
@@ -29,6 +29,7 @@ export function RoutePlanner() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [hasVisitedBefore, setHasVisitedBefore] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+  const profileChatRef = useRef(null);
   // Simple chat is now the only option
 
   // Load user profile from localStorage on component mount
@@ -455,6 +456,11 @@ export function RoutePlanner() {
               {/* Save and Close button */}
               <button
                 onClick={() => {
+                  // Save current answer first
+                  if (profileChatRef.current) {
+                    profileChatRef.current.saveCurrentAnswer();
+                  }
+                  
                   // Save current profile and close modal
                   if (userProfile) {
                     localStorage.setItem('userProfile', JSON.stringify(userProfile));
@@ -488,6 +494,7 @@ export function RoutePlanner() {
 
               {/* Simple Profile Setup Chat */}
               <SimpleProfileSetupChat
+                ref={profileChatRef}
                 userProfile={userProfile}
                 onProfileUpdate={setUserProfile}
                 onComplete={(profile) => {
