@@ -236,6 +236,11 @@ export function processAnswer(profile, fieldName, answer) {
     try {
         switch (fieldName) {
             case 'mobility':
+                // Validate: mobility must have a value
+                if (!answer) {
+                    console.warn('Mobility field requires a value');
+                    return false;
+                }
                 profile[fieldName] = answer;
                 // Automatically set avoidStairs based on mobility type
                 if (answer !== MobilityType.STANDARD) {
@@ -245,17 +250,46 @@ export function processAnswer(profile, fieldName, answer) {
                     profile.avoidStairs = false;
                 }
                 break;
+                
             case 'avoidStairs':
+                // Validate: avoidStairs must have a boolean value
+                if (answer === null || answer === undefined) {
+                    console.warn('avoidStairs field requires a value');
+                    return false;
+                }
+                profile[fieldName] = answer;
+                break;
+                
             case 'budgetLevel':
+                // Validate: budgetLevel must have a numeric value
+                if (answer === null || answer === undefined) {
+                    console.warn('budgetLevel field requires a value');
+                    return false;
+                }
+                profile[fieldName] = answer;
+                break;
+                
             case 'travelPace':
+                // Validate: travelPace must have a value
+                if (!answer) {
+                    console.warn('travelPace field requires a value');
+                    return false;
+                }
                 profile[fieldName] = answer;
                 break;
                 
             case 'preferredTransport':
-                profile.preferredTransport = Array.isArray(answer) ? answer : [answer];
+                // Validate: must have at least one transport mode selected
+                const transportArray = Array.isArray(answer) ? answer : [answer];
+                if (transportArray.length === 0 || !transportArray[0]) {
+                    console.warn('preferredTransport field requires at least one selection');
+                    return false;
+                }
+                profile.preferredTransport = transportArray;
                 break;
                 
             case 'interests':
+                // Validate: must have at least one interest selected
                 if (profile.interests === UNFILLED_MARKERS.OBJECT) {
                     profile.interests = {};
                 }
@@ -263,16 +297,28 @@ export function processAnswer(profile, fieldName, answer) {
                 profile.interests = {};
                 // Handle both array and object answers
                 if (Array.isArray(answer)) {
+                    if (answer.length === 0) {
+                        console.warn('interests field requires at least one selection');
+                        return false;
+                    }
                     answer.forEach(interest => {
                         profile.interests[interest] = 1.0;
                     });
                 } else if (typeof answer === 'object') {
+                    if (Object.keys(answer).length === 0) {
+                        console.warn('interests field requires at least one selection');
+                        return false;
+                    }
                     // Direct object assignment
                     Object.assign(profile.interests, answer);
+                } else {
+                    console.warn('interests field requires at least one selection');
+                    return false;
                 }
                 break;
                 
             case 'dietary':
+                // Dietary is ALWAYS valid, even if empty (no restrictions is a valid state)
                 if (profile.dietary === UNFILLED_MARKERS.OBJECT) {
                     profile.dietary = {
                         vegan: false,
@@ -290,15 +336,18 @@ export function processAnswer(profile, fieldName, answer) {
                 break;
                 
             case 'timeWindow':
-                if (typeof answer === 'object' && answer.startHour !== undefined && answer.endHour !== undefined) {
-                    // Validate that endHour > startHour
-                    if (answer.endHour <= answer.startHour) {
-                        console.warn('Invalid time window: endHour must be greater than startHour');
-                        return false;
-                    }
-                    profile.timeWindow.startHour = answer.startHour;
-                    profile.timeWindow.endHour = answer.endHour;
+                // Validate: both hours must be defined and valid
+                if (typeof answer !== 'object' || answer.startHour === undefined || answer.endHour === undefined) {
+                    console.warn('timeWindow field requires both startHour and endHour');
+                    return false;
                 }
+                // Validate that endHour > startHour
+                if (answer.endHour <= answer.startHour) {
+                    console.warn('Invalid time window: endHour must be greater than startHour');
+                    return false;
+                }
+                profile.timeWindow.startHour = answer.startHour;
+                profile.timeWindow.endHour = answer.endHour;
                 break;
                 
             default:
