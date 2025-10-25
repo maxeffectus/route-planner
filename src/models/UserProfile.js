@@ -185,6 +185,7 @@ export class UserProfile {
      */
     isComplete() {
         return this.isFieldFilled(this.mobility) &&
+               this.isFieldFilled(this.avoidStairs) &&
                this.isFieldFilled(this.budgetLevel) &&
                this.isFieldFilled(this.travelPace) &&
                this.isFieldFilled(this.timeWindow.startHour) &&
@@ -201,6 +202,7 @@ export class UserProfile {
     getMissingFields() {
         const missing = [];
         if (!this.isFieldFilled(this.mobility)) missing.push('mobility');
+        if (!this.isFieldFilled(this.avoidStairs)) missing.push('avoidStairs');
         if (!this.isFieldFilled(this.budgetLevel)) missing.push('budgetLevel');
         if (!this.isFieldFilled(this.travelPace)) missing.push('travelPace');
         if (!this.isFieldFilled(this.timeWindow.startHour)) missing.push('timeWindow.startHour');
@@ -215,7 +217,7 @@ export class UserProfile {
      * Get completion percentage (0-100)
      */
     getCompletionPercentage() {
-        const totalFields = 8; // mobility, budgetLevel, travelPace, timeWindow.startHour, timeWindow.endHour, preferredTransport, interests, dietary
+        const totalFields = 9; // mobility, avoidStairs, budgetLevel, travelPace, timeWindow.startHour, timeWindow.endHour, preferredTransport, interests, dietary
         const filledFields = totalFields - this.getMissingFields().length;
         return Math.round((filledFields / totalFields) * 100);
     }
@@ -235,6 +237,17 @@ export class UserProfile {
                     { value: MobilityType.WHEELCHAIR, label: 'Wheelchair user' },
                     { value: MobilityType.STROLLER, label: 'Traveling with stroller' },
                     { value: MobilityType.LOW_ENDURANCE, label: 'Limited endurance' }
+                ]
+            });
+        }
+
+        if (!this.isFieldFilled(this.avoidStairs)) {
+            questions.push({
+                field: 'avoidStairs',
+                question: 'Do you need to avoid stairs or prefer accessible routes?',
+                options: [
+                    { value: true, label: 'Yes, avoid stairs' },
+                    { value: false, label: 'No, stairs are fine' }
                 ]
             });
         }

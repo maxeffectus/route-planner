@@ -224,22 +224,26 @@ export function RoutePlanner() {
   // Initialize APIs in the background
   // Prompt API initialization removed - using simple chat only
 
-  // Show profile setup modal if profile is incomplete
+  // Show profile setup modal for new users or incomplete profiles
   useEffect(() => {
     const visited = localStorage.getItem('routePlannerVisited');
     if (!visited) {
+      // First time visitor - show profile setup
       localStorage.setItem('routePlannerVisited', 'true');
-    }
-    setHasVisitedBefore(true);
-    
-    // Check if profile is incomplete and show modal
-    if (!userProfile || !userProfile.isComplete()) {
-      // If no profile exists, create a new empty one
-      if (!userProfile) {
-        const newProfile = new UserProfile();
-        setUserProfile(newProfile);
-      }
+      setHasVisitedBefore(false);
+      
+      // Create new empty profile and show modal
+      const newProfile = new UserProfile();
+      setUserProfile(newProfile);
       setShowProfileModal(true);
+    } else {
+      // Returning user - check if profile is incomplete
+      setHasVisitedBefore(true);
+      
+      // If profile exists but is incomplete, show modal
+      if (userProfile && !userProfile.isComplete()) {
+        setShowProfileModal(true);
+      }
     }
   }, [userProfile]);
 
@@ -257,10 +261,10 @@ export function RoutePlanner() {
     };
   }, [showProfileModal]);
 
-  // Handle Escape key to close modal (only if profile is complete)
+  // Handle Escape key to close modal
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === 'Escape' && showProfileModal && userProfile && userProfile.isComplete()) {
+      if (e.key === 'Escape' && showProfileModal) {
         setShowProfileModal(false);
       }
     };
@@ -371,7 +375,12 @@ export function RoutePlanner() {
                 width: '100%'
               }}
             >
-              {userProfile && userProfile.isComplete() ? '✅ Your travel profile is setup' : '⚠️ Continue with your travel profile setup'}
+              {userProfile && userProfile.isComplete() 
+                ? '✅ Profile Complete - Edit Profile' 
+                : userProfile 
+                  ? `📝 Continue Profile Setup (${userProfile.getCompletionPercentage()}% complete)`
+                  : '📝 Setup Travel Profile'
+              }
             </button>
             <p style={{ 
               fontSize: '12px', 
@@ -416,9 +425,8 @@ export function RoutePlanner() {
           <div 
             className="modal-overlay" 
             onClick={(e) => {
-              // Close modal when clicking on overlay (but not on content)
-              // Only allow closing if profile is complete
-              if (e.target === e.currentTarget && userProfile && userProfile.isComplete()) {
+              // Close modal when clicking on overlay
+              if (e.target === e.currentTarget) {
                 setShowProfileModal(false);
               }
             }}
@@ -446,12 +454,7 @@ export function RoutePlanner() {
             }}>
               {/* Close button */}
               <button
-                onClick={() => {
-                  // Only allow closing if profile is complete
-                  if (userProfile && userProfile.isComplete()) {
-                    setShowProfileModal(false);
-                  }
-                }}
+                onClick={() => setShowProfileModal(false)}
                 style={{
                   position: 'absolute',
                   top: '10px',
@@ -459,9 +462,8 @@ export function RoutePlanner() {
                   background: 'none',
                   border: 'none',
                   fontSize: '24px',
-                  cursor: userProfile && userProfile.isComplete() ? 'pointer' : 'not-allowed',
-                  color: userProfile && userProfile.isComplete() ? '#666' : '#ccc',
-                  opacity: userProfile && userProfile.isComplete() ? 1 : 0.5
+                  cursor: 'pointer',
+                  color: '#666'
                 }}
               >
                 ×

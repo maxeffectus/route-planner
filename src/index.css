@@ -341,3 +341,42 @@ body.modal-open {
   overflow: hidden !important;
 }
 
+/* Action buttons for profile setup */
+.action-buttons {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.save-exit-button {
+  background-color: #6c757d !important;
+  color: white !important;
+  border: none !important;
+  padding: 10px 20px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  transition: background-color 0.2s ease !important;
+  pointer-events: auto !important;
+}
+
+.save-exit-button:hover {
+  background-color: #5a6268 !important;
+}
+
+.save-exit-button:disabled {
+  background-color: #ccc !important;
+  cursor: not-allowed !important;
+}
+
+.progress-info {
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+}
+

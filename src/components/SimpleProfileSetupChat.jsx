@@ -395,6 +395,29 @@ export default function SimpleProfileSetupChat({
                         <span>Processing...</span>
                     </div>
                 )}
+
+                {/* Action buttons */}
+                <div className="action-buttons">
+                    <button
+                        className="save-exit-button"
+                        onClick={() => {
+                            // Save current progress and exit
+                            onProfileUpdate(userProfile);
+                            onComplete(userProfile);
+                        }}
+                        disabled={isProcessing}
+                    >
+                        💾 Save & Exit
+                    </button>
+                    
+                    {completionPercentage > 0 && (
+                        <div className="progress-info">
+                            <small>
+                                Your progress has been saved. You can continue later.
+                            </small>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

@@ -12,15 +12,15 @@ describe('Modal Behavior Logic Tests', () => {
   });
 
   describe('Profile Completion Logic', () => {
-    test('should determine when modal should be shown', () => {
-      // Empty profile should show modal
-      expect(!profile || !profile.isComplete()).toBe(true);
+    test('should track completion percentage correctly', () => {
+      // Empty profile should have 0% completion
+      expect(profile.getCompletionPercentage()).toBe(0);
       
-      // Partial profile should show modal
+      // Partial profile should have some completion
       processAnswer(profile, 'mobility', 'standard');
-      expect(!profile || !profile.isComplete()).toBe(true);
+      expect(profile.getCompletionPercentage()).toBeGreaterThan(0);
       
-      // Complete profile should not show modal
+      // Complete profile should have 100% completion
       processAnswer(profile, 'avoidStairs', false);
       processAnswer(profile, 'preferredTransport', ['walk']);
       processAnswer(profile, 'budgetLevel', 2);
@@ -30,22 +30,16 @@ describe('Modal Behavior Logic Tests', () => {
       processAnswer(profile, 'timeWindow', { startHour: 9, endHour: 18 });
       
       expect(profile.isComplete()).toBe(true);
-      expect(!profile || !profile.isComplete()).toBe(false);
+      expect(profile.getCompletionPercentage()).toBe(100);
     });
   });
 
   describe('Modal Close Logic', () => {
-    test('should prevent closing when profile is incomplete', () => {
-      // Incomplete profile
+    test('should allow closing at any time', () => {
+      // Modal can be closed at any time now
       expect(profile && profile.isComplete()).toBe(false);
       
-      // Should not allow closing
-      const canClose = profile && profile.isComplete();
-      expect(canClose).toBe(false);
-    });
-
-    test('should allow closing when profile is complete', () => {
-      // Complete the profile
+      // Complete the profile - should still allow closing
       processAnswer(profile, 'mobility', 'standard');
       processAnswer(profile, 'avoidStairs', false);
       processAnswer(profile, 'preferredTransport', ['walk']);
@@ -97,26 +91,13 @@ describe('Modal Behavior Logic Tests', () => {
   });
 
   describe('Escape Key Logic', () => {
-    test('should handle escape key based on profile completion', () => {
+    test('should handle escape key at any time', () => {
       // Mock escape key event
       const mockEvent = { key: 'Escape' };
       
-      // Incomplete profile - should not close
-      const shouldCloseIncomplete = mockEvent.key === 'Escape' && profile && profile.isComplete();
-      expect(shouldCloseIncomplete).toBe(false);
-      
-      // Complete profile - should close
-      processAnswer(profile, 'mobility', 'standard');
-      processAnswer(profile, 'avoidStairs', false);
-      processAnswer(profile, 'preferredTransport', ['walk']);
-      processAnswer(profile, 'budgetLevel', 2);
-      processAnswer(profile, 'travelPace', 'MEDIUM');
-      processAnswer(profile, 'interests', { 'art_museums': true });
-      processAnswer(profile, 'dietary', { 'vegetarian': true });
-      processAnswer(profile, 'timeWindow', { startHour: 9, endHour: 18 });
-      
-      const shouldCloseComplete = mockEvent.key === 'Escape' && profile && profile.isComplete();
-      expect(shouldCloseComplete).toBe(true);
+      // Escape key should work at any time now
+      const shouldClose = mockEvent.key === 'Escape';
+      expect(shouldClose).toBe(true);
     });
   });
 });
