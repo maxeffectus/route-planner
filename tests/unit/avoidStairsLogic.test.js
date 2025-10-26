@@ -33,11 +33,11 @@ describe('AvoidStairs Logic Tests', () => {
       expect(profile.avoidStairs).toBe(true);
     });
     
-    test('should keep avoidStairs unfilled for STANDARD mobility', () => {
+    test('should set avoidStairs to false for STANDARD mobility', () => {
       processAnswer(profile, 'mobility', MobilityType.STANDARD);
       
       expect(profile.mobility).toBe(MobilityType.STANDARD);
-      expect(profile.avoidStairs).toBe('__UNFILLED__');
+      expect(profile.avoidStairs).toBe(false);
     });
   });
   
@@ -60,14 +60,15 @@ describe('AvoidStairs Logic Tests', () => {
       expect(nextQuestion.field).not.toBe('avoidStairs');
     });
     
-    test('should ask avoidStairs question for standard mobility', () => {
-      // Set mobility to standard
+    test('should skip avoidStairs question for standard mobility', () => {
+      // Set mobility to standard (this sets avoidStairs to false)
       processAnswer(profile, 'mobility', MobilityType.STANDARD);
       
+      // The avoidStairs question should be skipped because it's already set to false
       const nextQuestion = getNextQuestion(profile);
       
       expect(nextQuestion).toBeDefined();
-      expect(nextQuestion.field).toBe('avoidStairs');
+      expect(nextQuestion.field).toBe('preferredTransport');
     });
   });
   

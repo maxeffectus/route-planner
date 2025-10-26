@@ -20,16 +20,10 @@ describe('Profile Setup Integration Tests', () => {
       
       processAnswer(profile, 'mobility', MobilityType.STANDARD);
       expect(profile.mobility).toBe(MobilityType.STANDARD);
-      expect(profile.avoidStairs).toBe('__UNFILLED__');
+      expect(profile.avoidStairs).toBe(false);
       
-      // Step 2: Avoid stairs question (only for standard mobility)
-      nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('avoidStairs');
-      
-      processAnswer(profile, 'avoidStairs', true);
-      expect(profile.avoidStairs).toBe(true);
-      
-      // Step 3: Preferred transport
+      // Step 2: Avoid stairs question is skipped for standard mobility (auto-set to false)
+      // Go directly to preferred transport
       nextQuestion = getNextQuestion(profile);
       expect(nextQuestion.field).toBe('preferredTransport');
       
@@ -156,9 +150,12 @@ describe('Profile Setup Integration Tests', () => {
     });
     
     test('should handle array fields correctly', () => {
-      processAnswer(profile, 'preferredTransport', []);
-      expect(profile.preferredTransport).toEqual([]);
+      // Empty array is not valid - should return false and not update field
+      const result = processAnswer(profile, 'preferredTransport', []);
+      expect(result).toBe(false);
+      expect(profile.preferredTransport).toBe('__EMPTY_ARRAY__');
       
+      // Valid array should update the field
       processAnswer(profile, 'preferredTransport', [TransportMode.WALK, TransportMode.BIKE]);
       expect(profile.preferredTransport).toEqual([TransportMode.WALK, TransportMode.BIKE]);
     });

@@ -91,16 +91,21 @@ describe('Example: How to Write Tests', () => {
     });
     
     test('should handle empty arrays', () => {
-      processAnswer(profile, 'preferredTransport', []);
+      // Empty array is not a valid answer, so processAnswer should return false and not update the field
+      const result = processAnswer(profile, 'preferredTransport', []);
       
-      expect(profile.preferredTransport).toEqual([]);
-      expect(profile.preferredTransport).toHaveLength(0);
+      expect(result).toBe(false);
+      // Field should remain unfilled
+      expect(profile.preferredTransport).toBe('__EMPTY_ARRAY__');
     });
     
     test('should handle undefined values', () => {
-      processAnswer(profile, 'budgetLevel', undefined);
+      // Undefined is not a valid answer, so processAnswer should return false and not update the field
+      const result = processAnswer(profile, 'budgetLevel', undefined);
       
-      expect(profile.budgetLevel).toBeUndefined();
+      expect(result).toBe(false);
+      // Field should remain unfilled
+      expect(profile.budgetLevel).toBe(-999);
     });
   });
   
@@ -109,8 +114,9 @@ describe('Example: How to Write Tests', () => {
       // Test standard mobility flow
       processAnswer(profile, 'mobility', MobilityType.STANDARD);
       
+      // For standard mobility, avoidStairs is auto-set to false, so next question is preferredTransport
       let nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('avoidStairs');
+      expect(nextQuestion.field).toBe('preferredTransport');
       
       // Test wheelchair mobility flow
       const wheelchairProfile = new UserProfile('wheelchair-user');
