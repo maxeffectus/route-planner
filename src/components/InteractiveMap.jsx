@@ -10,7 +10,7 @@ import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Shared popup content component using reusable POI components
-function PopupContent({ poi, color, onClose, mapsAPI, onImageLoaded, getPoiCategory }) {
+function PopupContent({ poi, colors, onClose, mapsAPI, onImageLoaded }) {
   return (
     <div 
       style={{ minWidth: '240px', position: 'relative' }}
@@ -71,8 +71,8 @@ function PopupContent({ poi, color, onClose, mapsAPI, onImageLoaded, getPoiCateg
         />
       </div>
 
-      <POITitle poi={poi} color={color} variant="popup" />
-      <POIType poi={poi} getPoiCategory={getPoiCategory} />
+      <POITitle poi={poi} color={colors && colors.length > 0 ? colors[0] : '#999'} variant="popup" />
+      <POIType poi={poi} />
       <POIDescription poi={poi} />
       <POILinks poi={poi} fontSize="12px" gap="12px" />
     </div>
@@ -298,7 +298,6 @@ export function InteractiveMap({
   selectedCategories = [],
   onCategoriesChange,
   categoryColors = {},
-  getPoiCategory,
   selectedPoiId = null,
   onPoiSelect,
   onImageLoaded
@@ -532,10 +531,14 @@ export function InteractiveMap({
       {pois.map((poi, index) => {
         if (!poi.location?.lat || !poi.location?.lng) return null;
         
-        const poiCategory = getPoiCategory ? getPoiCategory(poi) : null;
-        const color = categoryColors[poiCategory] || '#999';
+        // Get categories and colors
+        const categories = poi.interest_categories || [];
+        
+        // Get colors for all categories
+        const colors = categories.map(cat => categoryColors[cat] || '#999');
+        const primaryColor = colors.length > 0 ? colors[0] : '#999';
         const isSelected = selectedPoiId === poi.id;
-        const customIcon = createColoredIcon(color, isSelected);
+        const customIcon = createColoredIcon(primaryColor, isSelected);
         
         return (
           <Marker 
@@ -560,10 +563,9 @@ export function InteractiveMap({
             >
               <PopupContent 
                 poi={poi} 
-                color={color}
+                colors={colors}
                 mapsAPI={mapsAPI}
                 onImageLoaded={onImageLoaded}
-                getPoiCategory={getPoiCategory}
                 onClose={() => {
                   isInteractingRef.current = true;
                   onPoiSelect && onPoiSelect(null);

@@ -98,38 +98,11 @@ export function RoutePlanner() {
     );
   };
 
-  // Helper: Determine POI category from its type/category field
-  const getPoiCategory = useCallback((poi) => {
-    // First, check if poi.category is already a valid InterestCategory
-    const category = poi.category;
-    if (category && Object.values(InterestCategory).includes(category)) {
-      return category;
-    }
-    
-    // Fallback: try to determine from type (OSM tags)
-    const type = poi.type || '';
-    const lowerType = type.toLowerCase();
-    
-    // Map OSM types to our category system
-    if (lowerType.includes('museum') || lowerType.includes('gallery') || lowerType.includes('arts_centre')) return InterestCategory.ART_MUSEUMS;
-    if (lowerType.includes('attraction')) return InterestCategory.ENTERTAINMENT;
-    if (lowerType.includes('historic') || lowerType.includes('castle') || 
-        lowerType.includes('monument') || lowerType.includes('ruins')) return InterestCategory.HISTORY_CULTURE;
-    if (lowerType.includes('place_of_worship') || lowerType.includes('worship')) return InterestCategory.ARCHITECTURE;
-    if (lowerType.includes('park') || lowerType.includes('garden')) return InterestCategory.NATURE_PARKS;
-    if (lowerType.includes('viewpoint')) return InterestCategory.NATURE_PARKS;
-    if (lowerType.includes('restaurant') || lowerType.includes('cafe') || lowerType.includes('food') || 
-        lowerType.includes('bakery') || lowerType.includes('butcher') || lowerType.includes('wine')) return InterestCategory.GASTRONOMY;
-    if (lowerType.includes('bar') || lowerType.includes('nightclub') || lowerType.includes('pub') || 
-        lowerType.includes('adult_gaming') || lowerType.includes('casino')) return InterestCategory.NIGHTLIFE;
-    
-    return null;
-  }, [selectedCategories]);
-
   // Filter POIs based on selected categories
+  // A POI is shown if it has at least one category in common with selectedCategories
   const filteredPois = pois.filter(poi => {
-    const poiCategory = getPoiCategory(poi);
-    return poiCategory && selectedCategories.includes(poiCategory);
+    const poiCategories = poi.interest_categories || [];
+    return poiCategories.some(cat => selectedCategories.includes(cat));
   });
 
   // UNIFIED POI DISPLAY: Always show POIs that are in the current map bounds
@@ -546,9 +519,28 @@ export function RoutePlanner() {
               border: '1px solid #ddd'
             }}>
               {filteredPois.map((poi, index) => {
-                const poiCategory = getPoiCategory(poi);
-                const color = categoryColors[poiCategory] || '#999';
+                const poiCategories = poi.interest_categories || [];
+                // Get colors for all categories
+                const colors = poiCategories.map(cat => categoryColors[cat] || '#999');
                 const isSelected = selectedPoiId === poi.id;
+                
+                // Create gradient for borderLeft if multiple categories
+                let borderLeftStyle;
+                if (colors.length === 1) {
+                  borderLeftStyle = `4px solid ${colors[0]}`;
+                } else {
+                  // Create a linear gradient that goes from first color to last color
+                  const gradient = colors.join(', ');
+                  borderLeftStyle = `4px solid transparent`;
+                  // Use border-image for gradient effect
+                  const borderImage = `linear-gradient(to right, ${gradient})`;
+                  // We'll use a custom style
+                  borderLeftStyle = { 
+                    borderImage: borderImage, 
+                    borderImageSlice: 1,
+                    borderLeft: `4px solid ${colors[0]}` // Fallback
+                  };
+                }
                 
                 return (
                   <div
@@ -563,7 +555,7 @@ export function RoutePlanner() {
                       borderBottom: index < filteredPois.length - 1 ? '1px solid #eee' : 'none',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      borderLeft: `4px solid ${color}`,
+                      ...(typeof borderLeftStyle === 'string' ? { borderLeft: borderLeftStyle } : borderLeftStyle),
                       position: 'relative',
                       backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
                       transform: isSelected ? 'translateX(4px)' : 'translateX(0)',
@@ -590,8 +582,8 @@ export function RoutePlanner() {
 
                     {/* POI Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <POITitle poi={poi} color={color} variant="default" />
-                      <POIType poi={poi} getPoiCategory={getPoiCategory} />
+                      <POITitle poi={poi} color={colors[0]} variant="default" />
+                      <POIType poi={poi} />
                       <POILinks poi={poi} fontSize="11px" gap="8px" />
             </div>
             </div>
@@ -641,7 +633,6 @@ export function RoutePlanner() {
           selectedCategories={selectedCategories}
           onCategoriesChange={setSelectedCategories}
           categoryColors={categoryColors}
-          getPoiCategory={getPoiCategory}
           selectedPoiId={selectedPoiId}
           onPoiSelect={setSelectedPoiId}
           onImageLoaded={handleImageLoaded}

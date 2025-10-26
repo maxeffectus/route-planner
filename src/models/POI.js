@@ -6,7 +6,7 @@ export class POI {
     this.id = data.id;
     this.name = data.name || 'Unnamed';
     this.type = data.type;
-    this.category = data.category;
+    this.interest_categories = data.interest_categories || [];
     this.location = data.location;
     this.description = data.description;
     this.website = data.website;
@@ -97,7 +97,7 @@ export class POI {
       id: this.id,
       name: this.name,
       type: this.type,
-      category: this.category,
+      interest_categories: this.interest_categories,
       location: this.location,
       description: this.description,
       website: this.website,

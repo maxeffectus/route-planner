@@ -193,15 +193,18 @@ export function POITitle({ poi, color, variant = 'default' }) {
 /**
  * POI Type Component
  * Displays POI type/category with icon using proper display label
+ * Supports multiple categories
  */
-export function POIType({ poi, getPoiCategory }) {
-  // Get the standardized category
-  const category = getPoiCategory ? getPoiCategory(poi) : null;
+export function POIType({ poi }) {
+  const categories = poi.interest_categories || [];
   
-  // Get the display label
-  const displayLabel = category 
-    ? getCategoryLabel(category) 
-    : getCategoryLabel(poi.type || poi.category);
+  // Get display labels
+  const displayLabels = categories.map(cat => getCategoryLabel(cat)).filter(Boolean);
+  
+  // If no labels found, fallback to type
+  const displayLabel = displayLabels.length > 0 
+    ? displayLabels.join(' • ')
+    : getCategoryLabel(poi.type);
 
   return (
     <div style={{ 

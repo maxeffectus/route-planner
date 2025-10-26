@@ -134,6 +134,68 @@ export class OpenStreetAPI extends MapsAPI {
     this.failedWikidataIds = new Set();
   }
 
+  /**
+   * Determine POI interest categories from OSM element tags
+   * Returns an array of InterestCategory values that the POI belongs to
+   * A POI can belong to multiple categories (e.g., a bar that is also entertainment venue)
+   * @param {Object} element - OSM element with tags
+   * @returns {Array<InterestCategory>} Array of interest categories
+   * @private
+   */
+  #determinePOIInterestCategories(element) {
+    const categories = [];
+    
+    // Check for Art & Museums
+    if (element.tags?.tourism === 'museum' || 
+        element.tags?.tourism === 'gallery' || 
+        element.tags?.amenity === 'arts_centre') {
+      categories.push(InterestCategory.ART_MUSEUMS);
+    }
+    
+    // Check for Architecture
+    if (element.tags?.amenity === 'place_of_worship' || 
+        element.tags?.building?.match(/cathedral|church|mosque|temple|castle|palace/)) {
+      categories.push(InterestCategory.ARCHITECTURE);
+    }
+    
+    // Check for Nature & Parks
+    if (element.tags?.leisure?.match(/park|garden/) || 
+        element.tags?.tourism === 'viewpoint' ||
+        element.tags?.natural?.match(/beach|cave|peak/)) {
+      categories.push(InterestCategory.NATURE_PARKS);
+    }
+    
+    // Check for Entertainment
+    if (element.tags?.tourism === 'attraction' || 
+        element.tags?.amenity?.match(/cinema|theatre|casino/)) {
+      categories.push(InterestCategory.ENTERTAINMENT);
+    }
+    
+    // Check for Gastronomy
+    if (element.tags?.amenity?.match(/restaurant|cafe|bar|pub|food_court/) ||
+        element.tags?.shop?.match(/bakery|butcher|seafood|wine|alcohol/)) {
+      categories.push(InterestCategory.GASTRONOMY);
+    }
+    
+    // Check for Nightlife
+    if (element.tags?.amenity?.match(/bar|pub|nightclub/) ||
+        element.tags?.leisure?.match(/adult_gaming_centre|casino/)) {
+      categories.push(InterestCategory.NIGHTLIFE);
+    }
+    
+    // Check for History & Culture
+    if (element.tags?.historic) {
+      categories.push(InterestCategory.HISTORY_CULTURE);
+    }
+    
+    // Default: if no categories were assigned, use HISTORY_CULTURE
+    if (categories.length === 0) {
+      categories.push(InterestCategory.HISTORY_CULTURE);
+    }
+    
+    return categories;
+  }
+
   getProviderName() {
     return 'OpenStreetMap';
   }
@@ -584,37 +646,14 @@ export class OpenStreetAPI extends MapsAPI {
           }
           // Note: If imageUrl is null, getPOIImage() will try Wikidata next
           
-          // Map OSM tags to InterestCategory
-          let interestCategory = InterestCategory.HISTORY_CULTURE; // default
-          if (element.tags?.tourism === 'museum' || 
-              element.tags?.tourism === 'gallery' || 
-              element.tags?.amenity === 'arts_centre') {
-            interestCategory = InterestCategory.ART_MUSEUMS;
-          } else if (element.tags?.amenity === 'place_of_worship' || 
-                     element.tags?.building?.match(/cathedral|church|mosque|temple|castle|palace/)) {
-            interestCategory = InterestCategory.ARCHITECTURE;
-          } else if (element.tags?.leisure?.match(/park|garden/) || 
-                     element.tags?.tourism === 'viewpoint' ||
-                     element.tags?.natural?.match(/beach|cave|peak/)) {
-            interestCategory = InterestCategory.NATURE_PARKS;
-          } else if (element.tags?.tourism === 'attraction' || 
-                     element.tags?.amenity?.match(/cinema|theatre|casino/)) {
-            interestCategory = InterestCategory.ENTERTAINMENT;
-          } else if (element.tags?.amenity?.match(/restaurant|cafe|bar|pub|food_court/) ||
-                     element.tags?.shop?.match(/bakery|butcher|seafood|wine|alcohol/)) {
-            interestCategory = InterestCategory.GASTRONOMY;
-          } else if (element.tags?.amenity?.match(/bar|pub|nightclub/) ||
-                     element.tags?.leisure?.match(/adult_gaming_centre|casino/)) {
-            interestCategory = InterestCategory.NIGHTLIFE;
-          } else if (element.tags?.historic) {
-            interestCategory = InterestCategory.HISTORY_CULTURE;
-          }
+          // Determine POI interest categories (can be multiple)
+          const interestCategories = this.#determinePOIInterestCategories(element);
           
           return new POI({
             id: element.id,
             name: element.tags?.name || 'Unnamed',
             type: element.tags?.tourism || element.tags?.historic || element.tags?.amenity || element.tags?.leisure,
-            category: interestCategory,
+            interest_categories: interestCategories,
             location: {
               lat: lat,
               lng: lon
