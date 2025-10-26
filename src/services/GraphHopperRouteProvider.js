@@ -97,14 +97,43 @@ export class GraphHopperRouteProvider extends BaseRouteProvider {
 
     try {
       const response = await fetch(`${this.baseUrl}/route?${params.toString()}`);
+      
+      // Check HTTP response status
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        
+        // Try to parse error details if available
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (e) {
+          // If parsing fails, use the text as is
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
       const data = await response.json();
 
+      // Check for GraphHopper-specific error messages in response body
       if (data.message) {
+        // Provide more helpful messages for common errors
+        if (data.message.includes('API limit')) {
+          throw new Error(
+            'GraphHopper API limit reached. Please wait or upgrade your plan at https://www.graphhopper.com/pricing/'
+          );
+        }
         throw new Error(data.message);
       }
 
       if (!data.paths || data.paths.length === 0) {
-        throw new Error('No route found');
+        throw new Error('No route found between the selected points');
       }
 
       const route = data.paths[0];
@@ -117,6 +146,10 @@ export class GraphHopperRouteProvider extends BaseRouteProvider {
         waypoints: points
       };
     } catch (error) {
+      // Re-throw as-is if it's already our formatted error
+      if (error.message.includes('GraphHopper') || error.message.includes('API limit')) {
+        throw error;
+      }
       throw new Error(`GraphHopper routing error: ${error.message}`);
     }
   }

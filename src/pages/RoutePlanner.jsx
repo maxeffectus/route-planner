@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { UserProfile, InterestCategory, MobilityType, TransportMode } from '../models/UserProfile';
 import { InteractiveMap } from '../components/InteractiveMap';
@@ -30,7 +30,7 @@ export function RoutePlanner() {
   const [routeError, setRouteError] = useState(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
-  const mapsAPI = new OpenStreetAPI();
+  const mapsAPI = useMemo(() => new OpenStreetAPI(), []); // Create once and reuse
   const citySelectionRef = React.useRef(null); // Track city selection for auto-search
   
   // Prompt API is no longer used for profile setup
@@ -63,7 +63,8 @@ export function RoutePlanner() {
     if (savedApiKey) {
       mapsAPI.setRouteProvider(new GraphHopperRouteProvider(savedApiKey));
     }
-  }, [mapsAPI]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount - mapsAPI is stable
 
   // Handler to update POI cache with resolved image URL
   const handleImageLoaded = useCallback((poiId, imageUrl) => {
@@ -118,10 +119,12 @@ export function RoutePlanner() {
 
   // Filter POIs based on selected categories
   // A POI is shown if it has at least one category in common with selectedCategories
-  const filteredPois = pois.filter(poi => {
-    const poiCategories = poi.interest_categories || [];
-    return poiCategories.some(cat => selectedCategories.includes(cat));
-  });
+  const filteredPois = useMemo(() => {
+    return pois.filter(poi => {
+      const poiCategories = poi.interest_categories || [];
+      return poiCategories.some(cat => selectedCategories.includes(cat));
+    });
+  }, [pois, selectedCategories]);
 
   // UNIFIED POI DISPLAY: Always show POIs that are in the current map bounds
   // This is the single source of truth for what POIs to display
@@ -212,7 +215,8 @@ export function RoutePlanner() {
     if (routeStartPOI && routeFinishPOI) {
       buildRoute();
     }
-  }, [apiKeyInput, mapsAPI, routeStartPOI, routeFinishPOI]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKeyInput, routeStartPOI, routeFinishPOI]); // mapsAPI is stable
 
   // Build route function
   const buildRoute = useCallback(async () => {
@@ -256,11 +260,24 @@ export function RoutePlanner() {
       setRouteData(route);
     } catch (error) {
       console.error('Route building failed:', error);
-      setRouteError(error.message);
+      
+      // Provide more user-friendly error messages
+      let errorMessage = error.message || 'Unknown error occurred';
+      
+      // Handle GraphHopper API limit errors
+      if (errorMessage.includes('API limit') || errorMessage.includes('heavily violated')) {
+        errorMessage = 'API request limit exceeded. Please wait a moment or try upgrading your GraphHopper plan.';
+      } else if (errorMessage.includes('GraphHopper routing error')) {
+        // Parse GraphHopper-specific errors
+        errorMessage = errorMessage.replace('GraphHopper routing error: ', '');
+      }
+      
+      setRouteError(errorMessage);
     } finally {
       setIsLoadingRoute(false);
     }
-  }, [routeStartPOI, routeFinishPOI, mapsAPI, userProfile, filteredPois]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeStartPOI, routeFinishPOI, userProfile, filteredPois.length]); // mapsAPI is stable
 
   // Trigger route building when points change
   useEffect(() => {
@@ -318,7 +335,8 @@ export function RoutePlanner() {
     } finally {
       setIsLoadingPOIs(false);
     }
-  }, [mapBounds, currentZoom, selectedCategories, poiCache, mapsAPI]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapBounds, currentZoom, selectedCategories, poiCache]); // mapsAPI is stable
 
   // Initialize APIs in the background
   // Prompt API initialization removed - using simple chat only
