@@ -1,5 +1,5 @@
 import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
-import { POI } from '../models/POI';
+import { OpenStreetPOI } from '../models/POI';
 import { InterestCategory } from '../models/UserProfile';
 
 /**
@@ -649,7 +649,7 @@ export class OpenStreetAPI extends MapsAPI {
           // Determine POI interest categories (can be multiple)
           const interestCategories = this.#determinePOIInterestCategories(element);
           
-          return new POI({
+          return new OpenStreetPOI({
             id: element.id,
             name: element.tags?.name || 'Unnamed',
             type: element.tags?.tourism || element.tags?.historic || element.tags?.amenity || element.tags?.leisure,

@@ -1,7 +1,7 @@
 /**
- * POI (Point of Interest) class - Single source of truth for POI data
+ * OpenStreetPOI (Point of Interest from OpenStreetMap) class - Single source of truth for POI data from OpenStreetMap
  */
-export class POI {
+export class OpenStreetPOI {
   constructor(data) {
     this.id = data.id;
     this.name = data.name || 'Unnamed';
@@ -113,10 +113,10 @@ export class POI {
   }
 
   /**
-   * Create POI instance from plain object
+   * Create OpenStreetPOI instance from plain object
    */
   static fromJSON(data) {
-    return new POI(data);
+    return new OpenStreetPOI(data);
   }
 }
 
