@@ -456,6 +456,43 @@ export class OpenStreetAPI extends MapsAPI {
   }
 
   /**
+   * Autocomplete POI by name/address
+   * @param {string} query - Partial name or address
+   * @param {number} limit - Max number of suggestions
+   * @returns {Promise<Array<OpenStreetPOI>>} Array of OpenStreetPOI suggestions
+   */
+  async autocompletePOI(query, limit = 5) {
+    const url = `${this.baseUrl}/search?` +
+      `q=${encodeURIComponent(query)}&` +
+      `format=json&` +
+      `limit=${limit}&` +
+      `addressdetails=1`;
+    
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      return data.map(place => new OpenStreetPOI({
+        id: `autocomplete_${place.place_id}`,
+        name: place.name || place.display_name.split(',')[0],
+        type: place.type || place.class,
+        interest_categories: [InterestCategory.HISTORY_CULTURE], // Default category
+        location: {
+          lat: parseFloat(place.lat),
+          lng: parseFloat(place.lon)
+        },
+        description: place.display_name,
+        osmType: place.type || 'node',
+        osmId: place.place_id,
+        significance: 1, // Minimal significance for autocomplete results
+        allTags: place.address || {} // Store address as tags
+      }));
+    } catch (error) {
+      throw new Error(`OpenStreetMap POI autocomplete error: ${error.message}`);
+    }
+  }
+
+  /**
    * Get Points of Interest using Overpass API
    * @param {Object} bbox - Bounding box {minLat, minLng, maxLat, maxLng}
    * @param {number} limit - Maximum number of results

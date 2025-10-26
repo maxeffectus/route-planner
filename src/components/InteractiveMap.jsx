@@ -89,6 +89,75 @@ let DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
+// Create start marker icon
+const createStartMarkerIcon = () => {
+  return L.divIcon({
+    className: 'custom-route-marker',
+    html: `<div style="
+      background-color: #4CAF50;
+      width: 30px;
+      height: 30px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 3px solid white;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <span style="transform: rotate(45deg); font-size: 16px;">📍</span>
+    </div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30]
+  });
+};
+
+// Create finish marker icon
+const createFinishMarkerIcon = () => {
+  return L.divIcon({
+    className: 'custom-route-marker',
+    html: `<div style="
+      background-color: #f44336;
+      width: 30px;
+      height: 30px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 3px solid white;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <span style="transform: rotate(45deg); font-size: 16px;">🏁</span>
+    </div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30]
+  });
+};
+
+// Create start/finish combined marker icon
+const createStartFinishMarkerIcon = () => {
+  return L.divIcon({
+    className: 'custom-route-marker',
+    html: `<div style="
+      background: conic-gradient(from 0deg, #4CAF50 0deg 180deg, #f44336 180deg 360deg);
+      width: 30px;
+      height: 30px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 3px solid white;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <span style="transform: rotate(45deg); font-size: 14px;">↻</span>
+    </div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30]
+  });
+};
+
 // Component to handle map updates when bbox changes
 function MapUpdater({ bbox, onZoomChange, onBoundsChange }) {
   const map = useMap();
@@ -301,7 +370,10 @@ export function InteractiveMap({
   categoryColors = {},
   selectedPoiId = null,
   onPoiSelect,
-  onImageLoaded
+  onImageLoaded,
+  routeStartPOI = null,
+  routeFinishPOI = null,
+  sameStartFinish = false
 }) {
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
@@ -611,6 +683,66 @@ export function InteractiveMap({
           </Marker>
         );
       })}
+      
+      {/* Route start marker */}
+      {routeStartPOI && !sameStartFinish && (
+        <Marker
+          position={[routeStartPOI.location.lat, routeStartPOI.location.lng]}
+          icon={createStartMarkerIcon()}
+        >
+          <Popup>
+            <div style={{ minWidth: '200px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                📍 Start Point
+              </div>
+              <div>{routeStartPOI.name}</div>
+              <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                {routeStartPOI.description || routeStartPOI.name}
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      )}
+      
+      {/* Route finish marker */}
+      {routeFinishPOI && !sameStartFinish && (
+        <Marker
+          position={[routeFinishPOI.location.lat, routeFinishPOI.location.lng]}
+          icon={createFinishMarkerIcon()}
+        >
+          <Popup>
+            <div style={{ minWidth: '200px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                🏁 Finish Point
+              </div>
+              <div>{routeFinishPOI.name}</div>
+              <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                {routeFinishPOI.description || routeFinishPOI.name}
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      )}
+      
+      {/* Combined start/finish marker */}
+      {sameStartFinish && routeStartPOI && (
+        <Marker
+          position={[routeStartPOI.location.lat, routeStartPOI.location.lng]}
+          icon={createStartFinishMarkerIcon()}
+        >
+          <Popup>
+            <div style={{ minWidth: '200px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                ↻ Start & Finish Point
+              </div>
+              <div>{routeStartPOI.name}</div>
+              <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                {routeStartPOI.description || routeStartPOI.name}
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      )}
     </MapContainer>
   );
 }
