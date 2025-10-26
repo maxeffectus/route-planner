@@ -100,20 +100,28 @@ export function RoutePlanner() {
 
   // Helper: Determine POI category from its type/category field
   const getPoiCategory = useCallback((poi) => {
-    const type = poi.type || poi.category || '';
+    // First, check if poi.category is already a valid InterestCategory
+    const category = poi.category;
+    if (category && Object.values(InterestCategory).includes(category)) {
+      return category;
+    }
+    
+    // Fallback: try to determine from type (OSM tags)
+    const type = poi.type || '';
     const lowerType = type.toLowerCase();
     
-    // Map POI types to our category system
-    if (lowerType.includes('museum')) return InterestCategory.ART_MUSEUMS;
+    // Map OSM types to our category system
+    if (lowerType.includes('museum') || lowerType.includes('gallery') || lowerType.includes('arts_centre')) return InterestCategory.ART_MUSEUMS;
     if (lowerType.includes('attraction')) return InterestCategory.ENTERTAINMENT;
     if (lowerType.includes('historic') || lowerType.includes('castle') || 
         lowerType.includes('monument') || lowerType.includes('ruins')) return InterestCategory.HISTORY_CULTURE;
     if (lowerType.includes('place_of_worship') || lowerType.includes('worship')) return InterestCategory.ARCHITECTURE;
     if (lowerType.includes('park') || lowerType.includes('garden')) return InterestCategory.NATURE_PARKS;
     if (lowerType.includes('viewpoint')) return InterestCategory.NATURE_PARKS;
-    
-    // Default: return the original category if it matches one of ours
-    if (selectedCategories.includes(lowerType)) return lowerType;
+    if (lowerType.includes('restaurant') || lowerType.includes('cafe') || lowerType.includes('food') || 
+        lowerType.includes('bakery') || lowerType.includes('butcher') || lowerType.includes('wine')) return InterestCategory.GASTRONOMY;
+    if (lowerType.includes('bar') || lowerType.includes('nightclub') || lowerType.includes('pub') || 
+        lowerType.includes('adult_gaming') || lowerType.includes('casino')) return InterestCategory.NIGHTLIFE;
     
     return null;
   }, [selectedCategories]);
