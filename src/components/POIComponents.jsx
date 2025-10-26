@@ -289,3 +289,74 @@ export function POIDescription({ poi }) {
   );
 }
 
+/**
+ * POI Accessibility Component
+ * Displays accessibility information for different user groups
+ */
+export function getPOIAccessibility({ poi }) {
+  const wheelchair = poi.isWheelchairAccessible();
+  const stroller = poi.isStrollerAccessible();
+  const mobility = poi.isTempMobilityIssuesAccessible();
+  const bicycle = poi.isBikeAccessible();
+  
+  const getAccessibilityIcon = (status) => {
+    switch(status) {
+      case 'yes': return '✓';
+      case 'no': return '✗';
+      case 'limited': return '~';
+      case 'unknown': return '?';
+      default: return '?';
+    }
+  };
+  
+  const getAccessibilityColor = (status) => {
+    switch(status) {
+      case 'yes': return '#4CAF50';
+      case 'no': return '#f44336';
+      case 'limited': return '#FF9800';
+      case 'unknown': return '#999';
+      default: return '#999';
+    }
+  };
+  
+  return (
+    <div style={{ 
+      marginTop: '8px',
+      padding: '8px',
+      backgroundColor: '#f9f9f9',
+      borderRadius: '4px',
+      fontSize: '11px'
+    }}>
+      <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '12px' }}>
+        Accessibility
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: getAccessibilityColor(wheelchair), fontWeight: 'bold' }}>
+            {getAccessibilityIcon(wheelchair)}
+          </span>
+          <span>Wheelchair: {wheelchair}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: getAccessibilityColor(stroller), fontWeight: 'bold' }}>
+            {getAccessibilityIcon(stroller)}
+          </span>
+          <span>Stroller: {stroller}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: getAccessibilityColor(mobility), fontWeight: 'bold' }}>
+            {getAccessibilityIcon(mobility)}
+          </span>
+          <span>Limited mobility: {mobility}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: getAccessibilityColor(bicycle), fontWeight: 'bold' }}>
+            {getAccessibilityIcon(bicycle)}
+          </span>
+          <span>Bicycle: {bicycle}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+

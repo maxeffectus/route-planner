@@ -3,7 +3,7 @@ import { OpenStreetAPI } from '../services/MapsAPI';
 import { UserProfile, InterestCategory } from '../models/UserProfile';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
-import { POIImageThumbnail, POITitle, POIType, POILinks } from '../components/POIComponents';
+import { POIImageThumbnail, POITitle, POIType, POILinks, getPOIAccessibility } from '../components/POIComponents';
 import SimpleProfileSetupChat from '../components/SimpleProfileSetupChat';
 import { getAllCategoryValues } from '../utils/categoryMapping';
 
@@ -589,6 +589,7 @@ export function RoutePlanner() {
                       <POITitle poi={poi} color={colors[0]} variant="default" />
                       <POIType poi={poi} />
                       <POILinks poi={poi} fontSize="11px" gap="8px" />
+                      {getPOIAccessibility({ poi })}
             </div>
             </div>
                 );

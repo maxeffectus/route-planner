@@ -1,7 +1,19 @@
 /**
+ * Accessibility status enum for POI
+ */
+export const IsAccessible = {
+  YES: 'yes',
+  NO: 'no',
+  LIMITED: 'limited',
+  UNKNOWN: 'unknown'
+};
+
+/**
  * OpenStreetPOI (Point of Interest from OpenStreetMap) class - Single source of truth for POI data from OpenStreetMap
  */
 export class OpenStreetPOI {
+  #allTags = {};
+  
   constructor(data) {
     this.id = data.id;
     this.name = data.name || 'Unnamed';
@@ -17,6 +29,9 @@ export class OpenStreetPOI {
     this.osmType = data.osmType;
     this.osmId = data.osmId;
     this.significance = data.significance;
+    
+    // Store OSM tags for accessibility checking
+    this.#allTags = data.allTags || {};
     
     // Cached resolved image URL (set after fetching)
     this.resolvedImageUrl = data.resolvedImageUrl || null;
@@ -90,6 +105,74 @@ export class OpenStreetPOI {
   }
 
   /**
+   * Check wheelchair accessibility
+   * @returns {string} IsAccessible.YES, NO, LIMITED, or UNKNOWN
+   */
+  isWheelchairAccessible() {
+    const wheelchair = this.#allTags.wheelchair;
+    if (wheelchair === 'yes') return IsAccessible.YES;
+    if (wheelchair === 'no') return IsAccessible.NO;
+    if (wheelchair === 'limited') return IsAccessible.LIMITED;
+    
+    // Check for ramps as fallback
+    if (this.#allTags.ramp === 'yes') return IsAccessible.LIMITED;
+    
+    return IsAccessible.UNKNOWN;
+  }
+
+  /**
+   * Check stroller accessibility
+   * @returns {string} IsAccessible.YES, NO, LIMITED, or UNKNOWN
+   */
+  isStrollerAccessible() {
+    const stroller = this.#allTags.stroller;
+    if (stroller === 'yes') return IsAccessible.YES;
+    if (stroller === 'no') return IsAccessible.NO;
+    if (stroller === 'limited') return IsAccessible.LIMITED;
+    
+    // Fallback: check wheelchair or ramp:stroller
+    if (this.#allTags.wheelchair === 'yes' || this.#allTags['ramp:stroller'] === 'yes') {
+      return IsAccessible.YES;
+    }
+    if (this.#allTags.wheelchair === 'limited') return IsAccessible.LIMITED;
+    
+    return IsAccessible.UNKNOWN;
+  }
+
+  /**
+   * Check accessibility for people with temporary mobility issues
+   * @returns {string} IsAccessible.YES, NO, LIMITED, or UNKNOWN
+   */
+  isTempMobilityIssuesAccessible() {
+    // Check for ramps and handrails
+    const hasRamp = this.#allTags.ramp === 'yes';
+    const hasHandrail = this.#allTags.handrail === 'yes';
+    const wheelchair = this.#allTags.wheelchair;
+    
+    if (wheelchair === 'yes' || (hasRamp && hasHandrail)) return IsAccessible.YES;
+    if (wheelchair === 'no') return IsAccessible.NO;
+    if (wheelchair === 'limited' || hasRamp || hasHandrail) return IsAccessible.LIMITED;
+    
+    return IsAccessible.UNKNOWN;
+  }
+
+  /**
+   * Check bicycle accessibility
+   * @returns {string} IsAccessible.YES, NO, LIMITED, or UNKNOWN
+   */
+  isBikeAccessible() {
+    const bicycle = this.#allTags.bicycle;
+    if (bicycle === 'yes' || bicycle === 'designated') return IsAccessible.YES;
+    if (bicycle === 'no') return IsAccessible.NO;
+    if (bicycle === 'dismount') return IsAccessible.LIMITED;
+    
+    // Check for bicycle parking as positive indicator
+    if (this.#allTags.bicycle_parking) return IsAccessible.YES;
+    
+    return IsAccessible.UNKNOWN;
+  }
+
+  /**
    * Convert to plain object (for JSON serialization, etc.)
    */
   toJSON() {
@@ -108,7 +191,8 @@ export class OpenStreetPOI {
       osmType: this.osmType,
       osmId: this.osmId,
       significance: this.significance,
-      resolvedImageUrl: this.resolvedImageUrl
+      resolvedImageUrl: this.resolvedImageUrl,
+      allTags: this.#allTags
     };
   }
 

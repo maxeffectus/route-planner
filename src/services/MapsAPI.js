@@ -666,7 +666,8 @@ export class OpenStreetAPI extends MapsAPI {
             wikimediaCommons: element.tags?.wikimedia_commons,
             osmType: element.type,
             osmId: element.id,
-            significance: significance
+            significance: significance,
+            allTags: element.tags || {} // Pass all OSM tags for accessibility checking
           });
         })
         .filter(poi => poi.location.lat && poi.location.lng) // Filter out POIs without coordinates

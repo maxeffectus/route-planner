@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { POIImageThumbnail, POITitle, POIType, POILinks, POIDescription } from './POIComponents';
+import { POIImageThumbnail, POITitle, POIType, POILinks, POIDescription, getPOIAccessibility } from './POIComponents';
 import { getAllCategories } from '../utils/categoryMapping';
 
 // Fix default marker icon issue in React-Leaflet
@@ -75,6 +75,7 @@ function PopupContent({ poi, colors, onClose, mapsAPI, onImageLoaded }) {
       <POIType poi={poi} />
       <POIDescription poi={poi} />
       <POILinks poi={poi} fontSize="12px" gap="12px" />
+      {getPOIAccessibility({ poi })}
     </div>
   );
 }
