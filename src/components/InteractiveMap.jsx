@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { POIImageThumbnail, POITitle, POIType, POILinks, POIDescription, getPOIAccessibility } from './POIComponents';
@@ -373,7 +373,8 @@ export function InteractiveMap({
   onImageLoaded,
   routeStartPOI = null,
   routeFinishPOI = null,
-  sameStartFinish = false
+  sameStartFinish = false,
+  routeData = null
 }) {
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
@@ -452,6 +453,21 @@ export function InteractiveMap({
     }
   };
 
+  // Decode route geometry to coordinates
+  const getRouteCoordinates = (routeData) => {
+    if (!routeData || !routeData.geometry) return [];
+    
+    // GraphHopper returns GeoJSON with coordinates array
+    if (routeData.geometry.coordinates) {
+      // GeoJSON format: [lng, lat] -> convert to [lat, lng] for Leaflet
+      return routeData.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+    }
+    
+    return [];
+  };
+  
+  const routeCoordinates = getRouteCoordinates(routeData);
+
   return (
     <MapContainer
       center={defaultCenter}
@@ -467,6 +483,16 @@ export function InteractiveMap({
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={19}
       />
+      
+      {/* Route polyline - render before markers so it's underneath */}
+      {routeCoordinates.length > 0 && (
+        <Polyline
+          positions={routeCoordinates}
+          color="#2196F3"
+          weight={5}
+          opacity={0.7}
+        />
+      )}
       
       {bbox && <MapUpdater bbox={bbox} onZoomChange={onZoomChange} onBoundsChange={onBoundsChange} />}
       

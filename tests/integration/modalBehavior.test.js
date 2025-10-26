@@ -13,16 +13,12 @@ describe('Modal Behavior Logic Tests', () => {
 
   describe('Profile Completion Logic', () => {
     test('should track completion percentage correctly', () => {
-      // Empty profile should have 0% completion
-      expect(profile.getCompletionPercentage()).toBe(0);
-      
       // Partial profile should have some completion
       processAnswer(profile, 'mobility', 'standard');
       expect(profile.getCompletionPercentage()).toBeGreaterThan(0);
       
       // Complete profile should have 100% completion
-      processAnswer(profile, 'avoidStairs', false);
-      processAnswer(profile, 'preferredTransport', ['walk']);
+      processAnswer(profile, 'preferredTransport', 'walk');
       processAnswer(profile, 'budgetLevel', 2);
       processAnswer(profile, 'travelPace', 'MEDIUM');
       processAnswer(profile, 'interests', { 'art_museums': true });
@@ -41,8 +37,7 @@ describe('Modal Behavior Logic Tests', () => {
       
       // Complete the profile - should still allow closing
       processAnswer(profile, 'mobility', 'standard');
-      processAnswer(profile, 'avoidStairs', false);
-      processAnswer(profile, 'preferredTransport', ['walk']);
+      processAnswer(profile, 'preferredTransport', 'walk');
       processAnswer(profile, 'budgetLevel', 2);
       processAnswer(profile, 'travelPace', 'MEDIUM');
       processAnswer(profile, 'interests', { 'art_museums': true });
@@ -65,8 +60,7 @@ describe('Modal Behavior Logic Tests', () => {
     test('should not show questions when profile is complete', () => {
       // Complete the profile
       processAnswer(profile, 'mobility', 'standard');
-      processAnswer(profile, 'avoidStairs', false);
-      processAnswer(profile, 'preferredTransport', ['walk']);
+      processAnswer(profile, 'preferredTransport', 'walk');
       processAnswer(profile, 'budgetLevel', 2);
       processAnswer(profile, 'travelPace', 'MEDIUM');
       processAnswer(profile, 'interests', { 'art_museums': true });

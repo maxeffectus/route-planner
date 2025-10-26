@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
-import { UserProfile, InterestCategory } from '../models/UserProfile';
+import { UserProfile, InterestCategory, MobilityType, TransportMode } from '../models/UserProfile';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks, getPOIAccessibility } from '../components/POIComponents';
 import SimpleProfileSetupChat from '../components/SimpleProfileSetupChat';
 import { getAllCategoryValues } from '../utils/categoryMapping';
+import { GraphHopperRouteProvider } from '../services/GraphHopperRouteProvider';
+import { Modal } from '../components/Modal';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -23,6 +25,11 @@ export function RoutePlanner() {
   const [routeStartPOI, setRouteStartPOI] = useState(null);
   const [routeFinishPOI, setRouteFinishPOI] = useState(null);
   const [sameStartFinish, setSameStartFinish] = useState(false);
+  const [routeData, setRouteData] = useState(null);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const [routeError, setRouteError] = useState(null);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
   const mapsAPI = new OpenStreetAPI();
   const citySelectionRef = React.useRef(null); // Track city selection for auto-search
   
@@ -49,6 +56,14 @@ export function RoutePlanner() {
       }
     }
   }, []);
+
+  // Load GraphHopper API key from localStorage
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem('graphhopperApiKey');
+    if (savedApiKey) {
+      mapsAPI.setRouteProvider(new GraphHopperRouteProvider(savedApiKey));
+    }
+  }, [mapsAPI]);
 
   // Handler to update POI cache with resolved image URL
   const handleImageLoaded = useCallback((poiId, imageUrl) => {
@@ -172,7 +187,89 @@ export function RoutePlanner() {
     setRouteStartPOI(null);
     setRouteFinishPOI(null);
     setSameStartFinish(false);
+    setRouteData(null);
   };
+
+  // API key save handler
+  const handleSaveApiKey = useCallback(() => {
+    if (!apiKeyInput.trim()) {
+      alert('Please enter an API key');
+      return;
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('graphhopperApiKey', apiKeyInput.trim());
+    
+    // Set route provider with new API key
+    const provider = new GraphHopperRouteProvider(apiKeyInput.trim());
+    mapsAPI.setRouteProvider(provider);
+    
+    // Close modal
+    setShowApiKeyModal(false);
+    setApiKeyInput('');
+    
+    // Trigger route building if points are selected
+    if (routeStartPOI && routeFinishPOI) {
+      buildRoute();
+    }
+  }, [apiKeyInput, mapsAPI, routeStartPOI, routeFinishPOI]);
+
+  // Build route function
+  const buildRoute = useCallback(async () => {
+    if (!routeStartPOI || !routeFinishPOI) return;
+    
+    const routeProvider = mapsAPI.getRouteProvider();
+    if (!routeProvider) {
+      // Show API key modal
+      setShowApiKeyModal(true);
+      return;
+    }
+    
+    setIsLoadingRoute(true);
+    setRouteError(null);
+    
+    try {
+      // Determine profile from user preferences
+      const mobilityType = userProfile?.mobility || MobilityType.STANDARD;
+      const transportMode = userProfile?.preferredTransport || TransportMode.WALK;
+      
+      const profile = routeProvider.getProfileForMobility(mobilityType, transportMode);
+      
+      // Select one random POI as intermediate waypoint (prototype)
+      const intermediateWaypoints = [];
+      if (filteredPois.length > 0) {
+        const randomPOI = filteredPois[Math.floor(Math.random() * filteredPois.length)];
+        intermediateWaypoints.push(randomPOI);
+        console.log('Added intermediate waypoint:', randomPOI.name);
+      }
+      
+      const route = await mapsAPI.buildRoute(
+        routeStartPOI,
+        routeFinishPOI,
+        {
+          profile: profile,
+          avoidStairs: userProfile?.avoidStairs || false,
+          waypoints: intermediateWaypoints
+        }
+      );
+      
+      setRouteData(route);
+    } catch (error) {
+      console.error('Route building failed:', error);
+      setRouteError(error.message);
+    } finally {
+      setIsLoadingRoute(false);
+    }
+  }, [routeStartPOI, routeFinishPOI, mapsAPI, userProfile, filteredPois]);
+
+  // Trigger route building when points change
+  useEffect(() => {
+    if (routeStartPOI && routeFinishPOI) {
+      buildRoute();
+    } else {
+      setRouteData(null);
+    }
+  }, [routeStartPOI, routeFinishPOI, buildRoute]);
 
   const handleFindPOIs = useCallback(async () => {
     if (!mapBounds) {
@@ -504,6 +601,49 @@ export function RoutePlanner() {
           </div>
         )}
 
+        {/* Route Information Display */}
+        {routeData && (
+          <div style={{
+            marginBottom: '20px',
+            padding: '12px',
+            backgroundColor: '#e8f5e9',
+            borderRadius: '8px',
+            border: '1px solid #c8e6c9'
+          }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 'bold' }}>
+              Route Information
+            </h4>
+            <div style={{ fontSize: '12px', color: '#333' }}>
+              <div style={{ marginBottom: '4px' }}>
+                📏 Distance: {(routeData.distance / 1000).toFixed(2)} km
+              </div>
+              <div>
+                ⏱️ Duration: {Math.round(routeData.duration / 60)} min
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isLoadingRoute && (
+          <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: '#666', marginBottom: '20px' }}>
+            Building route...
+          </div>
+        )}
+
+        {routeError && (
+          <div style={{
+            padding: '12px',
+            backgroundColor: '#ffebee',
+            borderRadius: '8px',
+            border: '1px solid #ffcdd2',
+            fontSize: '12px',
+            color: '#c62828',
+            marginBottom: '20px'
+          }}>
+            ⚠️ {routeError}
+          </div>
+        )}
+
         <h2 style={{ marginTop: 0, marginBottom: '12px', fontSize: '20px', color: '#333' }}>
           🗺️ Where would you like to go?
         </h2>
@@ -772,8 +912,75 @@ export function RoutePlanner() {
           routeStartPOI={routeStartPOI}
           routeFinishPOI={routeFinishPOI}
           sameStartFinish={sameStartFinish}
+          routeData={routeData}
         />
       </div>
+
+      {/* API Key Modal */}
+      <Modal
+        isOpen={showApiKeyModal}
+        onClose={() => setShowApiKeyModal(false)}
+        title={`${mapsAPI.getRouteProvider()?.getProviderName() || 'Route Provider'} API Key Required`}
+      >
+        <div dangerouslySetInnerHTML={{ 
+          __html: mapsAPI.getRouteProvider()?.getApiKeyInstructions() || 'Please provide an API key for route building.' 
+        }} />
+        
+        <div style={{ marginTop: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+            Enter your API Key:
+          </label>
+          <input
+            type="text"
+            value={apiKeyInput}
+            onChange={(e) => setApiKeyInput(e.target.value)}
+            placeholder="Paste your API key here"
+            style={{
+              width: '100%',
+              padding: '10px',
+              fontSize: '14px',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              boxSizing: 'border-box'
+            }}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleSaveApiKey();
+              }
+            }}
+          />
+        </div>
+        
+        <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => setShowApiKeyModal(false)}
+            style={{
+              padding: '10px 20px',
+              fontSize: '14px',
+              cursor: 'pointer',
+              backgroundColor: '#f5f5f5',
+              border: '1px solid #ddd',
+              borderRadius: '4px'
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSaveApiKey}
+            style={{
+              padding: '10px 20px',
+              fontSize: '14px',
+              cursor: 'pointer',
+              backgroundColor: '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px'
+            }}
+          >
+            Save API Key
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

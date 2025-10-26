@@ -1,0 +1,50 @@
+{
+  "paths": [
+    {
+      "points": {
+        "coordinates": [
+          [13.3777, 52.5160],
+          [13.3778, 52.5161],
+          [13.3780, 52.5162],
+          [13.3785, 52.5165],
+          [13.3790, 52.5170],
+          [13.3795, 52.5175],
+          [13.3800, 52.5180]
+        ],
+        "type": "LineString"
+      },
+      "distance": 1250.5,
+      "time": 960000,
+      "instructions": [
+        {
+          "distance": 50.0,
+          "sign": 0,
+          "interval": [0, 1],
+          "text": "Head north on Unter den Linden",
+          "street_name": "Unter den Linden"
+        },
+        {
+          "distance": 200.0,
+          "sign": 1,
+          "interval": [1, 2],
+          "text": "Turn right onto Friedrichstraße",
+          "street_name": "Friedrichstraße"
+        },
+        {
+          "distance": 1000.0,
+          "sign": 0,
+          "interval": [2, 6],
+          "text": "Continue straight for 1 km",
+          "street_name": "Friedrichstraße"
+        }
+      ],
+      "snapped_waypoints": {
+        "coordinates": [
+          [13.3777, 52.5160],
+          [13.3800, 52.5180]
+        ]
+      }
+    }
+  ]
+}
+

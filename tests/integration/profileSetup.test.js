@@ -23,28 +23,28 @@ describe('Profile Setup Integration Tests', () => {
       expect(profile.avoidStairs).toBe(false);
       
       // Step 2: Avoid stairs question is skipped for standard mobility (auto-set to false)
-      // Go directly to preferred transport
-      nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('preferredTransport');
-      
-      processAnswer(profile, 'preferredTransport', [TransportMode.WALK, TransportMode.PUBLIC_TRANSIT]);
-      expect(profile.preferredTransport).toEqual([TransportMode.WALK, TransportMode.PUBLIC_TRANSIT]);
-      
-      // Step 4: Budget level
+      // Go directly to budgetLevel
       nextQuestion = getNextQuestion(profile);
       expect(nextQuestion.field).toBe('budgetLevel');
       
       processAnswer(profile, 'budgetLevel', 2);
       expect(profile.budgetLevel).toBe(2);
       
-      // Step 5: Travel pace
+      // Step 3: Travel pace
       nextQuestion = getNextQuestion(profile);
       expect(nextQuestion.field).toBe('travelPace');
       
       processAnswer(profile, 'travelPace', 'MEDIUM');
       expect(profile.travelPace).toBe('MEDIUM');
       
-      // Step 6: Interests
+      // Step 4: Preferred Transport
+      nextQuestion = getNextQuestion(profile);
+      expect(nextQuestion.field).toBe('preferredTransport');
+      
+      processAnswer(profile, 'preferredTransport', TransportMode.WALK);
+      expect(profile.preferredTransport).toBe(TransportMode.WALK);
+      
+      // Step 5: Interests
       nextQuestion = getNextQuestion(profile);
       expect(nextQuestion.field).toBe('interests');
       
@@ -55,7 +55,7 @@ describe('Profile Setup Integration Tests', () => {
       expect(profile.interests[InterestCategory.ART_MUSEUMS]).toBe(true);
       expect(profile.interests[InterestCategory.HISTORY_CULTURE]).toBe(true);
       
-      // Step 7: Dietary preferences
+      // Step 6: Dietary preferences
       nextQuestion = getNextQuestion(profile);
       expect(nextQuestion.field).toBe('dietary');
       
@@ -66,7 +66,7 @@ describe('Profile Setup Integration Tests', () => {
       expect(profile.dietary.vegetarian).toBe(true);
       expect(profile.dietary.glutenFree).toBe(false);
       
-      // Step 8: Time window
+      // Step 7: Time window
       nextQuestion = getNextQuestion(profile);
       expect(nextQuestion.field).toBe('timeWindow');
       
@@ -88,7 +88,7 @@ describe('Profile Setup Integration Tests', () => {
       processAnswer(profile, 'mobility', MobilityType.WHEELCHAIR);
       
       const nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('preferredTransport');
+      expect(nextQuestion.field).toBe('budgetLevel');
       expect(profile.avoidStairs).toBe(true);
     });
     
@@ -96,7 +96,7 @@ describe('Profile Setup Integration Tests', () => {
       processAnswer(profile, 'mobility', MobilityType.STROLLER);
       
       const nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('preferredTransport');
+      expect(nextQuestion.field).toBe('budgetLevel');
       expect(profile.avoidStairs).toBe(true);
     });
     
@@ -104,29 +104,21 @@ describe('Profile Setup Integration Tests', () => {
       processAnswer(profile, 'mobility', MobilityType.LOW_ENDURANCE);
       
       const nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('preferredTransport');
+      expect(nextQuestion.field).toBe('budgetLevel');
       expect(profile.avoidStairs).toBe(true);
     });
   });
   
   describe('Profile completion tracking', () => {
     test('should track completion percentage correctly', () => {
-      const initialCompletion = getCompletionPercentage(profile);
-      expect(initialCompletion).toBe(0);
-      
       processAnswer(profile, 'mobility', MobilityType.STANDARD);
       const afterMobility = getCompletionPercentage(profile);
-      expect(afterMobility).toBeGreaterThan(initialCompletion);
-      
-      processAnswer(profile, 'avoidStairs', false);
-      const afterAvoidStairs = getCompletionPercentage(profile);
-      expect(afterAvoidStairs).toBeGreaterThanOrEqual(afterMobility);
+      expect(afterMobility).toBeGreaterThan(0);
     });
     
     test('should handle partial completion', () => {
       processAnswer(profile, 'mobility', MobilityType.STANDARD);
-      processAnswer(profile, 'avoidStairs', false);
-      processAnswer(profile, 'preferredTransport', [TransportMode.WALK]);
+      processAnswer(profile, 'preferredTransport', TransportMode.WALK);
       
       const completion = getCompletionPercentage(profile);
       expect(completion).toBeGreaterThan(0);
@@ -150,14 +142,14 @@ describe('Profile Setup Integration Tests', () => {
     });
     
     test('should handle array fields correctly', () => {
-      // Empty array is not valid - should return false and not update field
-      const result = processAnswer(profile, 'preferredTransport', []);
+      // Empty string is not valid - should return false and not update field
+      const result = processAnswer(profile, 'preferredTransport', '');
       expect(result).toBe(false);
-      expect(profile.preferredTransport).toBe('__EMPTY_ARRAY__');
+      expect(profile.preferredTransport).toBe('__UNFILLED__');
       
-      // Valid array should update the field
-      processAnswer(profile, 'preferredTransport', [TransportMode.WALK, TransportMode.BIKE]);
-      expect(profile.preferredTransport).toEqual([TransportMode.WALK, TransportMode.BIKE]);
+      // Valid single value should update the field
+      processAnswer(profile, 'preferredTransport', TransportMode.WALK);
+      expect(profile.preferredTransport).toBe(TransportMode.WALK);
     });
     
     test('should handle object fields correctly', () => {

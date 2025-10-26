@@ -1,6 +1,7 @@
 import noImagePlaceholder from '../static_resources/no_image_placeholder.png';
 import { OpenStreetPOI } from '../models/POI';
 import { InterestCategory } from '../models/UserProfile';
+import { GraphHopperRouteProvider } from './GraphHopperRouteProvider';
 
 /**
  * Base class for Maps API integrations
@@ -122,16 +123,52 @@ export class MapsAPI {
  * OpenStreetMap API implementation
  */
 export class OpenStreetAPI extends MapsAPI {
-  constructor(apiKey = null) {
+  constructor(apiKey = null, routeProviderApiKey = null) {
     super(apiKey);
     this.baseUrl = 'https://nominatim.openstreetmap.org';
     this.routingUrl = 'https://router.project-osrm.org';
+    this.overpassUrl = 'https://overpass-api.de/api/interpreter';
     // Request queue for Wikidata to avoid rate limiting
     this.wikidataQueue = [];
     this.isProcessingQueue = false;
     this.requestDelay = 500; // ms between requests
     // Cache for failed Wikidata requests to avoid retrying
     this.failedWikidataIds = new Set();
+    
+    // Initialize route provider (can be swapped for different provider)
+    this.routeProvider = routeProviderApiKey 
+      ? new GraphHopperRouteProvider(routeProviderApiKey)
+      : null;
+  }
+
+  /**
+   * Set route provider (allows switching between providers)
+   * @param {BaseRouteProvider} provider - Route provider instance
+   */
+  setRouteProvider(provider) {
+    this.routeProvider = provider;
+  }
+
+  /**
+   * Get current route provider
+   * @returns {BaseRouteProvider} Current route provider
+   */
+  getRouteProvider() {
+    return this.routeProvider;
+  }
+
+  /**
+   * Build route using configured route provider
+   * @param {OpenStreetPOI} startPOI - Starting point
+   * @param {OpenStreetPOI} finishPOI - Ending point
+   * @param {Object} options - Route options
+   * @returns {Promise<RouteData>} Route data
+   */
+  async buildRoute(startPOI, finishPOI, options = {}) {
+    if (!this.routeProvider) {
+      throw new Error('No route provider configured. Please provide API key.');
+    }
+    return await this.routeProvider.buildRoute(startPOI, finishPOI, options);
   }
 
   /**

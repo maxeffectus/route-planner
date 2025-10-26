@@ -101,7 +101,8 @@ export class UserProfile {
     avoidStairs;
 
     /**
-     * Suggested travel modes and their priority (in descending order).
+     * Preferred transport mode (single value, not array)
+     * @type {string} TransportMode value
      */
     preferredTransport;
 
@@ -140,7 +141,7 @@ export class UserProfile {
         this.userId = userId;
         this.mobility = UNFILLED_MARKERS.STRING; // Will be determined by AI questions
         this.avoidStairs = UNFILLED_MARKERS.BOOLEAN; // Will be determined by AI questions
-        this.preferredTransport = UNFILLED_MARKERS.ARRAY; // Will be filled based on user preferences
+        this.preferredTransport = UNFILLED_MARKERS.STRING; // Single value, not array
         this.interests = UNFILLED_MARKERS.OBJECT; // Will be filled based on user preferences
         this.budgetLevel = UNFILLED_MARKERS.NUMBER; // Will be determined by AI questions
         this.travelPace = UNFILLED_MARKERS.STRING; // Will be determined by AI questions
@@ -186,8 +187,7 @@ export class UserProfile {
                this.isFieldFilled(this.travelPace) &&
                this.isFieldFilled(this.timeWindow.startHour) &&
                this.isFieldFilled(this.timeWindow.endHour) &&
-               this.preferredTransport !== UNFILLED_MARKERS.ARRAY && 
-               this.preferredTransport.length > 0 &&
+               this.isFieldFilled(this.preferredTransport) &&
                this.interests !== UNFILLED_MARKERS.OBJECT &&
                this.dietary !== UNFILLED_MARKERS.OBJECT;
     }
@@ -203,7 +203,7 @@ export class UserProfile {
         if (!this.isFieldFilled(this.travelPace)) missing.push('travelPace');
         if (!this.isFieldFilled(this.timeWindow.startHour)) missing.push('timeWindow.startHour');
         if (!this.isFieldFilled(this.timeWindow.endHour)) missing.push('timeWindow.endHour');
-        if (this.preferredTransport === UNFILLED_MARKERS.ARRAY || this.preferredTransport.length === 0) missing.push('preferredTransport');
+        if (!this.isFieldFilled(this.preferredTransport)) missing.push('preferredTransport');
         if (this.interests === UNFILLED_MARKERS.OBJECT) missing.push('interests');
         if (this.dietary === UNFILLED_MARKERS.OBJECT) missing.push('dietary');
         return missing;
@@ -273,17 +273,16 @@ export class UserProfile {
             });
         }
 
-        if (this.preferredTransport === UNFILLED_MARKERS.ARRAY || this.preferredTransport.length === 0) {
+        if (!this.isFieldFilled(this.preferredTransport)) {
             questions.push({
                 field: 'preferredTransport',
-                question: 'How do you prefer to get around? (You can select multiple options)',
+                question: 'What is your preferred way to get around?',
                 options: [
                     { value: TransportMode.WALK, label: 'Walking' },
-                    { value: TransportMode.BIKE, label: 'Cycling' },
-                    { value: TransportMode.PUBLIC_TRANSIT, label: 'Public transport' },
+                    { value: TransportMode.BIKE, label: 'Bicycle/Scooter' },
+                    { value: TransportMode.PUBLIC_TRANSIT, label: 'Public Transport' },
                     { value: TransportMode.CAR_TAXI, label: 'Car/Taxi' }
-                ],
-                multiple: true
+                ]
             });
         }
 
@@ -361,17 +360,17 @@ export class UserProfile {
     }
 
     /**
-     * Get transport preferences as readable strings
+     * Get transport preference as readable string
      */
     getTransportDescription() {
-        if (this.preferredTransport === UNFILLED_MARKERS.ARRAY || this.preferredTransport.length === 0) return 'Not specified';
+        if (!this.isFieldFilled(this.preferredTransport)) return 'Not specified';
         const descriptions = {
             [TransportMode.WALK]: 'Walking',
             [TransportMode.BIKE]: 'Cycling',
             [TransportMode.PUBLIC_TRANSIT]: 'Public transport',
             [TransportMode.CAR_TAXI]: 'Car/Taxi'
         };
-        return this.preferredTransport.map(mode => descriptions[mode] || mode).join(', ');
+        return descriptions[this.preferredTransport] || this.preferredTransport;
     }
 
     /**

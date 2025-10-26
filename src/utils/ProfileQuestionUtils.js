@@ -54,11 +54,11 @@ export class ProfileQuestionUtils {
             case 'avoidStairs':
             case 'budgetLevel':
             case 'travelPace':
+            case 'preferredTransport':
                 if (currentValue !== null) {
                     setSelectedAnswers([currentValue]);
                 }
                 break;
-            case 'preferredTransport':
             case 'interests':
                 if (Array.isArray(currentValue) && currentValue.length > 0) {
                     setSelectedAnswers(currentValue);

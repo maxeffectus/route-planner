@@ -14,8 +14,8 @@ export const responseSchema = {
                 mobility: { type: "STRING", enum: Object.values(MobilityType) },
                 avoidStairs: { type: "BOOLEAN" },
                 preferredTransport: { 
-                    type: "ARRAY", 
-                    items: { type: "STRING", enum: Object.values(TransportMode) }
+                    type: "STRING", 
+                    enum: Object.values(TransportMode)
                 },
                 interests: { 
                     type: "OBJECT",
@@ -105,13 +105,9 @@ export function validateUserProfileResponse(response) {
             return false;
         }
         
-        // Check transport modes
-        if (profile.preferredTransport && Array.isArray(profile.preferredTransport)) {
-            for (const transport of profile.preferredTransport) {
-                if (!Object.values(TransportMode).includes(transport)) {
-                    return false;
-                }
-            }
+        // Check transport mode
+        if (profile.preferredTransport && !Object.values(TransportMode).includes(profile.preferredTransport)) {
+            return false;
         }
         
         // Check budget level
@@ -213,9 +209,9 @@ export const fieldSchemas = {
         description: "Whether user wants to avoid stairs"
     },
     preferredTransport: {
-        type: "array",
-        items: { type: "string", enum: Object.values(TransportMode) },
-        description: "Preferred transportation modes"
+        type: "string",
+        enum: Object.values(TransportMode),
+        description: "Preferred transportation mode"
     },
     interests: {
         type: "object",
@@ -316,7 +312,7 @@ Examples:
 - For field 'avoidStairs': { "avoidStairs": true }
 - For field 'budgetLevel': { "budgetLevel": 2 }
 - For field 'travelPace': { "travelPace": "MEDIUM" }
-- For field 'preferredTransport': { "preferredTransport": ["walk", "public_transit"] }
+- For field 'preferredTransport': { "preferredTransport": "walk" }
 - For field 'interests': { "interests": { "${InterestCategory.NATURE_PARKS}": 1.0, "${InterestCategory.GASTRONOMY}": 0.7 } }
 - For field 'dietary': { "dietary": { "vegan": false, "vegetarian": true, "glutenFree": false, "halal": false, "kosher": false, "allergies": [] } }
 - For field 'timeWindow': { "timeWindow": { "startHour": 9, "endHour": 18 } }
@@ -391,8 +387,7 @@ export function validateFieldData(fieldName, data) {
             case 'avoidStairs':
                 return typeof data[fieldName] === 'boolean';
             case 'preferredTransport':
-                return Array.isArray(data[fieldName]) && 
-                       data[fieldName].every(mode => Object.values(TransportMode).includes(mode));
+                return Object.values(TransportMode).includes(data[fieldName]);
             case 'budgetLevel':
                 return [0, 1, 2, 3].includes(data[fieldName]);
             case 'travelPace':

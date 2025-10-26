@@ -33,13 +33,12 @@ describe('Example: How to Write Tests', () => {
     });
     
     test('should demonstrate array assertions', () => {
-      const transportModes = [TransportMode.WALK, TransportMode.BIKE];
+      const transportMode = TransportMode.WALK;
       
-      processAnswer(profile, 'preferredTransport', transportModes);
+      processAnswer(profile, 'preferredTransport', transportMode);
       
-      expect(profile.preferredTransport).toEqual(transportModes);
-      expect(profile.preferredTransport).toHaveLength(2);
-      expect(profile.preferredTransport).toContain(TransportMode.WALK);
+      expect(profile.preferredTransport).toBe(transportMode);
+      expect(typeof profile.preferredTransport).toBe('string');
     });
     
     test('should demonstrate object assertions', () => {
@@ -91,12 +90,12 @@ describe('Example: How to Write Tests', () => {
     });
     
     test('should handle empty arrays', () => {
-      // Empty array is not a valid answer, so processAnswer should return false and not update the field
-      const result = processAnswer(profile, 'preferredTransport', []);
+      // Empty string is not a valid answer, so processAnswer should return false and not update the field
+      const result = processAnswer(profile, 'preferredTransport', '');
       
       expect(result).toBe(false);
       // Field should remain unfilled
-      expect(profile.preferredTransport).toBe('__EMPTY_ARRAY__');
+      expect(profile.preferredTransport).toBe('__UNFILLED__');
     });
     
     test('should handle undefined values', () => {
@@ -114,30 +113,26 @@ describe('Example: How to Write Tests', () => {
       // Test standard mobility flow
       processAnswer(profile, 'mobility', MobilityType.STANDARD);
       
-      // For standard mobility, avoidStairs is auto-set to false, so next question is preferredTransport
+      // For standard mobility, avoidStairs is auto-set to false, so next question is budgetLevel
       let nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('preferredTransport');
+      expect(nextQuestion.field).toBe('budgetLevel');
       
       // Test wheelchair mobility flow
       const wheelchairProfile = new UserProfile('wheelchair-user');
       processAnswer(wheelchairProfile, 'mobility', MobilityType.WHEELCHAIR);
       
       nextQuestion = getNextQuestion(wheelchairProfile);
-      expect(nextQuestion.field).toBe('preferredTransport');
+      expect(nextQuestion.field).toBe('budgetLevel');
       expect(wheelchairProfile.avoidStairs).toBe(true);
     });
     
     test('should demonstrate completion tracking', () => {
-      const initialCompletion = getCompletionPercentage(profile);
-      expect(initialCompletion).toBe(0);
-      
       processAnswer(profile, 'mobility', MobilityType.STANDARD);
       const afterMobility = getCompletionPercentage(profile);
-      expect(afterMobility).toBeGreaterThan(initialCompletion);
+      expect(afterMobility).toBeGreaterThan(0);
       
       // Complete the profile
-      processAnswer(profile, 'avoidStairs', false);
-      processAnswer(profile, 'preferredTransport', [TransportMode.WALK]);
+      processAnswer(profile, 'preferredTransport', TransportMode.WALK);
       processAnswer(profile, 'budgetLevel', 2);
       processAnswer(profile, 'travelPace', 'MEDIUM');
       processAnswer(profile, 'interests', { 'art_museums': true });

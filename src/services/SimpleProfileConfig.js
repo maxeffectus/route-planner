@@ -26,17 +26,6 @@ export const profileQuestions = [
         condition: (profile) => profile.mobility === MobilityType.STANDARD
     },
     {
-        field: 'preferredTransport',
-        question: 'What transportation methods do you prefer? (Select all that apply)',
-        type: 'multi-choice',
-        options: [
-            { value: TransportMode.WALK, label: 'Walking' },
-            { value: TransportMode.BIKE, label: 'Bicycle' },
-            { value: TransportMode.PUBLIC_TRANSIT, label: 'Public transit (bus, metro, train)' },
-            { value: TransportMode.CAR_TAXI, label: 'Car or Taxi' }
-        ]
-    },
-    {
         field: 'budgetLevel',
         question: 'What is your budget level for this trip?',
         type: 'single-choice',
@@ -55,6 +44,17 @@ export const profileQuestions = [
             { value: 'LOW', label: 'Relaxed - Take it slow, lots of breaks' },
             { value: 'MEDIUM', label: 'Moderate - Balanced pace with some rest' },
             { value: 'HIGH', label: 'Active - Pack in as much as possible' }
+        ]
+    },
+    {
+        field: 'preferredTransport',
+        question: 'What is your preferred way to get around?',
+        type: 'single-choice',
+        options: [
+            { value: TransportMode.WALK, label: 'Walking' },
+            { value: TransportMode.BIKE, label: 'Bicycle/Scooter' },
+            { value: TransportMode.PUBLIC_TRANSIT, label: 'Public Transport' },
+            { value: TransportMode.CAR_TAXI, label: 'Car/Taxi' }
         ]
     },
     {
@@ -111,8 +111,7 @@ export function getCurrentFieldValue(profile, fieldName) {
             return profile.isFieldFilled(profile[fieldName]) ? profile[fieldName] : null;
             
         case 'preferredTransport':
-            return (profile.preferredTransport !== UNFILLED_MARKERS.ARRAY && profile.preferredTransport.length > 0) 
-                ? [...profile.preferredTransport] : [];
+            return profile.isFieldFilled(profile.preferredTransport) ? profile.preferredTransport : null;
                    
         case 'interests':
             return (profile.interests !== UNFILLED_MARKERS.OBJECT && Object.keys(profile.interests).length > 0) 
@@ -208,8 +207,7 @@ function isFieldUnfilled(profile, fieldName) {
             return !profile.isFieldFilled(profile[fieldName]);
             
         case 'preferredTransport':
-            return profile.preferredTransport === UNFILLED_MARKERS.ARRAY || 
-                   profile.preferredTransport.length === 0;
+            return !profile.isFieldFilled(profile.preferredTransport);
                    
         case 'interests':
         case 'dietary':
@@ -279,13 +277,16 @@ export function processAnswer(profile, fieldName, answer) {
                 break;
                 
             case 'preferredTransport':
-                // Validate: must have at least one transport mode selected
-                const transportArray = Array.isArray(answer) ? answer : [answer];
-                if (transportArray.length === 0 || !transportArray[0]) {
-                    console.warn('preferredTransport field requires at least one selection');
+                // Validate: must have a transport mode selected
+                if (!answer || typeof answer !== 'string') {
+                    console.warn('preferredTransport field requires a valid selection');
                     return false;
                 }
-                profile.preferredTransport = transportArray;
+                if (!Object.values(TransportMode).includes(answer)) {
+                    console.warn('preferredTransport field requires a valid TransportMode value');
+                    return false;
+                }
+                profile.preferredTransport = answer;
                 break;
                 
             case 'interests':
