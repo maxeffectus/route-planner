@@ -314,15 +314,48 @@ export function InteractiveMap({
   const categories = getAllCategories();
 
   // Create custom colored marker icon
-  const createColoredIcon = (color, isSelected = false) => {
+  // Supports multiple colors - displays each category as a segment
+  const createColoredIcon = (colors, isSelected = false) => {
     const size = isSelected ? 35 : 25;
     const iconSize = isSelected ? 35 : 25;
     const iconAnchor = isSelected ? [17, 34] : [12, 24];
     
+    // If single color, use simple style
+    if (colors.length === 1) {
+      return L.divIcon({
+        className: 'custom-poi-marker',
+        html: `<div style="
+          background-color: ${colors[0]};
+          width: ${size}px;
+          height: ${size}px;
+          border-radius: 50% 50% 50% 0;
+          transform: rotate(-45deg);
+          border: 3px solid white;
+          box-shadow: 0 ${isSelected ? '4px 12px' : '2px 5px'} rgba(0,0,0,${isSelected ? '0.4' : '0.3'});
+          transition: all 0.2s;
+        "></div>`,
+        iconSize: [iconSize, iconSize],
+        iconAnchor: iconAnchor
+      });
+    }
+    
+    // Multiple colors: create segments using conic gradient with hard stops
+    const anglePerSegment = 360 / colors.length;
+    let gradientStops = [];
+    
+    colors.forEach((color, idx) => {
+      const startAngle = idx * anglePerSegment;
+      const endAngle = (idx + 1) * anglePerSegment;
+      // Use hard stops to create clear boundaries between segments
+      gradientStops.push(`${color} ${startAngle}deg ${endAngle}deg`);
+    });
+    
+    const gradient = `conic-gradient(from 0deg, ${gradientStops.join(', ')})`;
+    
     return L.divIcon({
       className: 'custom-poi-marker',
       html: `<div style="
-        background-color: ${color};
+        background: ${gradient};
         width: ${size}px;
         height: ${size}px;
         border-radius: 50% 50% 50% 0;
@@ -536,9 +569,8 @@ export function InteractiveMap({
         
         // Get colors for all categories
         const colors = categories.map(cat => categoryColors[cat] || '#999');
-        const primaryColor = colors.length > 0 ? colors[0] : '#999';
         const isSelected = selectedPoiId === poi.id;
-        const customIcon = createColoredIcon(primaryColor, isSelected);
+        const customIcon = createColoredIcon(colors, isSelected);
         
         return (
           <Marker 

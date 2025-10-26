@@ -524,23 +524,8 @@ export function RoutePlanner() {
                 const colors = poiCategories.map(cat => categoryColors[cat] || '#999');
                 const isSelected = selectedPoiId === poi.id;
                 
-                // Create gradient for borderLeft if multiple categories
-                let borderLeftStyle;
-                if (colors.length === 1) {
-                  borderLeftStyle = `4px solid ${colors[0]}`;
-                } else {
-                  // Create a linear gradient that goes from first color to last color
-                  const gradient = colors.join(', ');
-                  borderLeftStyle = `4px solid transparent`;
-                  // Use border-image for gradient effect
-                  const borderImage = `linear-gradient(to right, ${gradient})`;
-                  // We'll use a custom style
-                  borderLeftStyle = { 
-                    borderImage: borderImage, 
-                    borderImageSlice: 1,
-                    borderLeft: `4px solid ${colors[0]}` // Fallback
-                  };
-                }
+                // Create multi-color border using div elements for each category
+                const numCategories = colors.length;
                 
                 return (
                   <div
@@ -550,12 +535,17 @@ export function RoutePlanner() {
                       // Toggle selection: if already selected, deselect; otherwise select
                       setSelectedPoiId(prevId => prevId === poi.id ? null : poi.id);
                     }}
+                    onMouseOver={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                     style={{
                       padding: '12px 16px',
                       borderBottom: index < filteredPois.length - 1 ? '1px solid #eee' : 'none',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      ...(typeof borderLeftStyle === 'string' ? { borderLeft: borderLeftStyle } : borderLeftStyle),
                       position: 'relative',
                       backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
                       transform: isSelected ? 'translateX(4px)' : 'translateX(0)',
@@ -564,13 +554,27 @@ export function RoutePlanner() {
                       gap: '12px',
                       alignItems: 'center'
                     }}
-                    onMouseOver={(e) => {
-                      if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseOut={(e) => {
-                      if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
                   >
+                    {/* Multi-color category indicator (left border) */}
+                    <div style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: '4px',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}>
+                      {colors.map((color, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            flex: 1,
+                            backgroundColor: color
+                          }}
+                        />
+                      ))}
+                    </div>
                     {/* POI Image */}
                     <POIImageThumbnail 
                       poi={poi} 
