@@ -78,7 +78,7 @@ export function RoutePlanner() {
     [InterestCategory.NATURE_PARKS]: '#388E3C',        // Green - природа и парки
     [InterestCategory.ENTERTAINMENT]: '#FF6F00',       // Orange - развлечения
     [InterestCategory.GASTRONOMY]: '#D32F2F',          // Red - гастрономия
-    [InterestCategory.NIGHTLIFE]: '#8E24AA'            // Deep Purple - ночная жизнь
+    [InterestCategory.NIGHTLIFE]: '#1A237E'            // Very Dark Blue - ночная жизнь
   };
 
   // Helper: Check if a POI is within a bounding box
