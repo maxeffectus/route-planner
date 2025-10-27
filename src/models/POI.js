@@ -29,6 +29,7 @@ export class OpenStreetPOI {
     this.osmType = data.osmType;
     this.osmId = data.osmId;
     this.significance = data.significance;
+    this.wantToVisit = data.wantToVisit || false;
     
     // Store OSM tags for accessibility checking
     this.#allTags = data.allTags || {};
@@ -192,7 +193,8 @@ export class OpenStreetPOI {
       osmId: this.osmId,
       significance: this.significance,
       resolvedImageUrl: this.resolvedImageUrl,
-      allTags: this.#allTags
+      allTags: this.#allTags,
+      wantToVisit: this.wantToVisit
     };
   }
 

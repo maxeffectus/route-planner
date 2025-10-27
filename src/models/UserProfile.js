@@ -137,6 +137,12 @@ export class UserProfile {
      */
     timeWindow;
 
+    /**
+     * List of POIs the user wants to visit.
+     * Key: POI ID, Value: { name: string, addedAt: timestamp, location: object }
+     */
+    wantToVisitPOIs;
+
     constructor(userId) {
         this.userId = userId;
         this.mobility = UNFILLED_MARKERS.STRING; // Will be determined by AI questions
@@ -150,6 +156,7 @@ export class UserProfile {
             startHour: UNFILLED_MARKERS.NUMBER, // Will be determined by AI questions
             endHour: UNFILLED_MARKERS.NUMBER    // Will be determined by AI questions
         };
+        this.wantToVisitPOIs = UNFILLED_MARKERS.OBJECT; // Will be determined by AI questions
     }
 
     /**
@@ -161,6 +168,49 @@ export class UserProfile {
             this.interests = {};
         }
         this.interests[category] = Math.max(0, Math.min(1, weight)); // Restrict weight between 0 and 1
+    }
+
+    /**
+     * Add POI to want to visit list
+     */
+    addWantToVisit(poi) {
+        if (this.wantToVisitPOIs === UNFILLED_MARKERS.OBJECT) {
+            this.wantToVisitPOIs = {};
+        }
+        this.wantToVisitPOIs[poi.id] = {
+            name: poi.name,
+            addedAt: Date.now(),
+            location: poi.location
+        };
+    }
+
+    /**
+     * Remove POI from want to visit list
+     */
+    removeWantToVisit(poiId) {
+        if (this.wantToVisitPOIs !== UNFILLED_MARKERS.OBJECT) {
+            delete this.wantToVisitPOIs[poiId];
+        }
+    }
+
+    /**
+     * Check if POI is in want to visit list
+     */
+    isWantToVisit(poiId) {
+        if (this.wantToVisitPOIs === UNFILLED_MARKERS.OBJECT) {
+            return false;
+        }
+        return poiId in this.wantToVisitPOIs;
+    }
+
+    /**
+     * Get all want to visit POIs
+     */
+    getWantToVisitPOIs() {
+        if (this.wantToVisitPOIs === UNFILLED_MARKERS.OBJECT) {
+            return {};
+        }
+        return this.wantToVisitPOIs;
     }
 
     /**
@@ -447,7 +497,8 @@ export class UserProfile {
             timeWindow: {
                 startHour: this.timeWindow.startHour,
                 endHour: this.timeWindow.endHour
-            }
+            },
+            wantToVisitPOIs: this.wantToVisitPOIs === UNFILLED_MARKERS.OBJECT ? UNFILLED_MARKERS.OBJECT : this.wantToVisitPOIs
         };
     }
 
@@ -473,6 +524,16 @@ export class UserProfile {
         }
         
         profile.timeWindow = data.timeWindow;
+
+        // Handle wantToVisitPOIs field - if it's the unfilled marker, keep it; otherwise create the object
+        if (data.wantToVisitPOIs === undefined || data.wantToVisitPOIs === null) {
+            profile.wantToVisitPOIs = UNFILLED_MARKERS.OBJECT;
+        } else if (data.wantToVisitPOIs === UNFILLED_MARKERS.OBJECT) {
+            profile.wantToVisitPOIs = UNFILLED_MARKERS.OBJECT;
+        } else {
+            profile.wantToVisitPOIs = data.wantToVisitPOIs;
+        }
+
         return profile;
     }
 }

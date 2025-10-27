@@ -4,13 +4,14 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { POIImageThumbnail, POITitle, POIType, POILinks, POIDescription, getPOIAccessibility } from './POIComponents';
 import { getAllCategories } from '../utils/categoryMapping';
+import { WANT_TO_VISIT_POI_HIGHLIGHT_COLOR } from '../pages/RoutePlanner';
 
 // Fix default marker icon issue in React-Leaflet
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Shared popup content component using reusable POI components
-function PopupContent({ poi, colors, onClose, mapsAPI, onImageLoaded }) {
+function PopupContent({ poi, colors, onClose, mapsAPI, onImageLoaded, onToggleWantToVisit }) {
   return (
     <div 
       style={{ minWidth: '240px', position: 'relative' }}
@@ -58,6 +59,21 @@ function PopupContent({ poi, colors, onClose, mapsAPI, onImageLoaded }) {
       >
         ×
       </button>
+
+      {/* Want to Visit Checkbox */}
+      {onToggleWantToVisit && (
+        <div style={{ marginBottom: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '13px' }}>
+            <input
+              type="checkbox"
+              checked={poi.wantToVisit || false}
+              onChange={() => onToggleWantToVisit(poi)}
+              style={{ marginRight: '6px' }}
+            />
+            Want to visit
+          </label>
+        </div>
+      )}
 
       {/* POI Image - Full width in popup */}
       <div style={{ marginBottom: '12px' }}>
@@ -372,6 +388,7 @@ export function InteractiveMap({
   selectedPoiId = null,
   onPoiSelect,
   onImageLoaded,
+  onToggleWantToVisit,
   routeStartPOI = null,
   routeFinishPOI = null,
   sameStartFinish = false,
@@ -388,12 +405,26 @@ export function InteractiveMap({
   // Category definitions from central config
   const categories = getAllCategories();
 
-  // Create custom colored marker icon
+  // Create custom colored marker icon with optional halo for want-to-visit POIs
   // Supports multiple colors - displays each category as a segment
-  const createColoredIcon = (colors, isSelected = false) => {
-    const size = isSelected ? 35 : 25;
-    const iconSize = isSelected ? 35 : 25;
-    const iconAnchor = isSelected ? [17, 34] : [12, 24];
+  const createColoredIcon = (colors, isSelected = false, isWantToVisit = false) => {
+    // Want-to-visit markers are larger
+    const size = isWantToVisit ? (isSelected ? 40 : 32) : (isSelected ? 35 : 25);
+    const iconSize = isWantToVisit ? (isSelected ? 40 : 32) : (isSelected ? 35 : 25);
+    const iconAnchor = isWantToVisit ? (isSelected ? [20, 38] : [16, 30]) : (isSelected ? [17, 34] : [12, 24]);
+    
+    // Add halo for want-to-visit POIs
+    const shadows = [];
+    if (isWantToVisit) {
+      // Use WANT_TO_VISIT_POI_HIGHLIGHT_COLOR for halo (80% opacity - more vibrant)
+      shadows.push(`0 0 0 8px ${WANT_TO_VISIT_POI_HIGHLIGHT_COLOR}CC`); // CC = 80% opacity
+    }
+    if (isSelected) {
+      shadows.push('0 4px 12px rgba(0,0,0,0.4)');
+    } else {
+      shadows.push('0 2px 5px rgba(0,0,0,0.3)');
+    }
+    const boxShadow = shadows.join(', ');
     
     // If single color, use simple style
     if (colors.length === 1) {
@@ -406,7 +437,7 @@ export function InteractiveMap({
           border-radius: 50% 50% 50% 0;
           transform: rotate(-45deg);
           border: 3px solid white;
-          box-shadow: 0 ${isSelected ? '4px 12px' : '2px 5px'} rgba(0,0,0,${isSelected ? '0.4' : '0.3'});
+          box-shadow: ${boxShadow};
           transition: all 0.2s;
         "></div>`,
         iconSize: [iconSize, iconSize],
@@ -436,7 +467,7 @@ export function InteractiveMap({
         border-radius: 50% 50% 50% 0;
         transform: rotate(-45deg);
         border: 3px solid white;
-        box-shadow: 0 ${isSelected ? '4px 12px' : '2px 5px'} rgba(0,0,0,${isSelected ? '0.4' : '0.3'});
+        box-shadow: ${boxShadow};
         transition: all 0.2s;
       "></div>`,
       iconSize: [iconSize, iconSize],
@@ -703,7 +734,8 @@ export function InteractiveMap({
         // Get colors for all categories
         const colors = categories.map(cat => categoryColors[cat] || '#999');
         const isSelected = selectedPoiId === poi.id;
-        const customIcon = createColoredIcon(colors, isSelected);
+        const isWantToVisit = poi.wantToVisit || false;
+        const customIcon = createColoredIcon(colors, isSelected, isWantToVisit);
         
         return (
           <Marker 
@@ -731,6 +763,7 @@ export function InteractiveMap({
                 colors={colors}
                 mapsAPI={mapsAPI}
                 onImageLoaded={onImageLoaded}
+                onToggleWantToVisit={onToggleWantToVisit}
                 onClose={() => {
                   isInteractingRef.current = true;
                   onPoiSelect && onPoiSelect(null);

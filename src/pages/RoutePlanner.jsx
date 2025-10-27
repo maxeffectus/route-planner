@@ -12,6 +12,9 @@ import { Modal } from '../components/Modal';
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
 
+// Color for want-to-visit POI highlight (used for both card background and marker halos)
+export const WANT_TO_VISIT_POI_HIGHLIGHT_COLOR = '#BBDEFB'; // Medium blue - more visible than light blue
+
 export function RoutePlanner() {
   const [pois, setPois] = useState([]);
   const [isLoadingPOIs, setIsLoadingPOIs] = useState(false);
@@ -142,6 +145,18 @@ export function RoutePlanner() {
       return poiCategories.some(cat => selectedCategories.includes(cat));
     });
   }, [pois, selectedCategories]);
+
+  // Sort POIs: selected ones first, then alphabetically within groups
+  const sortedFilteredPois = useMemo(() => {
+    return [...filteredPois].sort((a, b) => {
+      // Selected POIs first
+      if (a.wantToVisit && !b.wantToVisit) return -1;
+      if (!a.wantToVisit && b.wantToVisit) return 1;
+      
+      // Alphabetically within groups
+      return a.name.localeCompare(b.name);
+    });
+  }, [filteredPois]);
 
   // UNIFIED POI DISPLAY: Always show POIs that are in the current map bounds
   // This is the single source of truth for what POIs to display
@@ -305,6 +320,40 @@ export function RoutePlanner() {
     }
   }, [routeStartPOI, routeFinishPOI, buildRoute]);
 
+  // Restore wantToVisit state from user profile
+  const restoreWantToVisitState = useCallback((pois) => {
+    if (!userProfile) return pois;
+    
+    return pois.map(poi => {
+      if (userProfile.isWantToVisit(poi.id)) {
+        poi.wantToVisit = true;
+      }
+      return poi;
+    });
+  }, [userProfile]);
+
+  // Handler for toggling want to visit
+  const handleToggleWantToVisit = useCallback((poi) => {
+    if (!userProfile) return;
+    
+    // Toggle POI instance state
+    poi.wantToVisit = !poi.wantToVisit;
+    
+    // Update profile
+    if (poi.wantToVisit) {
+      userProfile.addWantToVisit(poi);
+    } else {
+      userProfile.removeWantToVisit(poi.id);
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('userProfile', JSON.stringify(userProfile.toJSON()));
+    
+    // Force re-render
+    setPois([...pois]);
+    setPoiCache([...poiCache]);
+  }, [userProfile, pois, poiCache]);
+
   const handleFindPOIs = useCallback(async () => {
     if (!mapBounds) {
       setPoiError('Map bounds not available');
@@ -334,9 +383,12 @@ export function RoutePlanner() {
       
       const newPOIs = await mapsAPI.getPOI(bbox, fetchLimit, selectedCategories);
       
+      // Restore wantToVisit state from user profile
+      const poisWithState = restoreWantToVisitState(newPOIs);
+      
       // Merge with cache (avoiding duplicates by ID)
       const cachedIds = new Set(poiCache.map(p => p.id));
-      const uniqueNewPOIs = newPOIs.filter(poi => !cachedIds.has(poi.id));
+      const uniqueNewPOIs = poisWithState.filter(poi => !cachedIds.has(poi.id));
       
       // Update cache with new POIs - the display effect will automatically update the view
       if (uniqueNewPOIs.length > 0) {
@@ -353,7 +405,7 @@ export function RoutePlanner() {
       setIsLoadingPOIs(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapBounds, currentZoom, selectedCategories, poiCache]); // mapsAPI is stable
+  }, [mapBounds, currentZoom, selectedCategories, poiCache, restoreWantToVisitState]); // mapsAPI is stable
 
   // Initialize APIs in the background
   // Prompt API initialization removed - using simple chat only
@@ -814,7 +866,7 @@ export function RoutePlanner() {
         )}
 
         {/* POI List */}
-        {filteredPois.length > 0 && (
+        {sortedFilteredPois.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
             <h3 style={{ 
               marginTop: 0, 
@@ -822,7 +874,7 @@ export function RoutePlanner() {
               fontSize: '18px',
               color: '#333'
             }}>
-              Points of Interest ({filteredPois.length})
+              Points of Interest ({sortedFilteredPois.length})
               {poiCache.length > 0 && (
                 <span style={{ 
                   fontSize: '12px', 
@@ -840,8 +892,8 @@ export function RoutePlanner() {
               backgroundColor: '#fff',
             borderRadius: '8px',
               border: '1px solid #ddd'
-            }}>
-              {filteredPois.map((poi, index) => {
+                          }}>
+              {sortedFilteredPois.map((poi, index) => {
                 const poiCategories = poi.interest_categories || [];
                 // Get colors for all categories
                 const colors = poiCategories.map(cat => categoryColors[cat] || '#999');
@@ -859,18 +911,18 @@ export function RoutePlanner() {
                       setSelectedPoiId(prevId => prevId === poi.id ? null : poi.id);
                     }}
                     onMouseOver={(e) => {
-                      if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5';
+                      if (!isSelected && !poi.wantToVisit) e.currentTarget.style.backgroundColor = '#f5f5f5';
                     }}
                     onMouseOut={(e) => {
-                      if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                      if (!isSelected && !poi.wantToVisit) e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                     style={{
                       padding: '12px 16px',
-                      borderBottom: index < filteredPois.length - 1 ? '1px solid #eee' : 'none',
+                      borderBottom: index < sortedFilteredPois.length - 1 ? '1px solid #eee' : 'none',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                       position: 'relative',
-                      backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
+                      backgroundColor: poi.wantToVisit ? WANT_TO_VISIT_POI_HIGHLIGHT_COLOR : (isSelected ? '#e3f2fd' : 'transparent'),
                       transform: isSelected ? 'translateX(4px)' : 'translateX(0)',
                       boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
                       display: 'flex',
@@ -909,6 +961,25 @@ export function RoutePlanner() {
 
                     {/* POI Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Want to Visit Checkbox */}
+                      <div style={{ marginBottom: '4px' }}>
+                        <label 
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={poi.wantToVisit || false}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleToggleWantToVisit(poi);
+                            }}
+                            style={{ marginRight: '4px' }}
+                          />
+                          Want to visit
+                        </label>
+                      </div>
+                      
                       <POITitle poi={poi} color={colors[0]} variant="default" />
                       <POIType poi={poi} />
                       <POILinks poi={poi} fontSize="11px" gap="8px" />
@@ -921,7 +992,7 @@ export function RoutePlanner() {
           </div>
         )}
 
-        {filteredPois.length === 0 && !isLoadingPOIs && (
+        {sortedFilteredPois.length === 0 && !isLoadingPOIs && (
         <div style={{ 
             padding: '40px 20px',
             textAlign: 'center',
@@ -965,6 +1036,7 @@ export function RoutePlanner() {
           selectedPoiId={selectedPoiId}
           onPoiSelect={setSelectedPoiId}
           onImageLoaded={handleImageLoaded}
+          onToggleWantToVisit={handleToggleWantToVisit}
           routeStartPOI={routeStartPOI}
           routeFinishPOI={routeFinishPOI}
           sameStartFinish={sameStartFinish}
