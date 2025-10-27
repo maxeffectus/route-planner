@@ -66,9 +66,7 @@ export const profileQuestions = [
             { value: InterestCategory.ART_MUSEUMS, label: 'Art & Museums' },
             { value: InterestCategory.HISTORY_CULTURE, label: 'History & Culture' },
             { value: InterestCategory.GASTRONOMY, label: 'Food & Dining' },
-            { value: InterestCategory.SHOPPING, label: 'Shopping' },
             { value: InterestCategory.NIGHTLIFE, label: 'Nightlife & Entertainment' },
-            { value: InterestCategory.SPORT_FITNESS, label: 'Sports & Recreation' },
             { value: InterestCategory.ARCHITECTURE, label: 'Architecture & Landmarks' }
         ]
     },
