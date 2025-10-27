@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
-import { UserProfile, InterestCategory, MobilityType, TransportMode } from '../models/UserProfile';
+import { UserProfile, InterestCategory, MobilityType, TransportMode, UNFILLED_MARKERS } from '../models/UserProfile';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks, getPOIAccessibility } from '../components/POIComponents';
@@ -20,7 +20,7 @@ export function RoutePlanner() {
   const [mapBounds, setMapBounds] = useState(null);
   const [currentZoom, setCurrentZoom] = useState(2);
   const [selectedCityBbox, setSelectedCityBbox] = useState(null);
-  const [selectedCategories, setSelectedCategories] = useState(getAllCategoryValues());
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedPoiId, setSelectedPoiId] = useState(null);
   const [routeStartPOI, setRouteStartPOI] = useState(null);
   const [routeFinishPOI, setRouteFinishPOI] = useState(null);
@@ -65,6 +65,23 @@ export function RoutePlanner() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount - mapsAPI is stable
+
+  // Initialize selected categories based on user profile interests
+  useEffect(() => {
+    if (userProfile && userProfile.interests !== UNFILLED_MARKERS.OBJECT) {
+      const interests = userProfile.getInterests();
+      const categoriesFromProfile = Object.keys(interests).filter(cat => interests[cat] > 0);
+      if (categoriesFromProfile.length > 0) {
+        setSelectedCategories(categoriesFromProfile);
+      } else {
+        // If profile has no interests, select all
+        setSelectedCategories(getAllCategoryValues());
+      }
+    } else {
+      // No profile or profile not filled - select all by default
+      setSelectedCategories(getAllCategoryValues());
+    }
+  }, [userProfile]);
 
   // Handler to update POI cache with resolved image URL
   const handleImageLoaded = useCallback((poiId, imageUrl) => {
@@ -434,6 +451,26 @@ export function RoutePlanner() {
     }
     // Don't clear the flag if zoom is too low - wait for it to increase
   }, [currentZoom, mapBounds, selectedCityBbox, selectedCategories, handleFindPOIs]); // Trigger when zoom or bounds update after city selection
+
+  // Apply profile interests to category filter
+  const applyProfileInterests = useCallback(() => {
+    if (!userProfile || userProfile.interests === UNFILLED_MARKERS.OBJECT) {
+      alert('Please complete your profile first to set interests');
+      setShowProfileModal(true);
+      return;
+    }
+    
+    const interests = userProfile.getInterests();
+    const categoriesFromProfile = Object.keys(interests).filter(cat => interests[cat] > 0);
+    
+    if (categoriesFromProfile.length === 0) {
+      alert('No interests found in your profile. Please update your profile.');
+      setShowProfileModal(true);
+      return;
+    }
+    
+    setSelectedCategories(categoriesFromProfile);
+  }, [userProfile]);
 
   return (
     <div style={{ 
@@ -923,6 +960,7 @@ export function RoutePlanner() {
           hasPOIsInArea={filteredPois.length > 0}
           selectedCategories={selectedCategories}
           onCategoriesChange={setSelectedCategories}
+          onApplyProfileInterests={applyProfileInterests}
           categoryColors={categoryColors}
           selectedPoiId={selectedPoiId}
           onPoiSelect={setSelectedPoiId}

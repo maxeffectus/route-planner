@@ -367,6 +367,7 @@ export function InteractiveMap({
   hasPOIsInArea = false,
   selectedCategories = [],
   onCategoriesChange,
+  onApplyProfileInterests,
   categoryColors = {},
   selectedPoiId = null,
   onPoiSelect,
@@ -588,6 +589,39 @@ export function InteractiveMap({
                 </label>
               );
             })}
+            
+            {/* Apply Profile Interests Button - inside category row */}
+            {onApplyProfileInterests && (
+              <button
+                onClick={onApplyProfileInterests}
+                title="Set category filter according to your profile interests"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '3px 10px',
+                  backgroundColor: '#1976D2',
+                  color: 'white',
+                  border: '1px solid #1565C0',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                  flexShrink: 0
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.backgroundColor = '#1565C0';
+                  e.target.style.borderColor = '#0D47A1';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.backgroundColor = '#1976D2';
+                  e.target.style.borderColor = '#1565C0';
+                }}
+              >
+                ⭐ Set according to my interests
+              </button>
+            )}
           </div>
           
           {/* Zoom Level Indicator */}
