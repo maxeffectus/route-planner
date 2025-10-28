@@ -149,9 +149,9 @@ export function RoutePlanner() {
   // A POI is shown if it has at least one category in common with selectedCategories
   const filteredPois = useMemo(() => {
     return pois.filter(poi => {
-      const poiCategories = poi.interest_categories || [];
-      return poiCategories.some(cat => selectedCategories.includes(cat));
-    });
+    const poiCategories = poi.interest_categories || [];
+    return poiCategories.some(cat => selectedCategories.includes(cat));
+  });
   }, [pois, selectedCategories]);
 
   // Sort POIs: selected ones first, then alphabetically within groups
@@ -347,6 +347,9 @@ export function RoutePlanner() {
         }
       );
       
+      // Add intermediate POI IDs to route data for saving purposes
+      route.intermediatePOIIds = intermediateWaypoints.map(poi => String(poi.id));
+      
       setRouteData(route);
     } catch (error) {
       console.error('Route building failed:', error);
@@ -374,7 +377,7 @@ export function RoutePlanner() {
 
   // Clear route when points change
   useEffect(() => {
-    setRouteData(null);
+      setRouteData(null);
     setRouteError(null);
     setRouteBounds(null); // Clear route bounds when route points change
   }, [routeStartPOI, routeFinishPOI]);
@@ -398,23 +401,23 @@ export function RoutePlanner() {
     }
 
     try {
-      // Extract POI IDs from route
+      // Extract POI IDs from route in correct order: start -> intermediates -> finish
       const poiIds = [];
-      if (routeStartPOI) poiIds.push(String(routeStartPOI.id));
       
-      // Add waypoint POIs if we have intermediate waypoints
-      if (routeData.waypoints && routeData.waypoints.length > 2) {
-        const waypointIds = routeData.waypoints.slice(1, -1).map(wp => String(wp));
-        // Convert waypoint coordinates to POI IDs - we need to find matching POIs
-        const matchingPOIs = poiCache.filter(poi => {
-          return waypointIds.some(([lat, lng]) => {
-            return Math.abs(poi.location.lat - lat) < 0.001 && Math.abs(poi.location.lng - lng) < 0.001;
-          });
-        });
-        poiIds.push(...matchingPOIs.map(poi => String(poi.id)));
+      // Start POI
+      if (routeStartPOI) {
+        poiIds.push(String(routeStartPOI.id));
       }
       
-      if (routeFinishPOI) poiIds.push(String(routeFinishPOI.id));
+      // Add intermediate POI IDs (already in correct order from route building)
+      if (routeData.intermediatePOIIds && routeData.intermediatePOIIds.length > 0) {
+        poiIds.push(...routeData.intermediatePOIIds);
+      }
+      
+      // Finish POI
+      if (routeFinishPOI) {
+        poiIds.push(String(routeFinishPOI.id));
+      }
 
       // Create SavedRoute instance
       const savedRoute = new SavedRoute({
@@ -1202,7 +1205,7 @@ export function RoutePlanner() {
               backgroundColor: '#fff',
             borderRadius: '8px',
               border: '1px solid #ddd'
-                          }}>
+            }}>
               {sortedFilteredPois.map((poi, index) => {
                 const poiCategories = poi.interest_categories || [];
                 // Get colors for all categories
