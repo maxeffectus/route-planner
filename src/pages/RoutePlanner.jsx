@@ -41,6 +41,7 @@ export function RoutePlanner() {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const mapsAPI = useMemo(() => new OpenStreetAPI(), []); // Create once and reuse
   const citySelectionRef = React.useRef(null); // Track city selection for auto-search
+  const isLoadingSavedRouteRef = useRef(false); // Track if we're loading a saved route to prevent clearing routeData
   
   // Prompt API is no longer used for profile setup
   
@@ -375,9 +376,15 @@ export function RoutePlanner() {
   // Note: Removed automatic route building on point changes
   // Routes will only be calculated when user clicks "Calculate Route" button
 
-  // Clear route when points change
+  // Clear route when points change (but not when loading a saved route)
   useEffect(() => {
-      setRouteData(null);
+    // Don't clear route data if we're loading a saved route
+    if (isLoadingSavedRouteRef.current) {
+      isLoadingSavedRouteRef.current = false;
+      return;
+    }
+    
+    setRouteData(null);
     setRouteError(null);
     setRouteBounds(null); // Clear route bounds when route points change
   }, [routeStartPOI, routeFinishPOI]);
@@ -452,6 +459,9 @@ export function RoutePlanner() {
     if (!userProfile) return;
 
     try {
+      // Set flag to prevent route clearing in useEffect when we set start/finish POIs
+      isLoadingSavedRouteRef.current = true;
+      
       // Clear current route
       clearRoutePoints();
       
@@ -532,6 +542,8 @@ export function RoutePlanner() {
       setShowSavedRoutesModal(false);
       setShowProfileOrRoutesModal(false);
     } catch (error) {
+      // Reset flag on error
+      isLoadingSavedRouteRef.current = false;
       alert(`Error loading route: ${error.message}`);
     }
   }, [userProfile, poiCache, clearRoutePoints]);
