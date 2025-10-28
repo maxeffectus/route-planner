@@ -533,6 +533,41 @@ export function RoutePlanner() {
     }
   }, [userProfile, poiCache, clearRoutePoints]);
 
+  // Handler to export route as GeoJSON
+  const handleExportGeoJSON = useCallback((route, event) => {
+    event.stopPropagation(); // Prevent route loading when clicking export button
+    
+    try {
+      const geojson = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {
+              name: route.name,
+              distance: route.distance,
+              duration: route.duration,
+              poiCount: route.poiIds.length,
+              createdAt: new Date(route.createdAt).toISOString()
+            },
+            geometry: route.geometry
+          }
+        ]
+      };
+      
+      // Create downloadable file
+      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${route.name.replace(/[^a-z0-9]/gi, '_')}.geojson`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(`Error exporting GeoJSON: ${error.message}`);
+    }
+  }, []);
+
   // Restore wantToVisit state from user profile
   const restoreWantToVisitState = useCallback((pois) => {
     if (!userProfile) return pois;
@@ -1458,12 +1493,10 @@ export function RoutePlanner() {
             {userProfile.getAllSavedRoutes().map((route) => (
               <div
                 key={route.name}
-                onClick={() => handleLoadRoute(route)}
                 style={{
                   padding: '12px',
                   backgroundColor: '#f5f5f5',
                   borderRadius: '8px',
-                  cursor: 'pointer',
                   transition: 'all 0.2s',
                   border: '1px solid #ddd'
                 }}
@@ -1487,8 +1520,56 @@ export function RoutePlanner() {
                 <div style={{ fontSize: '12px', color: '#666' }}>
                   POIs: {route.poiIds.length} points
                 </div>
-                <div style={{ fontSize: '12px', color: '#666' }}>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
                   Distance: {(route.distance / 1000).toFixed(2)} km
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => handleLoadRoute(route)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      backgroundColor: '#2196F3',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1976D2';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#2196F3';
+                    }}
+                  >
+                    Load Route
+                  </button>
+                  <button
+                    onClick={(e) => handleExportGeoJSON(route, e)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#45a049';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#4CAF50';
+                    }}
+                  >
+                    Export GeoJSON
+                  </button>
                 </div>
               </div>
             ))}
