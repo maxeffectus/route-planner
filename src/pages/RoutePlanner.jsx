@@ -279,7 +279,18 @@ export function RoutePlanner() {
         const wantToVisitIds = Object.keys(userProfile.wantToVisitPOIs);
         
         // Find corresponding POI objects from poiCache
-        const wantToVisitPOIs = poiCache.filter(poi => wantToVisitIds.includes(poi.id));
+        // Convert both to strings for comparison (poi.id might be string or number)
+        const wantToVisitPOIs = poiCache.filter(poi => wantToVisitIds.includes(String(poi.id)));
+        
+        // Diagnostic logging
+        console.log('🔍 Want to Visit Debug:', {
+          wantToVisitIdsCount: wantToVisitIds.length,
+          wantToVisitIds: wantToVisitIds,
+          poiCacheSize: poiCache.length,
+          poiCacheIdsSample: poiCache.slice(0, 5).map(p => p.id),
+          wantToVisitPOIsFound: wantToVisitPOIs.length,
+          wantToVisitPOIs: wantToVisitPOIs.map(p => ({ id: p.id, name: p.name }))
+        });
         
         if (wantToVisitPOIs.length > 0) {
           // Sort waypoints using Nearest Neighbor for optimal order
