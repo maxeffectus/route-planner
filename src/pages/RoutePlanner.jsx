@@ -219,6 +219,17 @@ export function RoutePlanner() {
     setRouteFinishPOI(poi);
   }, []);
 
+  // Handler for selecting route point from context menu on map
+  const handleRoutePointSelect = useCallback((type, poi) => {
+    if (type === 'start') {
+      setRouteStartPOI(poi);
+      console.log('Route start point selected from map:', poi);
+    } else if (type === 'finish') {
+      setRouteFinishPOI(poi);
+      console.log('Route finish point selected from map:', poi);
+    }
+  }, []);
+
   const clearRoutePoints = () => {
     setRouteStartPOI(null);
     setRouteFinishPOI(null);
@@ -1111,6 +1122,7 @@ export function RoutePlanner() {
           routeFinishPOI={routeFinishPOI}
           sameStartFinish={sameStartFinish}
           routeData={routeData}
+          onRoutePointSelect={handleRoutePointSelect}
         />
       </div>
 

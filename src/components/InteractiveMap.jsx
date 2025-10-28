@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -259,6 +259,86 @@ function MapEventHandler({ onBoundsChange, onZoomChange, onMapClick }) {
   return null;
 }
 
+// Component to handle context menu for route point selection
+function ContextMenuHandler({ onRoutePointSelect, onContextMenu }) {
+  const map = useMap();
+  
+  React.useEffect(() => {
+    if (!onRoutePointSelect) return;
+
+    const handleContextMenu = (e) => {
+      e.originalEvent.preventDefault();
+      const containerPoint = e.containerPoint;
+      const latlng = e.latlng;
+      
+      onContextMenu({
+        x: containerPoint.x,
+        y: containerPoint.y,
+        latlng: latlng
+      });
+    };
+
+    map.on('contextmenu', handleContextMenu);
+
+    return () => {
+      map.off('contextmenu', handleContextMenu);
+    };
+  }, [map, onRoutePointSelect, onContextMenu]);
+
+  return null;
+}
+
+// Context menu component for route point selection  
+function RouteContextMenu({ position, onClose, onSetStart, onSetFinish }) {
+  const map = useMap();
+  
+  React.useEffect(() => {
+    if (!position || !position.latlng) return;
+
+    const popup = L.popup()
+      .setLatLng(position.latlng)
+      .setContent(`
+        <div style="min-width: 180px; cursor: default;">
+          <div 
+            onclick="window.handleRouteContextStart && window.handleRouteContextStart()"
+            onmouseover="this.style.backgroundColor='#f5f5f5'"
+            onmouseout="this.style.backgroundColor='transparent'"
+            style="padding: 10px 16px; cursor: pointer; font-size: 14px;">
+            📍 Set as route start
+          </div>
+          <div 
+            onclick="window.handleRouteContextFinish && window.handleRouteContextFinish()"
+            onmouseover="this.style.backgroundColor='#f5f5f5'"
+            onmouseout="this.style.backgroundColor='transparent'"
+            style="padding: 10px 16px; cursor: pointer; font-size: 14px;">
+            🏁 Set as route finish
+          </div>
+        </div>
+      `)
+      .openOn(map);
+
+    // Store handlers in window temporarily
+    window.handleRouteContextStart = () => {
+      onSetStart(position.latlng);
+      onClose();
+      map.closePopup();
+    };
+    window.handleRouteContextFinish = () => {
+      onSetFinish(position.latlng);
+      onClose();
+      map.closePopup();
+    };
+
+    return () => {
+      map.closePopup();
+      delete window.handleRouteContextStart;
+      delete window.handleRouteContextFinish;
+    };
+  }, [map, position, onSetStart, onSetFinish, onClose]);
+
+  return null;
+}
+
 // Component to handle selected POI (open popup and pan to location)
 function SelectedPOIHandler({ selectedPoiId, pois }) {
   const map = useMap();
@@ -392,7 +472,8 @@ export function InteractiveMap({
   routeStartPOI = null,
   routeFinishPOI = null,
   sameStartFinish = false,
-  routeData = null
+  routeData = null,
+  onRoutePointSelect = null
 }) {
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
@@ -401,6 +482,55 @@ export function InteractiveMap({
   
   // Track if we're in the middle of an interaction to prevent event conflicts
   const isInteractingRef = React.useRef(false);
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState(null);
+
+  // Handlers for context menu
+  const handleSetStart = (latlng) => {
+    if (onRoutePointSelect) {
+      // Create a temporary POI from the clicked coordinates
+      const tempPOI = {
+        id: 'map_point',
+        name: `Route Start`,
+        location: { lat: latlng.lat, lng: latlng.lng }
+      };
+      onRoutePointSelect('start', tempPOI);
+    }
+  };
+
+  const handleSetFinish = (latlng) => {
+    if (onRoutePointSelect) {
+      const tempPOI = {
+        id: 'map_point',
+        name: `Route Finish`,
+        location: { lat: latlng.lat, lng: latlng.lng }
+      };
+      onRoutePointSelect('finish', tempPOI);
+    }
+  };
+
+  const handleContextMenuClose = () => {
+    setContextMenu(null);
+  };
+
+  // Close context menu on map click
+  useEffect(() => {
+    const handleClick = () => {
+      setContextMenu(null);
+    };
+
+    if (contextMenu) {
+      // Add event listener with a small delay to avoid capturing the initial right-click
+      setTimeout(() => {
+        document.addEventListener('click', handleClick);
+      }, 100);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClick);
+    };
+  }, [contextMenu]);
 
   // Category definitions from central config
   const categories = getAllCategories();
@@ -543,6 +673,24 @@ export function InteractiveMap({
         selectedPoiId={selectedPoiId}
         pois={pois}
       />
+
+      {/* Context menu handler */}
+      {onRoutePointSelect && (
+        <ContextMenuHandler 
+          onRoutePointSelect={onRoutePointSelect}
+          onContextMenu={setContextMenu}
+        />
+      )}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <RouteContextMenu 
+          position={contextMenu}
+          onClose={handleContextMenuClose}
+          onSetStart={handleSetStart}
+          onSetFinish={handleSetFinish}
+        />
+      )}
 
       {/* Overlay Controls */}
       <div style={{
