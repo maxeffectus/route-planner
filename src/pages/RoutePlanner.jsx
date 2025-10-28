@@ -244,7 +244,8 @@ export function RoutePlanner() {
     setShowApiKeyModal(false);
     setApiKeyInput('');
     
-    // Trigger route building if points are selected
+    // Trigger route building if points are selected (after saving API key)
+    // This is intentional - when user saves API key, we should calculate the route
     if (routeStartPOI && routeFinishPOI) {
       buildRoute();
     }
@@ -329,14 +330,14 @@ export function RoutePlanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeStartPOI, routeFinishPOI, userProfile, poiCache, filteredPois.length]); // mapsAPI is stable
 
-  // Trigger route building when points change
+  // Note: Removed automatic route building on point changes
+  // Routes will only be calculated when user clicks "Calculate Route" button
+
+  // Clear route when points change
   useEffect(() => {
-    if (routeStartPOI && routeFinishPOI) {
-      buildRoute();
-    } else {
-      setRouteData(null);
-    }
-  }, [routeStartPOI, routeFinishPOI, buildRoute]);
+    setRouteData(null);
+    setRouteError(null);
+  }, [routeStartPOI, routeFinishPOI]);
 
   // Restore wantToVisit state from user profile
   const restoreWantToVisitState = useCallback((pois) => {
@@ -723,6 +724,45 @@ export function RoutePlanner() {
                 ↻ Same start and finish point
               </div>
             )}
+          </div>
+        )}
+
+        {/* Calculate Route Button */}
+        {routeStartPOI && routeFinishPOI && (
+          <div style={{ marginBottom: '20px' }}>
+            <button
+              onClick={buildRoute}
+              disabled={isLoadingRoute}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                backgroundColor: isLoadingRoute ? '#ccc' : '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: isLoadingRoute ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+              }}
+              onMouseEnter={(e) => {
+                if (!isLoadingRoute) {
+                  e.target.style.backgroundColor = '#1976D2';
+                  e.target.style.transform = 'translateY(-1px)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isLoadingRoute) {
+                  e.target.style.backgroundColor = '#2196F3';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                }
+              }}
+            >
+              {isLoadingRoute ? '⏳ Calculating Route...' : '🗺️ Calculate Route'}
+            </button>
           </div>
         )}
 

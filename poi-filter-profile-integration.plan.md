@@ -1,185 +1,72 @@
-Replace Random POI with Want to Visit POIs in Route Building
+# Manual Route Calculation Control
 
 ## Summary
 
-Replace the current random POI waypoint selection (line 274-280 in `RoutePlanner.jsx`) with all POIs marked as "Want to Visit", sorted using the Nearest Neighbor algorithm for optimal route order.
+Add a "Calculate Route" button to the left panel and remove automatic route calculation. Routes should only be calculated when the user explicitly clicks the button.
 
 ## Implementation Steps
 
-### 1. Extract Haversine Distance Function
-
-**File:** `src/utils/geography.js` (new file)
-
-Create a reusable distance calculation function by extracting the Haversine formula from `MapsAPI.js` (lines 384-395):
-
-```javascript
-/**
- * Calculate distance between two geographic points using Haversine formula
- * @param {Object} point1 - {lat, lng}
- * @param {Object} point2 - {lat, lng}
- * @returns {number} Distance in meters
- */
-export function calculateDistance(point1, point2) {
-  const R = 6371e3; // Earth's radius in meters
-  const φ1 = point1.lat * Math.PI / 180;
-  const φ2 = point2.lat * Math.PI / 180;
-  const Δφ = (point2.lat - point1.lat) * Math.PI / 180;
-  const Δλ = (point2.lng - point1.lng) * Math.PI / 180;
-  
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-  
-  return distance;
-}
-```
-
-### 2. Update MapsAPI.js to Use Shared Function
-
-**File:** `src/services/MapsAPI.js`
-
-Replace inline Haversine formula (lines 384-395) with import and call to shared function.
-
-### 3. Add Nearest Neighbor Sorting Utility
-
-**File:** `src/utils/routeOptimization.js` (new file)
-
-Create utility function using the shared distance function. Note: in the code, `current` represents the current position in the route (starts as startPOI, then becomes each visited POI). The algorithm finds the next nearest POI from the current position.
-
-```javascript
-import { calculateDistance } from './geography.js';
-
-/**
- * Sort waypoints using Nearest Neighbor greedy algorithm for optimal visiting order
- * TODO: Consider using GraphHopper Optimization API or similar TSP solver for better route optimization in future iterations
- * @param {Object} startPOI - Starting point
- * @param {Object} finishPOI - Ending point (or null for circular route)
- * @param {Array} waypoints - Array of POI objects to visit
- * @returns {Array} Sorted waypoints in optimal visiting order
- */
-export function sortWaypointsByNearestNeighbor(startPOI, finishPOI, waypoints) {
-  if (waypoints.length === 0) return [];
-  
-  const sorted = [];
-  const remaining = [...waypoints];
-  let current = startPOI;
-  
-  while (remaining.length > 0) {
-    // Find nearest POI to current position
-    let nearestIndex = 0;
-    let minDistance = calculateDistance(currentしま.location, remaining[0].location);
-    
-    for (let i = 1; i < remaining.length; i++) {
-      const dist = calculateDistance(current.location, remaining[i].location);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestIndex = i;
-      }
-    }
-    
-    // Add nearest to result and update current position
-    const nearest = remaining.splice(nearestIndex, 1)[0];
-    sorted.push(nearest);
-    current = nearest; // Move to next position for next iteration
-  }
-  
-  return sorted;
-}
-```
-
-### 4. Update Route Building Logic
+### 1. Remove Auto-Trigger useEffect
 
 **File:** `src/pages/RoutePlanner.jsx`
 
-In `buildRoute` function (lines 274-280), replace:
+Remove or comment out lines 332-339 which automatically trigger `buildRoute()` when start/finish points change.
 
-```javascript
-// Select one random POI as intermediate waypoint (prototype)
-const intermediateWaypoints =抢劫 [];
-if (filteredPois.length > 0) {
-  const randomPOI = filteredPois[Math.floor(Math.random() * filteredPois.length)];
-  intermediateWaypoints.push(randomPOI);
-  console.log('Added intermediate waypoint:', randomPOI.name);
-}
-```
+### 2. Add Calculate Route Button
 
-With:
+**File:** `src/pages/RoutePlanner.jsx`
 
-```javascript
-// Get all "Want to Visit" POIs as waypoints
-const intermediateWaypoints = [];
-if (userProfile && userProfile.wantToVisitPOIs !== UNFILLED_MARKERS.OBJECT) {
-  const wantToVisitIds = Object.keys(userProfile.wantToVisitPOIs);
-  
-  // Find corresponding POI objects from poiCache
-  const wantToVisitPOIs = poiCache.filter(poi => wantToVisitIds.includes(poi.id));
-  
-  if (wantToVisitPOIs.length > 0) {
-    // Sort waypoints using Nearest Neighbor for optimal order
-    const sortedWaypoints = sortWaypointsByNearestNeighbor(
-      routeStartPOI, 
-      routeFinishPOI, 
-      wantToVisitPOIs
-    );
-    intermediateWaypoints.push(...sortedWaypoints);
-    console.log(`Added ${sortedWaypoints.length} "Want to Visit" waypoints in optimized order`);
-  } else {
-    // Fallback: no "Want to Visit" POIs found - build route without waypoints
-    console.log('No "Want to Visit" POIs found, building direct route');
-  }
-} else {
-  console.log('User profile has no "Want to Visit" POIs, building direct route');
-}
-```
+Add a "Calculate Route" button in the left panel after the finish point selection section (after line 651), but before the POI list section.
 
-### 5. Import Required Dependencies
+Button requirements:
+- Only enabled when both start and finish points are selected
+- Shows loading state while calculating
+- Displays error message if calculation fails
+- Position it prominently near the route selection UI
 
-Add to imports in `RoutePlanner.jsx`:
+### 3. Update buildRoute Dependencies
 
-```javascript
-import { sortWaypointsByNearestNeighbor } from '../utils/routeOptimization';
-```
+**File:** `src/pages/RoutePlanner.jsx`
 
-### 6. Update buildRoute Dependencies
+Remove dependencies that might cause unwanted re-calculations. Update the useCallback dependencies on line 330 to remove `poiCache` and `filteredPois.length` if they cause issues.
 
-Add `poiCache` to the dependency array of `buildRoute` useCallback (currently line 312).
+### 4. Verify No Other Auto-Calculations
 
-### 7. Add Tests for Route Optimization
+Search for any other places that call `buildRoute()`:
+- Check if `handleToggleWantToVisit` triggers re-calculation (should NOT)
+- Check if `handleFindPOIsiseconds` triggers re-calculation (should NOT)
+- Check if map panning/zooming triggers re-calculation (should NOT)
+- Ensure route is only calculated when button is clicked
 
-**File:** `tests/unit/routeOptimization.test.js` (new file)
+### 5. Optional: Clear Route on Point Changes
 
-Add comprehensive tests for the route optimization functionality:
+When user changes start or finish point, clear the existing route until they click "Calculate Route" again.
 
-#### Test calculateDistance function from geography.js:
-- Calculate distance between two known points (e.g., Paris coordinates)
-- Test with same point (should return 0)
-- Test with very close points (should return small positive value)
-- Test with North-South distance (along same meridian)
-- Test with East-West distance (along same parallel)
+### 6. Add Tests
 
-#### Test sortWaypointsByNearestNeighbor function:
-- Sort single waypoint (should return it as-is)
-- Sort 2 waypoints - verify nearest first
-- Sort 3+ waypoints - verify optimal order
-- Test with waypoints in a line (should visit them sequentially)
-- Test with scattered waypoints (should find nearest neighbor at each step)
-- Test with clustered waypoints
-- Test with empty waypoints array (should return empty array)
-- Verify that each POI in result has `.location` property
+**File:** `tests/integration/manualRouteCalculation.test.js` (new file)
 
-#### Test calculateDistance edge cases:
-- Test with points at antipodes
-- Test with points crossing international date line
-- Test with points near poles
-- Verify distance is always positive or zero
+Add integration tests for manual route calculation:
 
-## Testing Considerations
+#### Test Manual Route Calculation:
+- Route should NOT be calculated when start point is selected
+- Route should NOT be calculated when finish point is selected
+- Route should only be calculated when "Calculate Route" button is clicked
+- Button should be disabled when start OR finish point is missing
+- Button should be enabled when both start AND finish points are selected
+- Button should show loading state during calculation
+- Route should be cleared when start point is changed
+- Route should be cleared when finish point is changed
 
-Manual testing in application:
-- Test with 0 "Want to Visit" POIs (should build direct route)
-- Test with 1 "Want to Visit" POI
-- Test with multiple "Want to Visit" POIs
-- Test circular route (start == finish)
-- Verify console logs show correct number of waypoints
+#### Test No Auto-Calculations:
+- Route should NOT be recalculated when POIs are fetched
+- Route should NOT be recalculated when category filter changes
+- Route should NOT be recalculated when "Want to Visit" status is toggled
+- Route should NOT be recalculated when map is panned
+- Route should NOT be recalculated when map is zoomed
+- Route should NOT be recalculated when POI cache is updated
+
+#### Test Route State Management:
+- Existing route should be cleared when clicking "Calculate Route" again
+- Error state should be displayed if route calculation fails
+- Error state should be cleared when successfully calculating a new route
