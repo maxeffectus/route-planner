@@ -465,20 +465,34 @@ export function RoutePlanner() {
       const wantToVisitPOIs = userProfile.getWantToVisitPOIs();
       
       for (const poiId of route.poiIds) {
-        if (wantToVisitPOIs[poiId]) {
-          // Create a minimal POI object from saved data
+        // First, check if POI already exists in cache with full data
+        const cachedPOI = poiCache.find(p => String(p.id) === String(poiId));
+        
+        if (cachedPOI) {
+          // POI exists in cache - use it and mark as wantToVisit
+          cachedPOI.wantToVisit = true;
+          // Make sure it's in the profile
+          if (!userProfile.isWantToVisit(poiId)) {
+            userProfile.addWantToVisit(cachedPOI);
+          }
+          loadedPOIs.push(cachedPOI);
+        } else if (wantToVisitPOIs[poiId]) {
+          // POI is in wantToVisit but not in cache - create minimal object
           const poiData = wantToVisitPOIs[poiId];
-          loadedPOIs.push({
+          const minimalPOI = {
             id: poiId,
             name: poiData.name,
-            location: poiData.location
-          });
+            location: poiData.location,
+            description: poiData.name,
+            interest_categories: [], // We don't have category info in minimal save
+            wantToVisit: true
+          };
+          loadedPOIs.push(minimalPOI);
         }
       }
 
-      // Add loaded POIs to cache
+      // Add loaded POIs to cache (if they're not already there)
       if (loadedPOIs.length > 0) {
-        // Check if POIs already exist in cache
         const existingIds = new Set(poiCache.map(p => String(p.id)));
         const newPOIs = loadedPOIs.filter(p => !existingIds.has(String(p.id)));
         if (newPOIs.length > 0) {
