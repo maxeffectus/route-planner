@@ -280,24 +280,25 @@ export function RoutePlanner() {
         
         // Find corresponding POI objects from poiCache
         // Convert both to strings for comparison (poi.id might be string or number)
-        const wantToVisitPOIs = poiCache.filter(poi => wantToVisitIds.includes(String(poi.id)));
+        const visibleWantToVisitPOIs = filteredPois.filter(poi => wantToVisitIds.includes(String(poi.id)));
         
         // Diagnostic logging
         console.log('🔍 Want to Visit Debug:', {
           wantToVisitIdsCount: wantToVisitIds.length,
           wantToVisitIds: wantToVisitIds,
+          filteredPoisSize: filteredPois.length,
           poiCacheSize: poiCache.length,
           poiCacheIdsSample: poiCache.slice(0, 5).map(p => p.id),
-          wantToVisitPOIsFound: wantToVisitPOIs.length,
-          wantToVisitPOIs: wantToVisitPOIs.map(p => ({ id: p.id, name: p.name }))
+          visibleWantToVisitPOIsFound: visibleWantToVisitPOIs.length,
+          visibleWantToVisitPOIs: visibleWantToVisitPOIs.map(p => ({ id: p.id, name: p.name }))
         });
         
-        if (wantToVisitPOIs.length > 0) {
+        if (visibleWantToVisitPOIs.length > 0) {
           // Sort waypoints using Nearest Neighbor for optimal order
           const sortedWaypoints = sortWaypointsByNearestNeighbor(
             routeStartPOI, 
             routeFinishPOI, 
-            wantToVisitPOIs
+            visibleWantToVisitPOIs
           );
           intermediateWaypoints.push(...sortedWaypoints);
           console.log(`Added ${sortedWaypoints.length} "Want to Visit" waypoints in optimized order`);
