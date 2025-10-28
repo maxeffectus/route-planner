@@ -16,6 +16,9 @@ const MIN_ZOOM_LEVEL = 11;
 // Color for want-to-visit POI highlight (used for both card background and marker halos)
 export const WANT_TO_VISIT_POI_HIGHLIGHT_COLOR = '#BBDEFB'; // Medium blue - more visible than light blue
 
+// Maximum number of intermediate points allowed in a route (start + up to 15 waypoints + finish = 17 total points, which fits in 4 GraphHopper API requests)
+const MAX_INTERMEDIATE_ROUTE_POINTS = 15;
+
 export function RoutePlanner() {
   const [pois, setPois] = useState([]);
   const [isLoadingPOIs, setIsLoadingPOIs] = useState(false);
@@ -303,6 +306,15 @@ export function RoutePlanner() {
           visibleWantToVisitPOIsFound: visibleWantToVisitPOIs.length,
           visibleWantToVisitPOIs: visibleWantToVisitPOIs.map(p => ({ id: p.id, name: p.name }))
         });
+        
+        // Check maximum points limit
+        if (visibleWantToVisitPOIs.length > MAX_INTERMEDIATE_ROUTE_POINTS) {
+          alert(
+            `The maximum number of points to visit is ${MAX_INTERMEDIATE_ROUTE_POINTS}. Currently selected ${visibleWantToVisitPOIs.length}. Please decrease the number of selected points`
+          );
+          setIsLoadingRoute(false);
+          return;
+        }
         
         if (visibleWantToVisitPOIs.length > 0) {
           // Sort waypoints using Nearest Neighbor for optimal order
