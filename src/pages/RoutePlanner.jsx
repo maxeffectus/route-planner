@@ -8,6 +8,7 @@ import SimpleProfileSetupChat from '../components/SimpleProfileSetupChat';
 import { getAllCategoryValues } from '../utils/categoryMapping';
 import { GraphHopperRouteProvider } from '../services/GraphHopperRouteProvider';
 import { Modal } from '../components/Modal';
+import { sortWaypointsByNearestNeighbor } from '../utils/routeOptimization';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -271,12 +272,29 @@ export function RoutePlanner() {
       
       const profile = routeProvider.getProfileForMobility(mobilityType, transportMode);
       
-      // Select one random POI as intermediate waypoint (prototype)
+      // Get all "Want to Visit" POIs as waypoints
       const intermediateWaypoints = [];
-      if (filteredPois.length > 0) {
-        const randomPOI = filteredPois[Math.floor(Math.random() * filteredPois.length)];
-        intermediateWaypoints.push(randomPOI);
-        console.log('Added intermediate waypoint:', randomPOI.name);
+      if (userProfile && userProfile.wantToVisitPOIs !== UNFILLED_MARKERS.OBJECT) {
+        const wantToVisitIds = Object.keys(userProfile.wantToVisitPOIs);
+        
+        // Find corresponding POI objects from poiCache
+        const wantToVisitPOIs = poiCache.filter(poi => wantToVisitIds.includes(poi.id));
+        
+        if (wantToVisitPOIs.length > 0) {
+          // Sort waypoints using Nearest Neighbor for optimal order
+          const sortedWaypoints = sortWaypointsByNearestNeighbor(
+            routeStartPOI, 
+            routeFinishPOI, 
+            wantToVisitPOIs
+          );
+          intermediateWaypoints.push(...sortedWaypoints);
+          console.log(`Added ${sortedWaypoints.length} "Want to Visit" waypoints in optimized order`);
+        } else {
+          // Fallback: no "Want to Visit" POIs found - build route without waypoints
+          console.log('No "Want to Visit" POIs found, building direct route');
+        }
+      } else {
+        console.log('User profile has no "Want to Visit" POIs, building direct route');
       }
       
       const route = await mapsAPI.buildRoute(
@@ -309,7 +327,7 @@ export function RoutePlanner() {
       setIsLoadingRoute(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeStartPOI, routeFinishPOI, userProfile, filteredPois.length]); // mapsAPI is stable
+  }, [routeStartPOI, routeFinishPOI, userProfile, poiCache, filteredPois.length]); // mapsAPI is stable
 
   // Trigger route building when points change
   useEffect(() => {
