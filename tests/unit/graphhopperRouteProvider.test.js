@@ -289,5 +289,159 @@ describe('GraphHopperRouteProvider', () => {
       expect(route).toBeDefined();
     });
   });
+
+  describe('Multi-Segment Routing (>5 points)', () => {
+    // Helper to create mock waypoints
+    const createMockWaypoints = (count) => {
+      const waypoints = [];
+      for (let i = 0; i < count; i++) {
+        waypoints.push({
+          id: `waypoint-${i}`,
+          name: `Waypoint ${i}`,
+          location: { lat: 52.5 + i * 0.01, lng: 13.3 + i * 0.01 }
+        });
+      }
+      return waypoints;
+    };
+
+    test('should split 6 points into 2 segments', async () => {
+      const waypoints = createMockWaypoints(4); // Start + 4 waypoints + finish = 6 points total
+      
+      // Mock responses for 2 segments
+      // Segment 1: points 0-4 (5 points)
+      const segment1Response = {
+        paths: [{
+          points: {
+            coordinates: [[13.3777, 52.5160], [13.3778, 52.5161], [13.3780, 52.5162], [13.3785, 52.5165], [13.3790, 52.5170]],
+            type: 'LineString'
+          },
+          distance: 500,
+          time: 300000,
+          instructions: [{ text: 'Segment 1 instruction', distance: 500 }]
+        }]
+      };
+      
+      // Segment 2: points 4-5 (overlap at point 4)
+      const segment2Response = {
+        paths: [{
+          points: {
+            coordinates: [[13.3790, 52.5170], [13.3800, 52.5180]],
+            type: 'LineString'
+          },
+          distance: 300,
+          time: 180000,
+          instructions: [{ text: 'Segment 2 instruction', distance: 300 }]
+        }]
+      };
+
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => segment1Response });
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => segment2Response });
+      
+      const route = await provider.buildRoute(startPOI, finishPOI, { waypoints });
+      
+      // Check that both segments were called
+      expect(fetch).toHaveBeenCalledTimes(2);
+      
+      // Check combined results
+      expect(route.distance).toBe(800); // 500 + 300
+      expect(route.duration).toBe(480); // (300000 + 180000) / 1000
+      expect(route.instructions).toHaveLength(2);
+      
+      // Check geometry - should have 6 coordinates (5 from segment1 + 1 new from segment2)
+      expect(route.geometry.coordinates).toHaveLength(6);
+    });
+
+    test('should split 9 points into 2 segments', async () => {
+      const waypoints = createMockWaypoints(7); // Start + 7 waypoints + finish = 9 points total
+      
+      // Should split into 2 segments:
+      // Segment 1: points 0-4 (5 points: start, w0, w1, w2, w3)
+      // Segment 2: points 4-8 (5 points from w3 with overlap, up to finish)
+      
+      const segment1Response = { paths: [{ points: { coordinates: Array(5).fill([13.3777, 52.5160]), type: 'LineString' }, distance: 1000, time: 600000, instructions: [] }] };
+      const segment2Response = { paths: [{ points: { coordinates: Array(5).fill([13.3777, 52.5160]), type: 'LineString' }, distance: 1500, time: 900000, instructions: [] }] };
+
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => segment1Response });
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => segment2Response });
+      
+      const route = await provider.buildRoute(startPOI, finishPOI, { waypoints });
+      
+      // Should only call API twice
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(route.distance).toBe(2500); // 1000 + 1500
+      expect(route.duration).toBe(1500); // (600000 + 900000) / 1000
+    });
+    
+    test('should split 10 points into 3 segments', async () => {
+      const waypoints = createMockWaypoints(8); // Start + 8 waypoints + finish = 10 points total
+      
+      // Should split into 3 segments:
+      // Segment 1: points 0-4 (5 points)
+      // Segment 2: points 4-8 (5 points with overlap)
+      // Segment 3: points 8-9 (2 points with overlap)
+      
+      const segment1Response = { paths: [{ points: { coordinates: Array(5).fill([13.3777, 52.5160]), type: 'LineString' }, distance: 1000, time: 600000, instructions: [] }] };
+      const segment2Response = { paths: [{ points: { coordinates: Array(5).fill([13.3777, 52.5160]), type: 'LineString' }, distance: 1500, time: 900000, instructions: [] }] };
+      const segment3Response = { paths: [{ points: { coordinates: Array(2).fill([13.3777, 52.5160]), type: 'LineString' }, distance: 500, time: 300000, instructions: [] }] };
+
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => segment1Response });
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => segment2Response });
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => segment3Response });
+      
+      const route = await provider.buildRoute(startPOI, finishPOI, { waypoints });
+      
+      // Should call API three times
+      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(route.distance).toBe(3000); // 1000 + 1500 + 500
+      expect(route.duration).toBe(1800); // (600000 + 900000 + 300000) / 1000
+    });
+
+    test('should handle single segment when points <= 5', async () => {
+      const waypoints = createMockWaypoints(3); // Start + 3 waypoints + finish = 5 points total
+      
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => graphHopperResponse });
+      
+      const route = await provider.buildRoute(startPOI, finishPOI, { waypoints });
+      
+      // Should only call API once (no splitting needed)
+      expect(fetch).toHaveBeenCalledTimes(1);
+      
+      expect(route.distance).toBe(graphHopperResponse.paths[0].distance);
+    });
+
+    test('should combine instructions from all segments', async () => {
+      const waypoints = createMockWaypoints(4);
+      
+      const segment1Response = {
+        paths: [{
+          points: { coordinates: Array(5).fill([13.3777, 52.5160]), type: 'LineString' },
+          distance: 500,
+          time: 300000,
+          instructions: [
+            { text: 'Turn left', distance: 200 },
+            { text: 'Go straight', distance: 300 }
+          ]
+        }]
+      };
+      
+      const segment2Response = {
+        paths: [{
+          points: { coordinates: Array(2).fill([13.3777, 52.5160]), type: 'LineString' },
+          distance: 300,
+          time: 180000,
+          instructions: [{ text: 'Turn right', distance: 300 }]
+        }]
+      };
+
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => segment1Response });
+      fetch.mockResolvedValueOnce({ ok: true, json: async () => segment2Response });
+      
+      const route = await provider.buildRoute(startPOI, finishPOI, { waypoints });
+      
+      expect(route.instructions).toHaveLength(3);
+      expect(route.instructions[0].text).toBe('Turn left');
+      expect(route.instructions[2].text).toBe('Turn right');
+    });
+  });
 });
 
