@@ -3,6 +3,8 @@
  * This data is used to create optimal and customized routes.
  */
 
+import { SavedRoute } from './SavedRoute.js';
+
 // --- 1. ENUMS and CONSTANTS for compactness and clarity ---
 
 /**
@@ -143,6 +145,12 @@ export class UserProfile {
      */
     wantToVisitPOIs;
 
+    /**
+     * Saved routes by name
+     * Key: route name, Value: SavedRoute instance
+     */
+    savedRoutes;
+
     constructor(userId) {
         this.userId = userId;
         this.mobility = UNFILLED_MARKERS.STRING; // Will be determined by AI questions
@@ -157,6 +165,7 @@ export class UserProfile {
             endHour: UNFILLED_MARKERS.NUMBER    // Will be determined by AI questions
         };
         this.wantToVisitPOIs = UNFILLED_MARKERS.OBJECT; // Will be determined by AI questions
+        this.savedRoutes = {};
     }
 
     /**
@@ -211,6 +220,60 @@ export class UserProfile {
             return {};
         }
         return this.wantToVisitPOIs;
+    }
+
+    /**
+     * Add a saved route
+     * @param {SavedRoute} route - Route to save
+     * @throws {Error} If route name already exists
+     */
+    addSavedRoute(route) {
+        if (!route.validate()) {
+            throw new Error('Invalid route: missing required fields');
+        }
+        if (this.savedRoutes[route.name]) {
+            throw new Error(`Route with name "${route.name}" already exists`);
+        }
+        this.savedRoutes[route.name] = route;
+    }
+
+    /**
+     * Get a saved route by name
+     * @param {string} name - Route name
+     * @returns {SavedRoute|null} Saved route or null if not found
+     */
+    getSavedRoute(name) {
+        return this.savedRoutes[name] || null;
+    }
+
+    /**
+     * Get all saved routes
+     * @returns {Array<SavedRoute>} Array of saved routes
+     */
+    getAllSavedRoutes() {
+        return Object.values(this.savedRoutes);
+    }
+
+    /**
+     * Delete a saved route
+     * @param {string} name - Route name
+     * @returns {boolean} True if deleted, false if not found
+     */
+    deleteSavedRoute(name) {
+        if (this.savedRoutes[name]) {
+            delete this.savedRoutes[name];
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if a route exists
+     * @param {string} name - Route name
+     * @returns {boolean} True if route exists
+     */
+    hasRoute(name) {
+        return name in this.savedRoutes;
     }
 
     /**
@@ -498,7 +561,11 @@ export class UserProfile {
                 startHour: this.timeWindow.startHour,
                 endHour: this.timeWindow.endHour
             },
-            wantToVisitPOIs: this.wantToVisitPOIs === UNFILLED_MARKERS.OBJECT ? UNFILLED_MARKERS.OBJECT : this.wantToVisitPOIs
+            wantToVisitPOIs: this.wantToVisitPOIs === UNFILLED_MARKERS.OBJECT ? UNFILLED_MARKERS.OBJECT : this.wantToVisitPOIs,
+            savedRoutes: Object.entries(this.savedRoutes).reduce((acc, [name, route]) => {
+                acc[name] = route.toJSON();
+                return acc;
+            }, {})
         };
     }
 
@@ -532,6 +599,13 @@ export class UserProfile {
             profile.wantToVisitPOIs = UNFILLED_MARKERS.OBJECT;
         } else {
             profile.wantToVisitPOIs = data.wantToVisitPOIs;
+        }
+
+        // Handle savedRoutes field
+        if (data.savedRoutes) {
+            for (const [name, routeData] of Object.entries(data.savedRoutes)) {
+                profile.savedRoutes[name] = SavedRoute.fromJSON(routeData);
+            }
         }
 
         return profile;

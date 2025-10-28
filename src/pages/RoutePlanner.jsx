@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { OpenStreetAPI } from '../services/MapsAPI';
 import { UserProfile, InterestCategory, MobilityType, TransportMode, UNFILLED_MARKERS } from '../models/UserProfile';
+import { SavedRoute } from '../models/SavedRoute';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
 import { POIImageThumbnail, POITitle, POIType, POILinks, getPOIAccessibility } from '../components/POIComponents';
@@ -35,6 +36,7 @@ export function RoutePlanner() {
   const [routeData, setRouteData] = useState(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [routeError, setRouteError] = useState(null);
+  const [routeBounds, setRouteBounds] = useState(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const mapsAPI = useMemo(() => new OpenStreetAPI(), []); // Create once and reuse
@@ -44,6 +46,8 @@ export function RoutePlanner() {
   
   // Profile setup modal state
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showProfileOrRoutesModal, setShowProfileOrRoutesModal] = useState(false);
+  const [showSavedRoutesModal, setShowSavedRoutesModal] = useState(false);
   const [hasVisitedBefore, setHasVisitedBefore] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const profileChatRef = useRef(null);
@@ -372,7 +376,148 @@ export function RoutePlanner() {
   useEffect(() => {
     setRouteData(null);
     setRouteError(null);
+    setRouteBounds(null); // Clear route bounds when route points change
   }, [routeStartPOI, routeFinishPOI]);
+
+  // Handler to open profile/routes choice modal
+  const handleOpenProfileOrRoutes = useCallback(() => {
+    setShowProfileOrRoutesModal(true);
+  }, []);
+
+  // Handler to save current route
+  const handleSaveRoute = useCallback(() => {
+    if (!routeData || !routeStartPOI || !routeFinishPOI || !userProfile) {
+      alert('No route to save');
+      return;
+    }
+
+    // Prompt for route name
+    const routeName = prompt('Enter a name for this route:');
+    if (!routeName || routeName.trim() === '') {
+      return; // User cancelled or entered empty string
+    }
+
+    try {
+      // Extract POI IDs from route
+      const poiIds = [];
+      if (routeStartPOI) poiIds.push(String(routeStartPOI.id));
+      
+      // Add waypoint POIs if we have intermediate waypoints
+      if (routeData.waypoints && routeData.waypoints.length > 2) {
+        const waypointIds = routeData.waypoints.slice(1, -1).map(wp => String(wp));
+        // Convert waypoint coordinates to POI IDs - we need to find matching POIs
+        const matchingPOIs = poiCache.filter(poi => {
+          return waypointIds.some(([lat, lng]) => {
+            return Math.abs(poi.location.lat - lat) < 0.001 && Math.abs(poi.location.lng - lng) < 0.001;
+          });
+        });
+        poiIds.push(...matchingPOIs.map(poi => String(poi.id)));
+      }
+      
+      if (routeFinishPOI) poiIds.push(String(routeFinishPOI.id));
+
+      // Create SavedRoute instance
+      const savedRoute = new SavedRoute({
+        name: routeName.trim(),
+        geometry: routeData.geometry,
+        distance: routeData.distance,
+        duration: routeData.duration,
+        poiIds: poiIds,
+        createdAt: Date.now(),
+        instructions: routeData.instructions || []
+      });
+
+      // Add to user profile
+      userProfile.addSavedRoute(savedRoute);
+
+      // Save to localStorage
+      const savedJSON = userProfile.toJSON();
+      localStorage.setItem('userProfile', JSON.stringify(savedJSON));
+      
+      // Reload profile from localStorage to trigger re-render
+      const updatedProfile = UserProfile.fromJSON(savedJSON);
+      setUserProfile(updatedProfile);
+
+      alert(`Route "${routeName}" saved successfully!`);
+    } catch (error) {
+      alert(`Error saving route: ${error.message}`);
+    }
+  }, [routeData, routeStartPOI, routeFinishPOI, userProfile, poiCache]);
+
+  // Handler to load a saved route
+  const handleLoadRoute = useCallback((route) => {
+    if (!userProfile) return;
+
+    try {
+      // Clear current route
+      clearRoutePoints();
+      
+      // Set route data for display
+      setRouteData({
+        geometry: route.geometry,
+        distance: route.distance,
+        duration: route.duration,
+        instructions: route.instructions
+      });
+
+      // Load POI objects from saved POI IDs
+      const loadedPOIs = [];
+      const wantToVisitPOIs = userProfile.getWantToVisitPOIs();
+      
+      for (const poiId of route.poiIds) {
+        if (wantToVisitPOIs[poiId]) {
+          // Create a minimal POI object from saved data
+          const poiData = wantToVisitPOIs[poiId];
+          loadedPOIs.push({
+            id: poiId,
+            name: poiData.name,
+            location: poiData.location
+          });
+        }
+      }
+
+      // Add loaded POIs to cache
+      if (loadedPOIs.length > 0) {
+        // Check if POIs already exist in cache
+        const existingIds = new Set(poiCache.map(p => String(p.id)));
+        const newPOIs = loadedPOIs.filter(p => !existingIds.has(String(p.id)));
+        if (newPOIs.length > 0) {
+          setPoiCache(prev => [...prev, ...newPOIs]);
+        }
+      }
+
+      // Set start and finish POIs
+      if (loadedPOIs.length >= 2) {
+        setRouteStartPOI(loadedPOIs[0]);
+        setRouteFinishPOI(loadedPOIs[loadedPOIs.length - 1]);
+      }
+
+      // Calculate map bounds to fit route
+      if (route.geometry && route.geometry.coordinates && route.geometry.coordinates.length > 0) {
+        const coords = route.geometry.coordinates;
+        let minLat = coords[0][1]; // GeoJSON has [lng, lat]
+        let maxLat = coords[0][1];
+        let minLng = coords[0][0];
+        let maxLng = coords[0][0];
+        
+        coords.forEach(([lng, lat]) => {
+          minLat = Math.min(minLat, lat);
+          maxLat = Math.max(maxLat, lat);
+          minLng = Math.min(minLng, lng);
+          maxLng = Math.max(maxLng, lng);
+        });
+
+        // Set bounds to trigger map fitBounds
+        setRouteBounds({ minLat, maxLat, minLng, maxLng });
+      }
+
+      // Close modal
+      setShowSavedRoutesModal(false);
+      setShowProfileOrRoutesModal(false);
+    } catch (error) {
+      alert(`Error loading route: ${error.message}`);
+    }
+  }, [userProfile, poiCache, clearRoutePoints]);
 
   // Restore wantToVisit state from user profile
   const restoreWantToVisitState = useCallback((pois) => {
@@ -596,7 +741,7 @@ export function RoutePlanner() {
         {hasVisitedBefore && (
           <div style={{ marginBottom: '20px' }}>
             <button
-              onClick={() => setShowProfileModal(true)}
+              onClick={handleOpenProfileOrRoutes}
               style={{
                 padding: '10px 20px',
                 backgroundColor: userProfile && userProfile.isComplete() ? '#28a745' : '#ffc107',
@@ -817,9 +962,32 @@ export function RoutePlanner() {
               <div style={{ marginBottom: '4px' }}>
                 📏 Distance: {(routeData.distance / 1000).toFixed(2)} km
               </div>
-              <div>
+              <div style={{ marginBottom: '8px' }}>
                 ⏱️ Duration: {Math.round(routeData.duration / 60)} min
               </div>
+              <button
+                onClick={handleSaveRoute}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#45a049';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#4CAF50';
+                }}
+              >
+                💾 Save Route
+              </button>
             </div>
           </div>
         )}
@@ -1135,6 +1303,7 @@ export function RoutePlanner() {
           sameStartFinish={sameStartFinish}
           routeData={routeData}
           onRoutePointSelect={handleRoutePointSelect}
+          routeBounds={routeBounds}
         />
       </div>
 
@@ -1202,6 +1371,122 @@ export function RoutePlanner() {
             Save API Key
           </button>
         </div>
+      </Modal>
+
+      {/* Profile/Routes Choice Modal */}
+      <Modal
+        isOpen={showProfileOrRoutesModal}
+        onClose={() => setShowProfileOrRoutesModal(false)}
+        title="Profile & Routes"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <button
+            onClick={() => {
+              setShowProfileOrRoutesModal(false);
+              setShowProfileModal(true);
+            }}
+            style={{
+              padding: '12px 20px',
+              fontSize: '15px',
+              fontWeight: '500',
+              backgroundColor: '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#1976D2';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = '#2196F3';
+            }}
+          >
+            📝 Profile Setup
+          </button>
+          <button
+            onClick={() => {
+              setShowProfileOrRoutesModal(false);
+              setShowSavedRoutesModal(true);
+            }}
+            style={{
+              padding: '12px 20px',
+              fontSize: '15px',
+              fontWeight: '500',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = '#45a049';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = '#4CAF50';
+            }}
+          >
+            🗺️ Saved Routes ({userProfile && userProfile.getAllSavedRoutes().length})
+          </button>
+        </div>
+      </Modal>
+
+      {/* Saved Routes Modal */}
+      <Modal
+        isOpen={showSavedRoutesModal}
+        onClose={() => setShowSavedRoutesModal(false)}
+        title="Saved Routes"
+      >
+        {userProfile && userProfile.getAllSavedRoutes().length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
+            {userProfile.getAllSavedRoutes().map((route) => (
+              <div
+                key={route.name}
+                onClick={() => handleLoadRoute(route)}
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  border: '1px solid #ddd'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#e3f2fd';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px' }}>
+                  {route.name}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  Created: {new Date(route.createdAt).toLocaleDateString()}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  POIs: {route.poiIds.length} points
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  Distance: {(route.distance / 1000).toFixed(2)} km
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
+            <p style={{ margin: 0, fontSize: '14px' }}>
+              No saved routes yet. Build and save your first route to get started!
+            </p>
+          </div>
+        )}
       </Modal>
     </div>
   );

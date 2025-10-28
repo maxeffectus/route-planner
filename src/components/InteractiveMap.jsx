@@ -473,7 +473,8 @@ export function InteractiveMap({
   routeFinishPOI = null,
   sameStartFinish = false,
   routeData = null,
-  onRoutePointSelect = null
+  onRoutePointSelect = null,
+  routeBounds = null
 }) {
   const defaultCenter = [20, 0];
   const defaultZoom = 2;
@@ -657,6 +658,7 @@ export function InteractiveMap({
       )}
       
       {bbox && <MapUpdater bbox={bbox} onZoomChange={onZoomChange} onBoundsChange={onBoundsChange} />}
+      {routeBounds && <MapUpdater bbox={routeBounds} onZoomChange={onZoomChange} onBoundsChange={onBoundsChange} />}
       
       <MapEventHandler 
         onBoundsChange={onBoundsChange} 
