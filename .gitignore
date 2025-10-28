@@ -27,3 +27,6 @@ Thumbs.db
 coverage/
 *.lcov
 
+# Test data
+src/static_resources/test_data/TODO.txt
+
