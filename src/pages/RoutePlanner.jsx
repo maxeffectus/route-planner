@@ -693,7 +693,8 @@ export function RoutePlanner() {
       setHasVisitedBefore(true);
       setShowWelcomeModal(true);
     }
-  }, [userProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Manage body scroll when modal is open
   useEffect(() => {
@@ -847,7 +848,8 @@ export function RoutePlanner() {
                 localStorage.removeItem('userProfile');
                 setHasVisitedBefore(false);
                 setUserProfile(null);
-                setShowProfileModal(true);
+                // Don't auto-open profile modal - let user open it manually
+                window.location.reload(); // Reload to reset state
               }}
               style={{
                 padding: '8px 16px',
