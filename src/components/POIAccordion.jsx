@@ -154,7 +154,7 @@ export function POIAccordion({
   const groupedPOIs = useMemo(() => {
     const mobilityType = userProfile?.mobility || MobilityType.STANDARD;
     return groupPOIsByAccessibility(pois, mobilityType);
-  }, [pois, userProfile]);
+  }, [pois, userProfile?.mobility]);
 
   // Toggle accordion open/closed
   const toggleAccordion = useCallback((key) => {
