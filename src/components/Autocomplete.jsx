@@ -9,6 +9,10 @@ import React, { useState, useEffect, useRef } from 'react';
  * @param {number} minChars - Minimum characters before search (default: 2)
  * @param {number} maxResults - Maximum number of results to fetch (default: 5)
  * @param {number} debounceMs - Debounce delay in milliseconds (default: 300)
+ * @param {string} value - Controlled value for the input (optional)
+ * @param {Function} onChange - Callback when input value changes (optional)
+ * @param {boolean} keepValueOnSelect - If true, keeps the selected value in input (default: false)
+ * @param {Function} getDisplayValue - Function to extract display value from selected item (optional)
  */
 export function Autocomplete({ 
   searchFunction, 
@@ -17,9 +21,14 @@ export function Autocomplete({
   placeholder = 'Start typing...',
   minChars = 2,
   maxResults = 5,
-  debounceMs = 300
+  debounceMs = 300,
+  value,
+  onChange,
+  keepValueOnSelect = false,
+  getDisplayValue = (item) => item.name || String(item)
 }) {
-  const [query, setQuery] = useState('');
+  const [internalQuery, setInternalQuery] = useState('');
+  const query = value !== undefined ? value : internalQuery;
   const [suggestions, setSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -88,7 +97,14 @@ export function Autocomplete({
   };
 
   const selectItem = (item) => {
-    setQuery(''); // Clear input after selection
+    const displayValue = keepValueOnSelect ? getDisplayValue(item) : '';
+    
+    if (onChange) {
+      onChange(displayValue);
+    } else {
+      setInternalQuery(displayValue);
+    }
+    
     setShowDropdown(false);
     setSelectedIndex(-1);
     onSelect(item);
@@ -113,7 +129,14 @@ export function Autocomplete({
         ref={inputRef}
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          const newValue = e.target.value;
+          if (onChange) {
+            onChange(newValue);
+          } else {
+            setInternalQuery(newValue);
+          }
+        }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         style={{

@@ -10,6 +10,9 @@ import { getAllCategoryValues } from '../utils/categoryMapping';
 import { GraphHopperRouteProvider } from '../services/GraphHopperRouteProvider';
 import { Modal } from '../components/Modal';
 import { sortWaypointsByNearestNeighbor } from '../utils/routeOptimization';
+import { usePromptAPI } from '../hooks/usePromptAPI';
+import { useStreamingText } from '../hooks/useStreamingText';
+import { ResponseDisplay } from '../components/ResponseDisplay';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -54,6 +57,15 @@ export function RoutePlanner() {
   const [userProfile, setUserProfile] = useState(null);
   const profileChatRef = useRef(null);
   // Simple chat is now the only option
+
+  // State for selected city in welcome modal
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [highlightedCity, setHighlightedCity] = useState(null); // Track city for which highlights were generated
+  const [cityInputValue, setCityInputValue] = useState(''); // Track input value in welcome modal
+
+  // Prompt API hooks for AI highlights
+  const { hasSession, createSession, promptStreaming } = usePromptAPI();
+  const { response: aiHighlights, isLoading: isLoadingHighlights, processStream, resetResponse } = useStreamingText();
 
   // Load user profile from localStorage on component mount
   useEffect(() => {
@@ -209,6 +221,15 @@ export function RoutePlanner() {
     setCurrentZoom(zoom);
   }, []);
 
+  // Reset highlighted city when user changes input value
+  useEffect(() => {
+    // If user changed the input value, reset highlighted city to allow re-generation
+    if (highlightedCity && cityInputValue !== highlightedCity.displayName) {
+      setHighlightedCity(null);
+      resetResponse();
+    }
+  }, [cityInputValue, highlightedCity, resetResponse]);
+
   const handleCitySelect = useCallback((city) => {
     console.log('City selected:', city);
     if (city.boundingbox) {
@@ -216,6 +237,8 @@ export function RoutePlanner() {
       // Mark that we just selected a city, so we can auto-search after zoom updates
       citySelectionRef.current = Date.now();
     }
+    // Store selected city for AI highlights (don't close modal)
+    setSelectedCity(city);
   }, []);
 
   const handleStartSelect = useCallback((poi) => {
@@ -786,6 +809,32 @@ export function RoutePlanner() {
     
     setSelectedCategories(categoriesFromProfile);
   }, [userProfile]);
+
+  // Handle AI highlights request
+  const handleGetAIHighlights = useCallback(async () => {
+    if (!selectedCity) return;
+    
+    try {
+      // Create session if not exists
+      if (!hasSession) {
+        await createSession();
+      }
+      
+      // Build prompt with city name
+      const prompt = `Provide a short tourist summary in a few paragraphs (2-3) about what ${selectedCity.displayName} is famous for. Focus on the most well-known facts and the main reasons why tourists visit. Respond only with the summary text, without any comments or introductory lines.`;
+      
+      // Get streaming response
+      const stream = await promptStreaming(prompt);
+      await processStream(stream, {
+        initialMessage: 'Generating highlights...'
+      });
+      
+      // Mark this city as highlighted
+      setHighlightedCity(selectedCity);
+    } catch (error) {
+      console.error('Error getting AI highlights:', error);
+    }
+  }, [selectedCity, hasSession, createSession, promptStreaming, processStream]);
 
   return (
     <div style={{ 
@@ -1480,10 +1529,17 @@ export function RoutePlanner() {
       {/* Welcome Modal */}
       <Modal
         isOpen={showWelcomeModal}
-        onClose={() => setShowWelcomeModal(false)}
+        onClose={() => {
+          setShowWelcomeModal(false);
+          setSelectedCity(null);
+          setHighlightedCity(null);
+          setCityInputValue('');
+          resetResponse();
+        }}
         title="🗺️ Welcome to Route Planner!"
+        style={{ minHeight: '100px' }}
       >
-        <div style={{ padding: '20px 0' }}>
+        <div style={{ padding: '20px 0', minHeight: '100px' }}>
           <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '18px', color: '#333', textAlign: 'center' }}>
             Where would you like to go?
           </h3>
@@ -1492,7 +1548,7 @@ export function RoutePlanner() {
             searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
             onSelect={(city) => {
               handleCitySelect(city);
-              setShowWelcomeModal(false);
+              // Don't close modal - let user get AI highlights
             }}
             renderSuggestion={(city) => (
               <>
@@ -1508,7 +1564,48 @@ export function RoutePlanner() {
             minChars={2}
             maxResults={5}
             debounceMs={300}
+            value={cityInputValue}
+            onChange={setCityInputValue}
+            keepValueOnSelect={true}
+            getDisplayValue={(city) => city.displayName}
           />
+          
+          {selectedCity && (() => {
+            // Check if highlights already generated for current city
+            const alreadyHighlighted = highlightedCity && highlightedCity.displayName === selectedCity.displayName;
+            const isButtonDisabled = isLoadingHighlights || alreadyHighlighted;
+            
+            return (
+              <button
+                onClick={handleGetAIHighlights}
+                disabled={isButtonDisabled}
+                style={{
+                  width: '100%',
+                  marginTop: '16px',
+                  padding: '12px',
+                  fontSize: '15px',
+                  fontWeight: '500',
+                  backgroundColor: isButtonDisabled ? '#ccc' : '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+              >
+                {isLoadingHighlights ? '⏳ Loading...' : alreadyHighlighted ? '✅ Highlights already generated' : '✨ Give me AI highlights'}
+              </button>
+            );
+          })()}
+          
+          {aiHighlights && (
+            <div style={{ marginTop: '16px' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
+                About {selectedCity.name}:
+              </h4>
+              <ResponseDisplay response={aiHighlights} />
+            </div>
+          )}
           
           <p style={{ color: '#666', fontSize: '14px', marginTop: '16px', marginBottom: '0', textAlign: 'center' }}>
             Or close this window and use the map to explore. <br />
