@@ -49,6 +49,7 @@ export function RoutePlanner() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showProfileOrRoutesModal, setShowProfileOrRoutesModal] = useState(false);
   const [showSavedRoutesModal, setShowSavedRoutesModal] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [hasVisitedBefore, setHasVisitedBefore] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const profileChatRef = useRef(null);
@@ -673,20 +674,24 @@ export function RoutePlanner() {
   // Initialize APIs in the background
   // Prompt API initialization removed - using simple chat only
 
-  // Initialize user profile on first load
+  // Initialize user profile and show welcome modal on first load
   useEffect(() => {
     const visited = localStorage.getItem('routePlannerVisited');
     if (!visited) {
-      // First time visitor - just mark as visited and create empty profile
+      // First time visitor - mark as visited, create empty profile, and show welcome modal
       localStorage.setItem('routePlannerVisited', 'true');
       setHasVisitedBefore(false);
       
-      // Create new empty profile (but don't show modal automatically)
+      // Create new empty profile
       const newProfile = new UserProfile();
       setUserProfile(newProfile);
+      
+      // Show welcome modal
+      setShowWelcomeModal(true);
     } else {
-      // Returning user
+      // Returning user - show welcome modal on every visit
       setHasVisitedBefore(true);
+      setShowWelcomeModal(true);
     }
   }, [userProfile]);
 
@@ -1069,33 +1074,6 @@ export function RoutePlanner() {
             ⚠️ {routeError}
           </div>
         )}
-
-        <h2 style={{ marginTop: 0, marginBottom: '12px', fontSize: '20px', color: '#333' }}>
-          🗺️ Where would you like to go?
-        </h2>
-        
-        <Autocomplete
-          searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
-          onSelect={handleCitySelect}
-          renderSuggestion={(city) => (
-            <>
-              <div style={{ fontWeight: '500', color: '#333' }}>
-                {city.name}
-              </div>
-              <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-                {city.displayName}
-              </div>
-            </>
-          )}
-          placeholder="Search for a city or location..."
-          minChars={2}
-          maxResults={5}
-          debounceMs={300}
-        />
-        
-        <p style={{ color: '#666', fontSize: '14px', marginTop: '15px', marginBottom: '20px' }}>
-          Or use the map on the right to explore. Zoom in to level {MIN_ZOOM_LEVEL} or higher to search for points of interest in the visible area.
-        </p>
 
         {/* Simple Profile Setup Modal */}
         {showProfileModal && (
@@ -1488,6 +1466,46 @@ export function RoutePlanner() {
           >
             🗺️ Saved Routes ({userProfile && userProfile.getAllSavedRoutes().length})
           </button>
+        </div>
+      </Modal>
+
+      {/* Welcome Modal */}
+      <Modal
+        isOpen={showWelcomeModal}
+        onClose={() => setShowWelcomeModal(false)}
+        title="🗺️ Welcome to Route Planner!"
+      >
+        <div style={{ padding: '20px 0' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '18px', color: '#333', textAlign: 'center' }}>
+            Where would you like to go?
+          </h3>
+          
+          <Autocomplete
+            searchFunction={(query, limit) => mapsAPI.autocompleteCities(query, limit)}
+            onSelect={(city) => {
+              handleCitySelect(city);
+              setShowWelcomeModal(false);
+            }}
+            renderSuggestion={(city) => (
+              <>
+                <div style={{ fontWeight: '500', color: '#333' }}>
+                  {city.name}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                  {city.displayName}
+                </div>
+              </>
+            )}
+            placeholder="Search for a city or location..."
+            minChars={2}
+            maxResults={5}
+            debounceMs={300}
+          />
+          
+          <p style={{ color: '#666', fontSize: '14px', marginTop: '16px', marginBottom: '0', textAlign: 'center' }}>
+            Or close this window and use the map to explore. <br />
+            Zoom in to level {MIN_ZOOM_LEVEL} or higher to search for points of interest.
+          </p>
         </div>
       </Modal>
 
