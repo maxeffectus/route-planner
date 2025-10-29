@@ -208,7 +208,7 @@ export class GraphHopperRouteProvider extends BaseRouteProvider {
         return {
           geometry: route.points,
           distance: route.distance,
-          duration: route.time / 1000,
+          duration: route.time, // Keep in milliseconds
           instructions: route.instructions || [],
           waypoints: points
         };
@@ -256,7 +256,7 @@ export class GraphHopperRouteProvider extends BaseRouteProvider {
           type: 'LineString'
         },
         distance: totalDistance,
-        duration: totalDuration / 1000, // Convert milliseconds to seconds
+        duration: totalDuration, // Keep in milliseconds
         instructions: allInstructions,
         waypoints: points
       };

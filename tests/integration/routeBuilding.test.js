@@ -89,7 +89,7 @@ describe('Route Building Integration', () => {
       
       expect(route).toBeDefined();
       expect(route.distance).toBe(1850.0);
-      expect(route.duration).toBe(1320);
+      expect(route.duration).toBe(1320000); // Duration in milliseconds
       expect(fetch).toHaveBeenCalled();
       
       const calledUrl = fetch.mock.calls[0][0];

@@ -1030,7 +1030,7 @@ export function RoutePlanner() {
                 📏 Distance: {(routeData.distance / 1000).toFixed(2)} km
               </div>
               <div style={{ marginBottom: '8px' }}>
-                ⏱️ Duration: {Math.round(routeData.duration / 60)} min
+                ⏱️ Duration: {Math.round(routeData.duration / 1000 / 60)} min
               </div>
               <button
                 onClick={handleSaveRoute}

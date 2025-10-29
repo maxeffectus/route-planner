@@ -22,7 +22,7 @@ async function exampleOpenStreetMap() {
   
   const route = await osmAPI.calculateRoute(waypoints);
   console.log('Route distance:', route.distance / 1000, 'km');
-  console.log('Route duration:', route.duration / 60, 'minutes');
+  console.log('Route duration:', route.duration / 1000 / 60, 'minutes');
   
   // Reverse geocode
   const address = await osmAPI.reverseGeocode(52.520008, 13.404954);
@@ -81,7 +81,7 @@ async function examplePolymorphism(mapsAPI) {
   
   console.log(`Route from Berlin to Paris:`);
   console.log(`  Distance: ${(route.distance / 1000).toFixed(2)} km`);
-  console.log(`  Duration: ${(route.duration / 60).toFixed(2)} minutes`);
+  console.log(`  Duration: ${(route.duration / 1000 / 60).toFixed(2)} minutes`);
 }
 
 

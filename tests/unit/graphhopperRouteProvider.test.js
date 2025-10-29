@@ -124,7 +124,7 @@ describe('GraphHopperRouteProvider', () => {
       expect(fetch).toHaveBeenCalled();
       expect(route).toBeDefined();
       expect(route.distance).toBe(1250.5);
-      expect(route.duration).toBe(960);
+      expect(route.duration).toBe(960000); // Duration in milliseconds
       expect(route.geometry).toBeDefined();
       expect(route.instructions).toHaveLength(3);
     });
@@ -351,7 +351,7 @@ describe('GraphHopperRouteProvider', () => {
       
       // Check combined results
       expect(route.distance).toBe(800); // 500 + 300
-      expect(route.duration).toBe(480); // (300000 + 180000) / 1000
+      expect(route.duration).toBe(480000); // 300000 + 180000 (milliseconds)
       expect(route.instructions).toHaveLength(2);
       
       // Check geometry - should have 6 coordinates (5 from segment1 + 1 new from segment2)
@@ -376,7 +376,7 @@ describe('GraphHopperRouteProvider', () => {
       // Should only call API twice
       expect(fetch).toHaveBeenCalledTimes(2);
       expect(route.distance).toBe(2500); // 1000 + 1500
-      expect(route.duration).toBe(1500); // (600000 + 900000) / 1000
+      expect(route.duration).toBe(1500000); // 600000 + 900000 (milliseconds)
     });
     
     test('should split 10 points into 3 segments', async () => {
@@ -400,7 +400,7 @@ describe('GraphHopperRouteProvider', () => {
       // Should call API three times
       expect(fetch).toHaveBeenCalledTimes(3);
       expect(route.distance).toBe(3000); // 1000 + 1500 + 500
-      expect(route.duration).toBe(1800); // (600000 + 900000 + 300000) / 1000
+      expect(route.duration).toBe(1800000); // 600000 + 900000 + 300000 (milliseconds)
     });
 
     test('should handle single segment when points <= 5', async () => {
