@@ -1598,7 +1598,7 @@ export function RoutePlanner() {
             );
           })()}
           
-          {aiHighlights && (
+          {aiHighlights && selectedCity && (
             <div style={{ marginTop: '16px' }}>
               <h4 style={{ marginTop: 0, marginBottom: '8px', fontSize: '14px', fontWeight: '600' }}>
                 About {selectedCity.name}:
