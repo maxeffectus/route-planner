@@ -15,6 +15,7 @@ import { useStreamingText } from '../hooks/useStreamingText';
 import { ResponseDisplay } from '../components/ResponseDisplay';
 import { usePOIGrouping } from '../hooks/usePOIGrouping';
 import { pickPOIsWithAI } from '../services/AIPoiPicker';
+import { exportRouteToGeoJSON, downloadGeoJSON } from '../utils/geojsonExport';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -447,31 +448,58 @@ export function RoutePlanner() {
     }
 
     try {
-      // Extract POI IDs from route in correct order: start -> intermediates -> finish
-      const poiIds = [];
+      // Extract full POI objects from route in correct order: start -> intermediates -> finish
+      const pois = [];
+      
+      // Helper function to extract POI data for storage
+      const extractPOIData = (poi) => {
+        if (!poi) return null;
+        return {
+          id: poi.id,
+          name: poi.name,
+          location: poi.location,
+          interest_categories: poi.interest_categories || [],
+          description: poi.description || poi.name,
+          website: poi.website || null,
+          wikipedia: poi.wikipedia || null,
+          imageUrl: poi.imageUrl || poi.resolvedImageUrl || null,
+          type: poi.type || null,
+          osmType: poi.osmType || null,
+          osmId: poi.osmId || null
+        };
+      };
       
       // Start POI
       if (routeStartPOI) {
-        poiIds.push(String(routeStartPOI.id));
+        const poiData = extractPOIData(routeStartPOI);
+        if (poiData) pois.push(poiData);
       }
       
-      // Add intermediate POI IDs (already in correct order from route building)
+      // Add intermediate POIs (already in correct order from route building)
       if (routeData.intermediatePOIIds && routeData.intermediatePOIIds.length > 0) {
-        poiIds.push(...routeData.intermediatePOIIds);
+        routeData.intermediatePOIIds.forEach(poiId => {
+          // Find full POI object from cache
+          const poi = poiCache.find(p => String(p.id) === String(poiId));
+          if (poi) {
+            const poiData = extractPOIData(poi);
+            if (poiData) pois.push(poiData);
+          }
+        });
       }
       
       // Finish POI
       if (routeFinishPOI) {
-        poiIds.push(String(routeFinishPOI.id));
+        const poiData = extractPOIData(routeFinishPOI);
+        if (poiData) pois.push(poiData);
       }
 
-      // Create SavedRoute instance
+      // Create SavedRoute instance with full POI data
       const savedRoute = new SavedRoute({
         name: routeName.trim(),
         geometry: routeData.geometry,
         distance: routeData.distance,
         duration: routeData.duration,
-        poiIds: poiIds,
+        pois: pois,
         createdAt: Date.now(),
         instructions: routeData.instructions || []
       });
@@ -512,36 +540,45 @@ export function RoutePlanner() {
         instructions: route.instructions
       });
 
-      // Load POI objects from saved POI IDs
+      // Load POI objects from saved route data
       const loadedPOIs = [];
-      const wantToVisitPOIs = userProfile.getWantToVisitPOIs();
       
-      for (const poiId of route.poiIds) {
-        // First, check if POI already exists in cache with full data
-        const cachedPOI = poiCache.find(p => String(p.id) === String(poiId));
+      if (!route.pois || route.pois.length === 0) {
+        throw new Error('Route does not contain POI data. Cannot load route.');
+      }
+      
+      route.pois.forEach(poiData => {
+        // Check if POI already exists in cache
+        let poi = poiCache.find(p => String(p.id) === String(poiData.id));
         
-        if (cachedPOI) {
-          // POI exists in cache - use it and mark as wantToVisit
-          cachedPOI.wantToVisit = true;
-          // Make sure it's in the profile
-          if (!userProfile.isWantToVisit(poiId)) {
-            userProfile.addWantToVisit(cachedPOI);
-          }
-          loadedPOIs.push(cachedPOI);
-        } else if (wantToVisitPOIs[poiId]) {
-          // POI is in wantToVisit but not in cache - create minimal object
-          const poiData = wantToVisitPOIs[poiId];
-          const minimalPOI = {
-            id: poiId,
+        if (poi) {
+          // Use cached POI (it has full OpenStreetPOI methods)
+          poi.wantToVisit = true;
+        } else {
+          // Create POI from saved data
+          poi = {
+            id: poiData.id,
             name: poiData.name,
             location: poiData.location,
-            description: poiData.name,
-            interest_categories: [], // We don't have category info in minimal save
+            description: poiData.description || poiData.name,
+            interest_categories: poiData.interest_categories || [],
+            website: poiData.website || null,
+            wikipedia: poiData.wikipedia || null,
+            imageUrl: poiData.imageUrl || null,
+            type: poiData.type || null,
+            osmType: poiData.osmType || null,
+            osmId: poiData.osmId || null,
             wantToVisit: true
           };
-          loadedPOIs.push(minimalPOI);
         }
-      }
+        
+        // Make sure it's in the profile's wantToVisit
+        if (!userProfile.isWantToVisit(poiData.id)) {
+          userProfile.addWantToVisit(poi);
+        }
+        
+        loadedPOIs.push(poi);
+      });
 
       // Add loaded POIs to cache (if they're not already there)
       if (loadedPOIs.length > 0) {
@@ -592,31 +629,8 @@ export function RoutePlanner() {
     event.stopPropagation(); // Prevent route loading when clicking export button
     
     try {
-      const geojson = {
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            properties: {
-              name: route.name,
-              distance: route.distance,
-              duration: route.duration,
-              poiCount: route.poiIds.length,
-              createdAt: new Date(route.createdAt).toISOString()
-            },
-            geometry: route.geometry
-          }
-        ]
-      };
-      
-      // Create downloadable file
-      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${route.name.replace(/[^a-z0-9]/gi, '_')}.geojson`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const geojson = exportRouteToGeoJSON(route);
+      downloadGeoJSON(geojson, route.name);
     } catch (error) {
       alert(`Error exporting GeoJSON: ${error.message}`);
     }
@@ -947,7 +961,7 @@ export function RoutePlanner() {
         errorMessage = 
           'Chrome AI (Prompt API) is not available in your browser.\n\n' +
           'To use this feature:\n' +
-          '1. Use Chrome Canary or Chrome Dev (version 127+)\n' +
+          '1. Use Chrome Canary or Chrome Dev (version 138+)\n' +
           '2. Enable flags:\n' +
           '   • chrome://flags/#prompt-api-for-gemini-nano\n' +
           '   • chrome://flags/#optimization-guide-on-device-model\n' +
@@ -1765,7 +1779,7 @@ export function RoutePlanner() {
                   Created: {new Date(route.createdAt).toLocaleDateString()}
                 </div>
                 <div style={{ fontSize: '12px', color: '#666' }}>
-                  POIs: {route.poiIds.length} points
+                  POIs: {route.pois?.length || 0} points
                 </div>
                 <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
                   Distance: {(route.distance / 1000).toFixed(2)} km

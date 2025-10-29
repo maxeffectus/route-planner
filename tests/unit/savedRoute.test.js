@@ -10,12 +10,45 @@ describe('SavedRoute', () => {
     coordinates: [[52.5, 13.4], [52.51, 13.41], [52.52, 13.42]]
   };
 
+  const mockPOIs = [
+    {
+      id: 'poi1',
+      name: 'Brandenburg Gate',
+      location: { lat: 52.5163, lng: 13.3777 },
+      interest_categories: ['history_culture', 'architecture'],
+      description: 'Historic monument',
+      website: 'https://example.com',
+      wikipedia: 'en:Brandenburg_Gate',
+      imageUrl: 'https://example.com/image.jpg'
+    },
+    {
+      id: 'poi2',
+      name: 'Reichstag',
+      location: { lat: 52.5186, lng: 13.3761 },
+      interest_categories: ['history_culture'],
+      description: 'Parliament building',
+      website: null,
+      wikipedia: null,
+      imageUrl: null
+    },
+    {
+      id: 'poi3',
+      name: 'Berlin Cathedral',
+      location: { lat: 52.5191, lng: 13.4013 },
+      interest_categories: ['architecture'],
+      description: 'Historic church',
+      website: 'https://example.com/cathedral',
+      wikipedia: 'en:Berlin_Cathedral',
+      imageUrl: null
+    }
+  ];
+
   const mockRouteData = {
     name: 'Berlin Tour',
     geometry: mockGeometry,
     distance: 5000,
     duration: 3600,
-    poiIds: ['poi1', 'poi2', 'poi3'],
+    pois: mockPOIs,
     createdAt: Date.now(),
     instructions: ['Turn left', 'Turn right']
   };
@@ -28,7 +61,8 @@ describe('SavedRoute', () => {
       expect(route.geometry).toEqual(mockGeometry);
       expect(route.distance).toBe(5000);
       expect(route.duration).toBe(3600);
-      expect(route.poiIds).toEqual(['poi1', 'poi2', 'poi3']);
+      expect(route.pois).toEqual(mockPOIs);
+      expect(route.pois.length).toBe(3);
       expect(route.createdAt).toBeDefined();
       expect(route.instructions).toEqual(['Turn left', 'Turn right']);
     });
@@ -40,7 +74,7 @@ describe('SavedRoute', () => {
       expect(route.geometry).toBeNull();
       expect(route.distance).toBe(0);
       expect(route.duration).toBe(0);
-      expect(route.poiIds).toEqual([]);
+      expect(route.pois).toEqual([]);
       expect(route.createdAt).toBeDefined();
       expect(route.instructions).toEqual([]);
     });
@@ -68,18 +102,18 @@ describe('SavedRoute', () => {
       expect(route.validate()).toBe(false);
     });
 
-    it('should return false for missing POI IDs', () => {
+    it('should return false for missing POIs', () => {
       const route = new SavedRoute({
         ...mockRouteData,
-        poiIds: []
+        pois: []
       });
       expect(route.validate()).toBe(false);
     });
 
-    it('should return false for less than 2 POI IDs', () => {
+    it('should return false for less than 2 POIs', () => {
       const route = new SavedRoute({
         ...mockRouteData,
-        poiIds: ['poi1']
+        pois: [mockPOIs[0]]
       });
       expect(route.validate()).toBe(false);
     });
@@ -95,7 +129,7 @@ describe('SavedRoute', () => {
         geometry: mockGeometry,
         distance: 5000,
         duration: 3600,
-        poiIds: ['poi1', 'poi2', 'poi3'],
+        pois: mockPOIs,
         createdAt: mockRouteData.createdAt,
         instructions: ['Turn left', 'Turn right']
       });
@@ -109,7 +143,7 @@ describe('SavedRoute', () => {
         geometry: mockGeometry,
         distance: 5000,
         duration: 3600,
-        poiIds: ['poi1', 'poi2', 'poi3'],
+        pois: mockPOIs,
         createdAt: 1234567890,
         instructions: ['Turn left', 'Turn right']
       };
@@ -120,7 +154,7 @@ describe('SavedRoute', () => {
       expect(route.geometry).toEqual(mockGeometry);
       expect(route.distance).toBe(5000);
       expect(route.duration).toBe(3600);
-      expect(route.poiIds).toEqual(['poi1', 'poi2', 'poi3']);
+      expect(route.pois).toEqual(mockPOIs);
       expect(route.createdAt).toBe(1234567890);
       expect(route.instructions).toEqual(['Turn left', 'Turn right']);
     });

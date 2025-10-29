@@ -7,7 +7,7 @@ export class SavedRoute {
     this.geometry = data.geometry || null;
     this.distance = data.distance || 0;
     this.duration = data.duration || 0;
-    this.poiIds = data.poiIds || [];
+    this.pois = data.pois || []; // Array of POI objects with full metadata
     this.createdAt = data.createdAt || Date.now();
     this.instructions = data.instructions || [];
   }
@@ -23,7 +23,7 @@ export class SavedRoute {
     if (!this.geometry || !this.geometry.coordinates) {
       return false;
     }
-    if (this.poiIds.length < 2) {
+    if (this.pois.length < 2) {
       return false; // Must have at least start and finish POIs
     }
     return true;
@@ -39,7 +39,7 @@ export class SavedRoute {
       geometry: this.geometry,
       distance: this.distance,
       duration: this.duration,
-      poiIds: this.poiIds,
+      pois: this.pois,
       createdAt: this.createdAt,
       instructions: this.instructions
     };
