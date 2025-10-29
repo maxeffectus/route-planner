@@ -14,6 +14,7 @@ import { usePromptAPI } from '../hooks/usePromptAPI';
 import { useStreamingText } from '../hooks/useStreamingText';
 import { ResponseDisplay } from '../components/ResponseDisplay';
 import { usePOIGrouping } from '../hooks/usePOIGrouping';
+import { pickPOIsWithAI } from '../services/AIPoiPicker';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -73,6 +74,10 @@ export function RoutePlanner() {
 
   // Accessibility warning modal state
   const [accessibilityWarning, setAccessibilityWarning] = useState(null); // { poi, message }
+
+  // AI POI picker state
+  const [isPickingPOIs, setIsPickingPOIs] = useState(false);
+  const [aiPickerWarning, setAiPickerWarning] = useState(null); // { pois: [], onConfirm: function }
 
   // Load user profile from localStorage on component mount
   useEffect(() => {
@@ -188,7 +193,7 @@ export function RoutePlanner() {
   }, [filteredPois]);
 
   // Use POI grouping to check accessibility
-  const { getGroupForPOI } = usePOIGrouping(sortedFilteredPois, userProfile);
+  const { getGroupForPOI, groups } = usePOIGrouping(sortedFilteredPois, userProfile);
 
   // UNIFIED POI DISPLAY: Always show POIs that are in the current map bounds
   // This is the single source of truth for what POIs to display
@@ -859,6 +864,102 @@ export function RoutePlanner() {
     setShowWelcomeModal(true);
   }, []);
 
+  // Handle AI POI picking
+  const handlePickPOIsWithAI = useCallback(async () => {
+    if (!userProfile) {
+      alert('Please create a user profile first');
+      return;
+    }
+
+    // Validate time window and travel pace
+    if (!userProfile.timeWindow || 
+        userProfile.timeWindow.startHour === UNFILLED_MARKERS.NUMBER ||
+        userProfile.timeWindow.endHour === UNFILLED_MARKERS.NUMBER ||
+        !userProfile.travelPace ||
+        userProfile.travelPace === UNFILLED_MARKERS.STRING) {
+      alert('Please complete your profile first. Set your preferred time window and travel pace.');
+      setShowProfileModal(true);
+      return;
+    }
+
+    // Get accessible POIs from grouping
+    const accessiblePOIs = groups.accessible || [];
+    
+    if (accessiblePOIs.length === 0) {
+      alert('No accessible POIs found. Please find POIs on the map first.');
+      return;
+    }
+
+    setIsPickingPOIs(true);
+
+    try {
+      // Call AI service
+      const selectedIds = await pickPOIsWithAI(accessiblePOIs, userProfile);
+      
+      if (!selectedIds || selectedIds.length === 0) {
+        alert('AI could not select any POIs. Please try again.');
+        setIsPickingPOIs(false);
+        return;
+      }
+
+      // Find the actual POI objects
+      const selectedPOIs = accessiblePOIs.filter(poi => 
+        selectedIds.includes(String(poi.id))
+      );
+
+      // Check for inaccessible POIs (should not happen as we only send accessible ones)
+      // But check anyway in case something changed
+      const problematicPOIs = [];
+      selectedPOIs.forEach(poi => {
+        const group = getGroupForPOI(poi.id);
+        if (group === 'inaccessible' || group === 'limitedAccessibility' || group === 'unknown') {
+          problematicPOIs.push({ poi, group });
+        }
+      });
+
+      // If there are problematic POIs, show warning modal
+      if (problematicPOIs.length > 0) {
+        setAiPickerWarning({
+          pois: problematicPOIs,
+          onConfirm: () => {
+            // Mark all as Want to Visit
+            selectedPOIs.forEach(poi => {
+              performWantToVisitToggle(poi);
+            });
+            setAiPickerWarning(null);
+            setIsPickingPOIs(false);
+          }
+        });
+      } else {
+        // No problems, add all directly
+        selectedPOIs.forEach(poi => {
+          performWantToVisitToggle(poi);
+        });
+        setIsPickingPOIs(false);
+      }
+
+    } catch (error) {
+      console.error('Error picking POIs with AI:', error);
+      
+      // Show user-friendly error message
+      let errorMessage = error.message;
+      if (errorMessage.includes('not available')) {
+        errorMessage = 
+          'Chrome AI (Prompt API) is not available in your browser.\n\n' +
+          'To use this feature:\n' +
+          '1. Use Chrome Canary or Chrome Dev (version 127+)\n' +
+          '2. Enable flags:\n' +
+          '   • chrome://flags/#prompt-api-for-gemini-nano\n' +
+          '   • chrome://flags/#optimization-guide-on-device-model\n' +
+          '3. Restart your browser\n\n' +
+          'Or manually select POIs by clicking the checkboxes.';
+      }
+      
+      alert(`Failed to pick POIs with AI:\n\n${errorMessage}`);
+      setIsPickingPOIs(false);
+    }
+  }, [userProfile, groups, getGroupForPOI, performWantToVisitToggle]);
+
   // Handle AI highlights request
   const handleGetAIHighlights = useCallback(async () => {
     if (!selectedCity) return;
@@ -1217,6 +1318,36 @@ export function RoutePlanner() {
                 </span>
               )}
             </h3>
+
+            <button
+              onClick={handlePickPOIsWithAI}
+              disabled={isPickingPOIs || sortedFilteredPois.length === 0}
+              style={{
+                width: '100%',
+                padding: '10px',
+                marginBottom: '12px',
+                fontSize: '14px',
+                fontWeight: '500',
+                backgroundColor: isPickingPOIs || sortedFilteredPois.length === 0 ? '#ccc' : '#9C27B0',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: isPickingPOIs || sortedFilteredPois.length === 0 ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (!isPickingPOIs && sortedFilteredPois.length > 0) {
+                  e.target.style.backgroundColor = '#7B1FA2';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isPickingPOIs && sortedFilteredPois.length > 0) {
+                  e.target.style.backgroundColor = '#9C27B0';
+                }
+              }}
+            >
+              {isPickingPOIs ? '⏳ AI is selecting POIs...' : '🤖 Pick POIs with AI'}
+            </button>
 
             <POIAccordion
               pois={sortedFilteredPois}
@@ -1765,6 +1896,109 @@ export function RoutePlanner() {
                 }}
               >
                 Yes
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* AI Picker Warning Modal */}
+      {aiPickerWarning && (
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            setAiPickerWarning(null);
+            setIsPickingPOIs(false);
+          }}
+          title="⚠️ Some POIs have accessibility concerns"
+        >
+          <div style={{ padding: '20px 0' }}>
+            <p style={{ 
+              margin: '0 0 12px 0', 
+              fontSize: '15px', 
+              color: '#333',
+              lineHeight: '1.5'
+            }}>
+              The AI selected the following POIs with accessibility issues for your mobility type:
+            </p>
+            
+            <ul style={{ 
+              margin: '0 0 20px 0', 
+              padding: '0 0 0 20px',
+              fontSize: '14px',
+              color: '#555'
+            }}>
+              {aiPickerWarning.pois.map(({ poi, group }) => {
+                let status = '';
+                if (group === 'inaccessible') status = 'Not accessible';
+                else if (group === 'limitedAccessibility') status = 'Limited accessibility';
+                else if (group === 'unknown') status = 'Unknown accessibility';
+                
+                return (
+                  <li key={poi.id} style={{ marginBottom: '8px' }}>
+                    <strong>{poi.name}</strong>
+                    <span style={{ color: '#999', marginLeft: '8px' }}>({status})</span>
+                  </li>
+                );
+              })}
+            </ul>
+            
+            <p style={{ 
+              margin: '0 0 20px 0', 
+              fontSize: '14px', 
+              color: '#666',
+              lineHeight: '1.5'
+            }}>
+              Do you want to add all selected POIs to your "Want to Visit" list anyway?
+            </p>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setAiPickerWarning(null);
+                  setIsPickingPOIs(false);
+                }}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: '#f5f5f5',
+                  color: '#333',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#e0e0e0';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f5f5f5';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={aiPickerWarning.onConfirm}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: '#2196F3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1976D2';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#2196F3';
+                }}
+              >
+                Add All Anyway
               </button>
             </div>
           </div>
