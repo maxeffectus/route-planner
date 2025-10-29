@@ -1,8 +1,7 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { MobilityType } from '../models/UserProfile';
-import { IsAccessible } from '../models/POI';
+import React, { useState, useCallback } from 'react';
 import { POIImageThumbnail, POITitle, POIType, POILinks, getPOIAccessibility } from './POIComponents';
 import { WANT_TO_VISIT_POI_HIGHLIGHT_COLOR } from '../pages/RoutePlanner';
+import { usePOIGrouping } from '../hooks/usePOIGrouping';
 
 /**
  * Accordion item component for POI groups
@@ -66,70 +65,8 @@ function AccordionItem({ title, count, isOpen, onToggle, children }) {
 }
 
 /**
- * Group POIs by accessibility based on user's mobility type
- * @param {Array} pois - Array of POIs to group
- * @param {string} mobilityType - User's mobility type from MobilityType enum
- * @returns {Object} Object with accessibility groups
- */
-function groupPOIsByAccessibility(pois, mobilityType) {
-  const groups = {
-    wantToVisit: [],
-    accessible: [],
-    limitedAccessibility: [],
-    inaccessible: [],
-    unknown: []
-  };
-
-  // For STANDARD mobility, all POIs go to "accessible" or "wantToVisit"
-  if (mobilityType === MobilityType.STANDARD) {
-    pois.forEach(poi => {
-      if (poi.wantToVisit) {
-        groups.wantToVisit.push(poi);
-      } else {
-        groups.accessible.push(poi);
-      }
-    });
-    return groups;
-  }
-
-  // For other mobility types, categorize by accessibility
-  pois.forEach(poi => {
-    // "Want to Visit" always goes first, regardless of accessibility
-    if (poi.wantToVisit) {
-      groups.wantToVisit.push(poi);
-      return;
-    }
-
-    let accessibilityStatus;
-    
-    // Determine accessibility based on mobility type
-    if (mobilityType === MobilityType.WHEELCHAIR) {
-      accessibilityStatus = poi.isWheelchairAccessible();
-    } else if (mobilityType === MobilityType.STROLLER) {
-      accessibilityStatus = poi.isStrollerAccessible();
-    } else if (mobilityType === MobilityType.LOW_ENDURANCE) {
-      accessibilityStatus = poi.isTempMobilityIssuesAccessible();
-    } else {
-      accessibilityStatus = IsAccessible.UNKNOWN;
-    }
-
-    // Categorize by status
-    if (accessibilityStatus === IsAccessible.YES) {
-      groups.accessible.push(poi);
-    } else if (accessibilityStatus === IsAccessible.LIMITED) {
-      groups.limitedAccessibility.push(poi);
-    } else if (accessibilityStatus === IsAccessible.NO) {
-      groups.inaccessible.push(poi);
-    } else {
-      groups.unknown.push(poi);
-    }
-  });
-
-  return groups;
-}
-
-/**
  * POI Accordion component - displays POIs grouped by accessibility
+ * Uses usePOIGrouping hook to manage grouping logic and metadata
  */
 export function POIAccordion({ 
   pois, 
@@ -141,6 +78,17 @@ export function POIAccordion({
   onImageLoaded,
   onToggleWantToVisit
 }) {
+  // Use POI grouping hook to manage grouping logic and metadata
+  const {
+    groups: groupedPOIs,
+    poiToGroupMap,
+    mobilityType,
+    getGroupForPOI,
+    isPOIInGroup,
+    getGroupInfo,
+    getVisibleGroups
+  } = usePOIGrouping(pois, userProfile);
+
   // Accordion state for POI groups
   const [openAccordions, setOpenAccordions] = useState({
     wantToVisit: true,
@@ -149,12 +97,6 @@ export function POIAccordion({
     inaccessible: false,
     unknown: false
   });
-
-  // Group POIs by accessibility
-  const groupedPOIs = useMemo(() => {
-    const mobilityType = userProfile?.mobility || MobilityType.STANDARD;
-    return groupPOIsByAccessibility(pois, mobilityType);
-  }, [pois, userProfile?.mobility]);
 
   // Toggle accordion open/closed
   const toggleAccordion = useCallback((key) => {
@@ -257,77 +199,28 @@ export function POIAccordion({
     );
   }, [selectedPoiId, categoryColors, mapsAPI, onImageLoaded, onToggleWantToVisit, onPoiSelect]);
 
+  // Get visible groups based on mobility type
+  const visibleGroups = getVisibleGroups();
+
   return (
     <>
-      {/* Want to Visit Group */}
-      {groupedPOIs.wantToVisit.length > 0 && (
-        <AccordionItem
-          title="Want to Visit"
-          count={groupedPOIs.wantToVisit.length}
-          isOpen={openAccordions.wantToVisit}
-          onToggle={() => toggleAccordion('wantToVisit')}
-        >
-          {groupedPOIs.wantToVisit.map((poi, index) =>
-            renderPOIItem(poi, index, index === groupedPOIs.wantToVisit.length - 1)
-          )}
-        </AccordionItem>
-      )}
-
-      {/* Accessible Group */}
-      {groupedPOIs.accessible.length > 0 && (
-        <AccordionItem
-          title="Accessible"
-          count={groupedPOIs.accessible.length}
-          isOpen={openAccordions.accessible}
-          onToggle={() => toggleAccordion('accessible')}
-        >
-          {groupedPOIs.accessible.map((poi, index) =>
-            renderPOIItem(poi, index, index === groupedPOIs.accessible.length - 1)
-          )}
-        </AccordionItem>
-      )}
-
-      {/* Limited Accessibility Group - only show for non-STANDARD mobility */}
-      {userProfile?.mobility !== MobilityType.STANDARD && groupedPOIs.limitedAccessibility.length > 0 && (
-        <AccordionItem
-          title="Limited Accessibility"
-          count={groupedPOIs.limitedAccessibility.length}
-          isOpen={openAccordions.limitedAccessibility}
-          onToggle={() => toggleAccordion('limitedAccessibility')}
-        >
-          {groupedPOIs.limitedAccessibility.map((poi, index) =>
-            renderPOIItem(poi, index, index === groupedPOIs.limitedAccessibility.length - 1)
-          )}
-        </AccordionItem>
-      )}
-
-      {/* Inaccessible Group - only show for non-STANDARD mobility */}
-      {userProfile?.mobility !== MobilityType.STANDARD && groupedPOIs.inaccessible.length > 0 && (
-        <AccordionItem
-          title="Inaccessible"
-          count={groupedPOIs.inaccessible.length}
-          isOpen={openAccordions.inaccessible}
-          onToggle={() => toggleAccordion('inaccessible')}
-        >
-          {groupedPOIs.inaccessible.map((poi, index) =>
-            renderPOIItem(poi, index, index === groupedPOIs.inaccessible.length - 1)
-          )}
-        </AccordionItem>
-      )}
-
-      {/* Accessibility Unknown Group - only show for non-STANDARD mobility */}
-      {userProfile?.mobility !== MobilityType.STANDARD && groupedPOIs.unknown.length > 0 && (
-        <AccordionItem
-          title="Accessibility Unknown"
-          count={groupedPOIs.unknown.length}
-          isOpen={openAccordions.unknown}
-          onToggle={() => toggleAccordion('unknown')}
-        >
-          {groupedPOIs.unknown.map((poi, index) =>
-            renderPOIItem(poi, index, index === groupedPOIs.unknown.length - 1)
-          )}
-        </AccordionItem>
-      )}
+      {visibleGroups.map(groupName => {
+        const groupInfo = getGroupInfo(groupName);
+        
+        return (
+          <AccordionItem
+            key={groupName}
+            title={groupInfo.title}
+            count={groupInfo.count}
+            isOpen={openAccordions[groupName]}
+            onToggle={() => toggleAccordion(groupName)}
+          >
+            {groupInfo.pois.map((poi, index) =>
+              renderPOIItem(poi, index, index === groupInfo.pois.length - 1)
+            )}
+          </AccordionItem>
+        );
+      })}
     </>
   );
 }
