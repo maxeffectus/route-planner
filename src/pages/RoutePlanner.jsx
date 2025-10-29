@@ -636,10 +636,13 @@ export function RoutePlanner() {
       userProfile.removeWantToVisit(poi.id);
     }
     
-    // Save to localStorage
-    localStorage.setItem('userProfile', JSON.stringify(userProfile.toJSON()));
+    // Save to localStorage and reload profile to trigger re-render
+    const savedJSON = userProfile.toJSON();
+    localStorage.setItem('userProfile', JSON.stringify(savedJSON));
+    const updatedProfile = UserProfile.fromJSON(savedJSON);
+    setUserProfile(updatedProfile);
     
-    // Force re-render
+    // Force re-render of POI lists
     setPois([...pois]);
     setPoiCache([...poiCache]);
   }, [userProfile, pois, poiCache]);
