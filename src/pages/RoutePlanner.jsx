@@ -67,7 +67,7 @@ export function RoutePlanner() {
   const [cityInputValue, setCityInputValue] = useState(''); // Track input value in welcome modal
 
   // Prompt API hooks for AI highlights
-  const { hasSession, createSession, promptStreaming } = usePromptAPI();
+  const { hasSession, createSession, promptStreaming, destroySession } = usePromptAPI();
   const { response: aiHighlights, isLoading: isLoadingHighlights, processStream, resetResponse } = useStreamingText();
 
   // Load user profile from localStorage on component mount
@@ -823,10 +823,13 @@ export function RoutePlanner() {
     if (!selectedCity) return;
     
     try {
-      // Create session if not exists
-      if (!hasSession) {
-        await createSession();
+      // Destroy existing session if it exists
+      if (hasSession) {
+        await destroySession();
       }
+      
+      // Create new session for this request
+      await createSession();
       
       // Build prompt with city name
       const prompt = `Provide a short tourist summary in a few paragraphs (2-3) about what ${selectedCity.displayName} is famous for. Focus on the most well-known facts and the main reasons why tourists visit. Respond only with the summary text, without any comments or introductory lines.`;
@@ -839,10 +842,21 @@ export function RoutePlanner() {
       
       // Mark this city as highlighted
       setHighlightedCity(selectedCity);
+      
+      // Destroy session after completion
+      await destroySession();
     } catch (error) {
       console.error('Error getting AI highlights:', error);
+      // Try to clean up session even on error
+      try {
+        if (hasSession) {
+          await destroySession();
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up session:', cleanupError);
+      }
     }
-  }, [selectedCity, hasSession, createSession, promptStreaming, processStream]);
+  }, [selectedCity, hasSession, createSession, promptStreaming, processStream, destroySession]);
 
   return (
     <div style={{ 
@@ -1539,7 +1553,16 @@ export function RoutePlanner() {
       {/* Welcome Modal */}
       <Modal
         isOpen={showWelcomeModal}
-        onClose={() => {
+        onClose={async () => {
+          // Destroy PromptAPI session if it exists
+          if (hasSession) {
+            try {
+              await destroySession();
+            } catch (error) {
+              console.error('Error destroying session on modal close:', error);
+            }
+          }
+          
           setShowWelcomeModal(false);
           setSelectedCity(null);
           setHighlightedCity(null);
