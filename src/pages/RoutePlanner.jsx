@@ -13,6 +13,7 @@ import { sortWaypointsByNearestNeighbor } from '../utils/routeOptimization';
 import { usePromptAPI } from '../hooks/usePromptAPI';
 import { useStreamingText } from '../hooks/useStreamingText';
 import { ResponseDisplay } from '../components/ResponseDisplay';
+import { usePOIGrouping } from '../hooks/usePOIGrouping';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -69,6 +70,9 @@ export function RoutePlanner() {
   // Prompt API hooks for AI highlights
   const { hasSession, createSession, promptStreaming, destroySession } = usePromptAPI();
   const { response: aiHighlights, isLoading: isLoadingHighlights, processStream, resetResponse } = useStreamingText();
+
+  // Accessibility warning modal state
+  const [accessibilityWarning, setAccessibilityWarning] = useState(null); // { poi, message }
 
   // Load user profile from localStorage on component mount
   useEffect(() => {
@@ -182,6 +186,9 @@ export function RoutePlanner() {
       return a.name.localeCompare(b.name);
     });
   }, [filteredPois]);
+
+  // Use POI grouping to check accessibility
+  const { getGroupForPOI } = usePOIGrouping(sortedFilteredPois, userProfile);
 
   // UNIFIED POI DISPLAY: Always show POIs that are in the current map bounds
   // This is the single source of truth for what POIs to display
@@ -622,8 +629,8 @@ export function RoutePlanner() {
     });
   }, [userProfile]);
 
-  // Handler for toggling want to visit
-  const handleToggleWantToVisit = useCallback((poi) => {
+  // Actual toggle logic (separated for reuse in confirmation)
+  const performWantToVisitToggle = useCallback((poi) => {
     if (!userProfile) return;
     
     // Toggle POI instance state
@@ -646,6 +653,37 @@ export function RoutePlanner() {
     setPois([...pois]);
     setPoiCache([...poiCache]);
   }, [userProfile, pois, poiCache]);
+
+  // Handler for toggling want to visit
+  const handleToggleWantToVisit = useCallback((poi) => {
+    if (!userProfile) return;
+    
+    const isAdding = !poi.wantToVisit;
+    
+    // If adding to "Want to Visit", check accessibility
+    if (isAdding) {
+      const group = getGroupForPOI(poi.id);
+      
+      // Generate warning message based on accessibility group
+      let warningMessage = null;
+      if (group === 'inaccessible') {
+        warningMessage = 'This venue is not suitable for your mobility needs. Are you sure you want to visit it?';
+      } else if (group === 'limitedAccessibility') {
+        warningMessage = 'This venue has got limited accessibility for your mobility needs. Are you sure you want to visit it?';
+      } else if (group === 'unknown') {
+        warningMessage = "We don't know if this venue is suitable for your mobility needs. Are you sure you want to visit it?";
+      }
+      
+      // If there's a warning, show modal instead of proceeding
+      if (warningMessage) {
+        setAccessibilityWarning({ poi, message: warningMessage });
+        return;
+      }
+    }
+    
+    // If no warning or removing from "Want to Visit", proceed directly
+    performWantToVisitToggle(poi);
+  }, [userProfile, getGroupForPOI, performWantToVisitToggle]);
 
   const handleFindPOIs = useCallback(async () => {
     if (!mapBounds) {
@@ -1661,6 +1699,77 @@ export function RoutePlanner() {
           </div>
         )}
       </Modal>
+
+      {/* Accessibility Warning Modal */}
+      {accessibilityWarning && (
+        <Modal
+          isOpen={true}
+          onClose={() => setAccessibilityWarning(null)}
+          title="⚠️ Accessibility Warning"
+        >
+          <div style={{ padding: '20px 0' }}>
+            <p style={{ 
+              margin: '0 0 20px 0', 
+              fontSize: '15px', 
+              color: '#333',
+              lineHeight: '1.5'
+            }}>
+              {accessibilityWarning.message}
+            </p>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setAccessibilityWarning(null)}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: '#f5f5f5',
+                  color: '#333',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#e0e0e0';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f5f5f5';
+                }}
+              >
+                No
+              </button>
+              <button
+                onClick={() => {
+                  // Confirm and proceed with adding to "Want to Visit"
+                  performWantToVisitToggle(accessibilityWarning.poi);
+                  setAccessibilityWarning(null);
+                }}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: '#2196F3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#1976D2';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#2196F3';
+                }}
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
