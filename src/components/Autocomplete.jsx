@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * Generic Autocomplete Component
@@ -33,6 +34,7 @@ export function Autocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 }); // Track dropdown position for portal
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
   const lastSelectedValueRef = useRef(null); // Track last selected value to prevent redundant API calls
@@ -134,6 +136,29 @@ export function Autocomplete({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Update dropdown position when it opens or window resizes/scrolls
+  useEffect(() => {
+    if (showDropdown && inputRef.current) {
+      const updatePosition = () => {
+        const rect = inputRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width
+        });
+      };
+      
+      updatePosition();
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', updatePosition, true); // Capture scroll events
+      
+      return () => {
+        window.removeEventListener('resize', updatePosition);
+        window.removeEventListener('scroll', updatePosition, true);
+      };
+    }
+  }, [showDropdown]);
+
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <input
@@ -178,21 +203,21 @@ export function Autocomplete({
         </div>
       )}
 
-      {showDropdown && suggestions.length > 0 && (
+      {showDropdown && suggestions.length > 0 && createPortal(
         <div
           ref={dropdownRef}
           style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
+            position: 'fixed',
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            width: `${dropdownPosition.width}px`,
             backgroundColor: 'white',
             border: '1px solid #ddd',
             borderTop: 'none',
             borderRadius: '0 0 4px 4px',
             maxHeight: '200px',
             overflowY: 'auto',
-            zIndex: 1000,
+            zIndex: 10000,
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
           }}
         >
@@ -212,7 +237,8 @@ export function Autocomplete({
               {renderSuggestion(item)}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
