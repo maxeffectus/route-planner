@@ -673,26 +673,20 @@ export function RoutePlanner() {
   // Initialize APIs in the background
   // Prompt API initialization removed - using simple chat only
 
-  // Show profile setup modal for new users or incomplete profiles
+  // Initialize user profile on first load
   useEffect(() => {
     const visited = localStorage.getItem('routePlannerVisited');
     if (!visited) {
-      // First time visitor - show profile setup
+      // First time visitor - just mark as visited and create empty profile
       localStorage.setItem('routePlannerVisited', 'true');
       setHasVisitedBefore(false);
       
-      // Create new empty profile and show modal
+      // Create new empty profile (but don't show modal automatically)
       const newProfile = new UserProfile();
       setUserProfile(newProfile);
-      setShowProfileModal(true);
     } else {
-      // Returning user - check if profile is incomplete
+      // Returning user
       setHasVisitedBefore(true);
-      
-      // If profile exists but is incomplete, show modal
-      if (userProfile && !userProfile.isComplete()) {
-        setShowProfileModal(true);
-      }
     }
   }, [userProfile]);
 
