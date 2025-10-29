@@ -3,7 +3,7 @@
  * Uses PromptAPI to intelligently select POIs based on user's time window and travel pace
  */
 
-import { UNFILLED_MARKERS } from '../models/UserProfile';
+import { InterestCategory, UNFILLED_MARKERS } from '../models/UserProfile';
 import { PromptAPI } from './PromptAPI';
 
 /**
@@ -39,9 +39,62 @@ function formatPOIsForAI(pois) {
     id: poi.id,
     interest_categories: poi.interest_categories || [],
     wikipedia: poi.wikipedia || null,
-    website: poi.website || null,
-    description: poi.description || poi.name
+    website: poi.website || null
   }));
+}
+
+/**
+ * Generate text describing user's interests for AI prompt
+ * @param {Object} userProfile - User profile with interests
+ * @returns {string} Formatted text about user interests
+ */
+function getUserInterestsText(userProfile) {
+  if (!userProfile.interests || userProfile.interests === UNFILLED_MARKERS.OBJECT) {
+    return '';
+  }
+  
+  const interests = userProfile.getInterests();
+  const sortedInterests = Object.entries(interests)
+    .filter(([_, weight]) => weight > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([category, _]) => category);
+  
+  if (sortedInterests.length === 0) return '';
+  
+  return `\n\n# User's interests (prioritize POIs matching these categories):\n${sortedInterests.join(', ')}`;
+}
+
+/**
+ * Validate diversity of selected POIs and log warnings if needed
+ * @param {Array} selectedPOIs - Array of selected POI IDs
+ * @param {Array} allPOIs - Array of all available POIs
+ * @returns {Object} Category distribution statistics
+ */
+function validateDiversity(selectedPOIs, allPOIs) {
+  const categoryCount = {};
+  
+  selectedPOIs.forEach(poiId => {
+    const poi = allPOIs.find(p => String(p.id) === String(poiId));
+    if (poi && poi.interest_categories) {
+      poi.interest_categories.forEach(cat => {
+        categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+      });
+    }
+  });
+  
+  // Check if one category dominates
+  const maxCount = Math.max(...Object.values(categoryCount));
+  const totalCategories = Object.keys(categoryCount).length;
+  
+  // If one category occupies more than 50% and there are multiple categories - log warning
+  if (maxCount > selectedPOIs.length * 0.5 && totalCategories > 1) {
+    console.warn('⚠️ Low diversity detected in AI POI selection:', categoryCount);
+    const dominantCategory = Object.entries(categoryCount)
+      .find(([_, count]) => count === maxCount)?.[0];
+    console.warn(`Category "${dominantCategory}" dominates with ${maxCount}/${selectedPOIs.length} POIs`);
+  }
+  
+  return categoryCount;
 }
 
 /**
@@ -99,22 +152,83 @@ export async function pickPOIsWithAI(accessiblePOIs, userProfile) {
 
   // Create session with system prompt
   await promptAPI.createSession({
-    systemPrompt: `# The Goal:
-Your goal is to select the most interesting tourist attractions from the submitted list POIs. You will receive an array of POIs in format [{'name': 'POI name', 'id': 'POI id', 'interest_categories': ['category_1', 'category_2', ...], 'wikipedia': 'Wikipedia URL', 'website': 'website URL', 'description': 'description'}, ...]'.
+    systemPrompt: `You are a POI selection assistant. Your task is to select POIs and return ONLY a JSON array.
 
-# Important considerations:
-Pay attention to the categories of the POIs. Try to balance the resulting list and include POIs of different categories in it. If there are POIs with category 'gastronomy' pick one from this category and put it approximately in the middle of the returned array. If there are POIs with category 'nightlife' pick one and put in the end of the returned array. If you want to pick a theater POI, put it in the end of the returned array, but before 'nightlife'.
+# The Goal:
+Pick a DIVERSE and BALANCED collection of attractions from the submitted array of POIs.
 
-# Response format:
-Reply with an array of POI ids: ['POI id 1', 'POI id 2', ...]. DO NOT include any other information in the response.`
+# Input format:
+You will receive an array of POIs in format [
+  {
+    'name': 'POI name', 
+    'id': 'POI id', 
+    'interest_categories': ['category_1', 'category_2', ...], 
+    'wikipedia': 'Wikipedia URL', 
+    'website': 'website URL'
+    }, 
+    ...
+]
+
+# IMPORTANT RULES for diversity:
+1. **Category Balance**: Try to select POIs from DIFFERENT interest_categories. 
+2. **Avoid Repetition**: Do NOT select more than 2 POIs from the same category (unless there are no other options).
+3. **Variety is Key**: Prefer a mix of different experiences rather than similar ones.
+4. **Consider ALL categories**: ${Object.values(InterestCategory).join(', ')}
+
+# Category placement guidelines:
+- If there are POIs with category '${InterestCategory.GASTRONOMY}', include one approximately in the MIDDLE of the array
+- If there are POIs with category '${InterestCategory.NIGHTLIFE}', include one at the END of the array
+- If selecting a theater POI, place it near the end but BEFORE ${InterestCategory.NIGHTLIFE}
+- Museums (${InterestCategory.ART_MUSEUMS}, ${InterestCategory.HISTORY_CULTURE}) should NOT dominate the list - limit to 2 maximum unless no other options exist
+
+# CRITICAL OUTPUT REQUIREMENTS:
+You MUST return an array containing the VALUES of the 'id' field from the selected POI objects.
+Extract the numeric ID values from the POIs and return them as a JSON array of integers.
+
+RESPOND WITH ONLY A JSON ARRAY. NOTHING ELSE.
+NO explanations. NO comments. NO markdown. NO code blocks.
+JUST the array of id values: [$POI_1.id, $POI_2.id, $POI_3.id]
+
+Example of CORRECT response (if you selected POIs with ids 10, 11, 12, 21):
+[10, 11, 12, 21]
+
+Example of WRONG responses (DO NOT DO THIS):
+Here's a selection of diverse POIs: [10, 11, 12, 21]
+OR
+\`\`\`json
+[10, 11, 12]
+\`\`\`
+OR
+[
+  10,  # Museum ABC
+  11,  # Restaurant XYZ
+  12   # Theater QWE
+]
+
+RESPOND WITH ONLY THE ARRAY OF ID VALUES.`,
+    responseConstraint: {
+      type: 'array',
+      items: {
+        type: 'integer'
+      }
+    }
   });
 
   try {
+    // Get user interests text
+    const userInterestsText = getUserInterestsText(userProfile);
+    
     // Create prompt with POI data and count
     const prompt = `Here is the list of available POIs:
 ${JSON.stringify(formattedPOIs, null, 2)}
+${userInterestsText}
 
-Please select exactly ${recommendedCount} most interesting POI(s) from this list. Return only the array of POI ids.`;
+Please select exactly ${recommendedCount} POIs from this list, ensuring MAXIMUM DIVERSITY across different interest_categories. 
+Remember: avoid selecting too many POIs from the same category.
+
+CRITICAL: Extract the 'id' field values from the selected POIs and return ONLY a JSON array of those integer IDs.
+Example: if you select POIs with id=10, id=15, id=22, respond with: [10, 15, 22]
+Do NOT add any text, comments, or explanations. ONLY the array of id values.`;
 
     // Get AI response
     const response = await promptAPI.prompt(prompt);
@@ -122,16 +236,46 @@ Please select exactly ${recommendedCount} most interesting POI(s) from this list
     // Parse the response
     let selectedIds;
     try {
-      // Try to parse as JSON
-      selectedIds = JSON.parse(response);
-    } catch (parseError) {
-      // If parsing fails, try to extract array from text
-      const arrayMatch = response.match(/\[(.*?)\]/s);
-      if (arrayMatch) {
-        selectedIds = JSON.parse(`[${arrayMatch[1]}]`);
-      } else {
-        throw new Error('Could not parse AI response');
+      // First, try to clean up the response by removing markdown code blocks and comments
+      let cleanedResponse = response.trim();
+      
+      // Remove markdown code blocks
+      cleanedResponse = cleanedResponse.replace(/```[a-z]*\n/g, '').replace(/\n```/g, '');
+      
+      // Extract the array part
+      const arrayMatch = cleanedResponse.match(/\[([\s\S]*?)\]/);
+      if (!arrayMatch) {
+        throw new Error('No array found in response');
       }
+      
+      let arrayContent = arrayMatch[1];
+      
+      // Remove Python/JS style comments (# comment or // comment)
+      arrayContent = arrayContent.split('\n')
+        .map(line => {
+          // Remove # comments
+          const hashIndex = line.indexOf('#');
+          if (hashIndex !== -1) {
+            line = line.substring(0, hashIndex);
+          }
+          // Remove // comments
+          const slashIndex = line.indexOf('//');
+          if (slashIndex !== -1) {
+            line = line.substring(0, slashIndex);
+          }
+          return line.trim();
+        })
+        .filter(line => line.length > 0)
+        .join(',');
+      
+      // Try to parse as JSON
+      selectedIds = JSON.parse(`[${arrayContent}]`);
+      
+      console.log('✅ Successfully parsed AI response');
+    } catch (parseError) {
+      console.error('❌ Failed to parse AI response:', parseError);
+      console.error('Original response:', response);
+      throw new Error('Could not parse AI response: ' + parseError.message);
     }
 
     // Validate response is an array
@@ -150,11 +294,17 @@ Please select exactly ${recommendedCount} most interesting POI(s) from this list
       throw new Error('AI did not return any valid POI IDs');
     }
 
+    // Validate diversity and log statistics
+    const categoryStats = validateDiversity(validSelectedIds, accessiblePOIs);
+    console.log('✅ AI POI selection category distribution:', categoryStats);
+
     return validSelectedIds;
 
   } finally {
-    // Clean up session
+    // Clean up session immediately after getting response
+    console.log('🧹 Cleaning up PromptAPI session...');
     await promptAPI.destroySession();
+    console.log('✅ PromptAPI session destroyed');
   }
 }
 
