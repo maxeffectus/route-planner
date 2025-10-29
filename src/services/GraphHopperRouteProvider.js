@@ -22,9 +22,16 @@ export class GraphHopperRouteProvider extends BaseRouteProvider {
    * @returns {string} GraphHopper profile name
    */
   getProfileForMobility(mobilityType, transportMode) {
-    // MobilityType takes priority - wheelchair/stroller need accessible routes
+    // WORKAROUND: GraphHopper free tier doesn't support 'wheelchair' profile
+    // For wheelchair/stroller users, we use 'foot' profile with avoid=steps parameter
+    // The avoidStairs option should be set to true for these mobility types
     if (mobilityType === MobilityType.WHEELCHAIR || mobilityType === MobilityType.STROLLER) {
-      return 'wheelchair';
+      return 'foot'; // Use foot profile + avoid=steps instead of wheelchair profile
+    }
+    
+    // LOW_ENDURANCE also benefits from avoiding stairs
+    if (mobilityType === MobilityType.LOW_ENDURANCE) {
+      return 'foot'; // Will use avoid=steps if avoidStairs is true
     }
     
     // Map TransportMode to GraphHopper profiles

@@ -52,19 +52,23 @@ describe('GraphHopperRouteProvider', () => {
   });
   
   describe('getProfileForMobility', () => {
-    test('should return wheelchair profile for WHEELCHAIR mobility', () => {
+    test('should return foot profile for WHEELCHAIR mobility', () => {
+      // WORKAROUND: GraphHopper free tier doesn't support wheelchair profile
+      // Uses foot + avoid=steps instead
       const profile = provider.getProfileForMobility(MobilityType.WHEELCHAIR, TransportMode.WALK);
-      expect(profile).toBe('wheelchair');
+      expect(profile).toBe('foot');
     });
     
-    test('should return wheelchair profile for STROLLER mobility', () => {
+    test('should return foot profile for STROLLER mobility', () => {
+      // WORKAROUND: GraphHopper free tier doesn't support wheelchair profile
+      // Uses foot + avoid=steps instead
       const profile = provider.getProfileForMobility(MobilityType.STROLLER, TransportMode.WALK);
-      expect(profile).toBe('wheelchair'); // STROLLER uses wheelchair profile
+      expect(profile).toBe('foot');
     });
     
-    test('should return wheelchair profile for LOW_ENDURANCE mobility', () => {
+    test('should return foot profile for LOW_ENDURANCE mobility', () => {
       const profile = provider.getProfileForMobility(MobilityType.LOW_ENDURANCE, TransportMode.WALK);
-      expect(profile).toBe('foot'); // According to implementation
+      expect(profile).toBe('foot');
     });
     
     test('should return foot profile for STANDARD mobility with WALK transport', () => {
@@ -170,21 +174,22 @@ describe('GraphHopperRouteProvider', () => {
       ).rejects.toThrow('No route found');
     });
     
-    test('should handle wheelchair profile with avoid_stairs', async () => {
+    test('should handle foot profile with avoid_stairs (wheelchair workaround)', async () => {
       fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => graphHopperResponse
       });
       
+      // WORKAROUND: Use foot profile with avoidStairs instead of wheelchair
       await provider.buildRoute(startPOI, finishPOI, {
-        profile: 'wheelchair',
+        profile: 'foot',
         avoidStairs: true,
         waypoints: []
       });
       
       const calledUrl = fetch.mock.calls[0][0];
-      // Should include wheelchair-specific options
-      expect(calledUrl).toContain('profile=wheelchair');
+      // Should include foot profile with avoid=steps
+      expect(calledUrl).toContain('profile=foot');
       expect(calledUrl).toContain('avoid=steps');
     });
     

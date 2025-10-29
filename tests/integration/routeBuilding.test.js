@@ -150,27 +150,30 @@ describe('Route Building Integration', () => {
     });
     
     test('should handle avoidStairs option', async () => {
+      // WORKAROUND: Use foot profile instead of wheelchair for free tier
       await routeProvider.buildRoute(startPOI, finishPOI, {
-        profile: 'wheelchair',
+        profile: 'foot',
         avoidStairs: true,
         waypoints: []
       });
       
       const calledUrl = fetch.mock.calls[0][0];
-      // Check for stairs avoidance option
-      expect(calledUrl).toContain('profile=wheelchair');
+      // Check for stairs avoidance option (foot + avoid=steps)
+      expect(calledUrl).toContain('profile=foot');
       expect(calledUrl).toContain('avoid=steps');
     });
   });
   
   describe('Route Building with User Profile', () => {
     test('should map user profile to routing profile', () => {
+      // WORKAROUND: GraphHopper free tier doesn't support wheelchair profile
+      // Should return 'foot' for wheelchair users (use with avoidStairs=true)
       const profile = routeProvider.getProfileForMobility(
         MobilityType.WHEELCHAIR,
         TransportMode.WALK
       );
       
-      expect(profile).toBe('wheelchair');
+      expect(profile).toBe('foot');
     });
   });
   
