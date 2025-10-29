@@ -135,8 +135,26 @@ export async function pickPOIsWithAI(accessiblePOIs, userProfile) {
     throw new Error('Time window is too short for any POI visits');
   }
 
+  // TEMPORARY: Limit the number of POIs sent to the model to avoid exceeding context window
+  // This is a workaround for the limited context size of the on-device Gemini Nano model.
+  // Future improvements could include:
+  // - Pagination: split POIs into batches and process them in multiple sessions
+  // - Parallel sessions: run multiple AI sessions in parallel to process more POIs
+  // However, testing on current hardware showed unsatisfactory performance due to:
+  // - High memory usage when running multiple sessions simultaneously
+  // - Slow response times (multiple sessions competing for limited resources)
+  // - Inconsistent results quality when context is split
+  const MAX_POIS_FOR_AI = 100;
+  let poisToProcess = accessiblePOIs;
+  
+  if (accessiblePOIs.length > MAX_POIS_FOR_AI) {
+    console.warn(`⚠️ Too many POIs (${accessiblePOIs.length}). Limiting to ${MAX_POIS_FOR_AI} for AI processing.`);
+    // Take first N POIs (they are likely already sorted by relevance/distance)
+    poisToProcess = accessiblePOIs.slice(0, MAX_POIS_FOR_AI);
+  }
+
   // Format POIs for AI
-  const formattedPOIs = formatPOIsForAI(accessiblePOIs);
+  const formattedPOIs = formatPOIsForAI(poisToProcess);
 
   // Create PromptAPI instance and session
   const promptAPI = new PromptAPI();
@@ -286,8 +304,8 @@ Do NOT add any text, comments, or explanations. ONLY the array of id values.`;
     // Convert all IDs to strings for consistency
     selectedIds = selectedIds.map(id => String(id));
 
-    // Validate that selected IDs exist in the input POIs
-    const validIds = new Set(accessiblePOIs.map(poi => String(poi.id)));
+    // Validate that selected IDs exist in the input POIs (that were sent to AI)
+    const validIds = new Set(poisToProcess.map(poi => String(poi.id)));
     const validSelectedIds = selectedIds.filter(id => validIds.has(id));
 
     if (validSelectedIds.length === 0) {
@@ -295,7 +313,7 @@ Do NOT add any text, comments, or explanations. ONLY the array of id values.`;
     }
 
     // Validate diversity and log statistics
-    const categoryStats = validateDiversity(validSelectedIds, accessiblePOIs);
+    const categoryStats = validateDiversity(validSelectedIds, poisToProcess);
     console.log('✅ AI POI selection category distribution:', categoryStats);
 
     return validSelectedIds;
