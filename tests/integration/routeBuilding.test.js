@@ -150,7 +150,8 @@ describe('Route Building Integration', () => {
     });
     
     test('should handle avoidStairs option', async () => {
-      // WORKAROUND: Use foot profile instead of wheelchair for free tier
+      // NOTE: avoidStairs is accepted but not used with GraphHopper free tier
+      // Free tier doesn't support flexible mode required for avoid=steps
       await routeProvider.buildRoute(startPOI, finishPOI, {
         profile: 'foot',
         avoidStairs: true,
@@ -158,9 +159,10 @@ describe('Route Building Integration', () => {
       });
       
       const calledUrl = fetch.mock.calls[0][0];
-      // Check for stairs avoidance option (foot + avoid=steps)
+      // Check that foot profile is used (avoid=steps disabled for free tier)
       expect(calledUrl).toContain('profile=foot');
-      expect(calledUrl).toContain('avoid=steps');
+      expect(calledUrl).not.toContain('avoid=steps');
+      expect(calledUrl).not.toContain('ch.disable');
     });
   });
   

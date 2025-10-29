@@ -174,13 +174,14 @@ describe('GraphHopperRouteProvider', () => {
       ).rejects.toThrow('No route found');
     });
     
-    test('should handle foot profile with avoid_stairs (wheelchair workaround)', async () => {
+    test('should handle foot profile with avoidStairs option', async () => {
       fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => graphHopperResponse
       });
       
-      // WORKAROUND: Use foot profile with avoidStairs instead of wheelchair
+      // NOTE: avoidStairs parameter is accepted but not used with free tier
+      // GraphHopper free tier doesn't support flexible mode (avoid=steps)
       await provider.buildRoute(startPOI, finishPOI, {
         profile: 'foot',
         avoidStairs: true,
@@ -188,9 +189,10 @@ describe('GraphHopperRouteProvider', () => {
       });
       
       const calledUrl = fetch.mock.calls[0][0];
-      // Should include foot profile with avoid=steps
+      // Should use foot profile (avoid=steps is disabled for free tier)
       expect(calledUrl).toContain('profile=foot');
-      expect(calledUrl).toContain('avoid=steps');
+      expect(calledUrl).not.toContain('avoid=steps');
+      expect(calledUrl).not.toContain('ch.disable');
     });
     
     test('should handle bike profile', async () => {

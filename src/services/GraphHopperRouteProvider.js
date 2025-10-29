@@ -129,13 +129,18 @@ export class GraphHopperRouteProvider extends BaseRouteProvider {
       params.append('point', `${point[0]},${point[1]}`);
     });
 
-    // Add accessibility options
-    if (profile === 'wheelchair' || avoidStairs) {
-      params.append('ch.disable', 'true');
-      if (avoidStairs) {
-        params.append('avoid', 'steps');
-      }
-    }
+    // DISABLED: GraphHopper free tier doesn't support flexible mode (ch.disable=true)
+    // Flexible mode is required to use 'avoid' parameters like 'avoid=steps'
+    // For wheelchair/stroller users, we use 'foot' profile but cannot avoid stairs with free tier
+    // To enable stairs avoidance, upgrade to a paid GraphHopper plan
+    // 
+    // Original code (commented out):
+    // if (profile === 'wheelchair' || avoidStairs) {
+    //   params.append('ch.disable', 'true');
+    //   if (avoidStairs) {
+    //     params.append('avoid', 'steps');
+    //   }
+    // }
 
     const response = await fetch(`${this.baseUrl}/route?${params.toString()}`);
     
