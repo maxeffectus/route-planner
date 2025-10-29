@@ -4,7 +4,7 @@ import { UserProfile, InterestCategory, MobilityType, TransportMode, UNFILLED_MA
 import { SavedRoute } from '../models/SavedRoute';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
-import { POIImageThumbnail, POITitle, POIType, POILinks, getPOIAccessibility } from '../components/POIComponents';
+import { POIAccordion } from '../components/POIAccordion';
 import SimpleProfileSetupChat from '../components/SimpleProfileSetupChat';
 import { getAllCategoryValues } from '../utils/categoryMapping';
 import { GraphHopperRouteProvider } from '../services/GraphHopperRouteProvider';
@@ -1158,7 +1158,7 @@ export function RoutePlanner() {
 
         {/* Scrollable POI List - takes remaining space */}
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {/* POI List */}
+          {/* POI List with Accordion */}
           {sortedFilteredPois.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
             <h3 style={{ 
@@ -1179,107 +1179,17 @@ export function RoutePlanner() {
                 </span>
               )}
             </h3>
-          <div style={{ 
-              backgroundColor: '#fff',
-              borderRadius: '8px',
-              border: '1px solid #ddd'
-            }}>
-              {sortedFilteredPois.map((poi, index) => {
-                const poiCategories = poi.interest_categories || [];
-                // Get colors for all categories
-                const colors = poiCategories.map(cat => categoryColors[cat] || '#999');
-                const isSelected = selectedPoiId === poi.id;
-                
-                // Create multi-color border using div elements for each category
-                const numCategories = colors.length;
-                
-                return (
-                  <div
-                    key={poi.id || index}
-                    id={`poi-item-${poi.id}`}
-                    onClick={() => {
-                      // Toggle selection: if already selected, deselect; otherwise select
-                      setSelectedPoiId(prevId => prevId === poi.id ? null : poi.id);
-                    }}
-                    onMouseOver={(e) => {
-                      if (!isSelected && !poi.wantToVisit) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseOut={(e) => {
-                      if (!isSelected && !poi.wantToVisit) e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                    style={{
-                      padding: '12px 16px',
-                      borderBottom: index < sortedFilteredPois.length - 1 ? '1px solid #eee' : 'none',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      position: 'relative',
-                      backgroundColor: poi.wantToVisit ? WANT_TO_VISIT_POI_HIGHLIGHT_COLOR : (isSelected ? '#e3f2fd' : 'transparent'),
-                      transform: isSelected ? 'translateX(4px)' : 'translateX(0)',
-                      boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-                      display: 'flex',
-                      gap: '12px',
-                      alignItems: 'center'
-                    }}
-                  >
-                    {/* Multi-color category indicator (left border) */}
-                    <div style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: '4px',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}>
-                      {colors.map((color, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            flex: 1,
-                            backgroundColor: color
-                          }}
-                        />
-                      ))}
-                    </div>
-                    {/* POI Image */}
-                    <POIImageThumbnail 
-                      poi={poi} 
-                      mapsAPI={mapsAPI} 
-                      onImageLoaded={handleImageLoaded}
-                      size={80}
-                      showPreview={true}
-                    />
 
-                    {/* POI Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {/* Want to Visit Checkbox */}
-                      <div style={{ marginBottom: '4px' }}>
-                        <label 
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '12px' }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={poi.wantToVisit || false}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleToggleWantToVisit(poi);
-                            }}
-                            style={{ marginRight: '4px' }}
-                          />
-                          Want to visit
-                        </label>
-                      </div>
-                      
-                      <POITitle poi={poi} color={colors[0]} variant="default" />
-                      <POIType poi={poi} />
-                      <POILinks poi={poi} fontSize="11px" gap="8px" />
-                      {getPOIAccessibility({ poi })}
-            </div>
-            </div>
-                );
-              })}
-            </div>
+            <POIAccordion
+              pois={sortedFilteredPois}
+              userProfile={userProfile}
+              categoryColors={categoryColors}
+              selectedPoiId={selectedPoiId}
+              onPoiSelect={setSelectedPoiId}
+              mapsAPI={mapsAPI}
+              onImageLoaded={handleImageLoaded}
+              onToggleWantToVisit={handleToggleWantToVisit}
+            />
           </div>
         )}
 
