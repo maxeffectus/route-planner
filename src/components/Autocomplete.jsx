@@ -35,12 +35,18 @@ export function Autocomplete({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
+  const lastSelectedValueRef = useRef(null); // Track last selected value to prevent redundant API calls
 
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (query.length < minChars) {
         setSuggestions([]);
         setShowDropdown(false);
+        return;
+      }
+
+      // Skip API call if query matches the last selected value
+      if (query === lastSelectedValueRef.current) {
         return;
       }
 
@@ -99,6 +105,11 @@ export function Autocomplete({
   const selectItem = (item) => {
     const displayValue = keepValueOnSelect ? getDisplayValue(item) : '';
     
+    // Store the selected value to prevent redundant API calls
+    if (keepValueOnSelect && displayValue) {
+      lastSelectedValueRef.current = displayValue;
+    }
+    
     if (onChange) {
       onChange(displayValue);
     } else {
@@ -131,6 +142,12 @@ export function Autocomplete({
         value={query}
         onChange={(e) => {
           const newValue = e.target.value;
+          
+          // Reset last selected value when user manually changes input
+          if (newValue !== lastSelectedValueRef.current) {
+            lastSelectedValueRef.current = null;
+          }
+          
           if (onChange) {
             onChange(newValue);
           } else {
