@@ -797,42 +797,46 @@ export function RoutePlanner() {
         flex: '0 0 50%',
         padding: '20px',
         backgroundColor: '#f9f9f9',
-        overflowY: 'auto',
-        borderRight: '2px solid #e0e0e0'
+        overflowY: 'hidden',
+        borderRight: '2px solid #e0e0e0',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
-        {/* Profile Setup Button - show different states based on profile completion */}
-        {hasVisitedBefore && (
-          <div style={{ marginBottom: '20px' }}>
-            <button
-              onClick={handleOpenProfileOrRoutes}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: userProfile && userProfile.isComplete() ? '#28a745' : '#ffc107',
-                color: userProfile && userProfile.isComplete() ? 'white' : '#000',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                width: '100%'
-              }}
-            >
-              {userProfile && userProfile.isComplete() 
-                ? '✅ Profile Complete - Edit Profile' 
-                : userProfile 
-                  ? `📝 Continue Profile Setup (${userProfile.getCompletionPercentage()}% complete)`
-                  : '📝 Setup Travel Profile'
-              }
-            </button>
-            <p style={{ 
-              fontSize: '12px', 
-              color: '#666', 
-              marginTop: '5px',
-              textAlign: 'center'
-            }}>
-              {userProfile && userProfile.isComplete() ? 'Profile completed successfully' : 'Complete your profile for better recommendations'}
-            </p>
-          </div>
-        )}
+        {/* Fixed top section with all controls */}
+        <div style={{ flexShrink: 0 }}>
+          {/* Profile Setup Button - show different states based on profile completion */}
+          {hasVisitedBefore && (
+            <div style={{ marginBottom: '20px' }}>
+              <button
+                onClick={handleOpenProfileOrRoutes}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: userProfile && userProfile.isComplete() ? '#28a745' : '#ffc107',
+                  color: userProfile && userProfile.isComplete() ? 'white' : '#000',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  width: '100%'
+                }}
+              >
+                {userProfile && userProfile.isComplete() 
+                  ? '✅ Profile Complete - Edit Profile' 
+                  : userProfile 
+                    ? `📝 Continue Profile Setup (${userProfile.getCompletionPercentage()}% complete)`
+                    : '📝 Setup Travel Profile'
+                }
+              </button>
+              <p style={{ 
+                fontSize: '12px', 
+                color: '#666', 
+                marginTop: '5px',
+                textAlign: 'center'
+              }}>
+                {userProfile && userProfile.isComplete() ? 'Profile completed successfully' : 'Complete your profile for better recommendations'}
+              </p>
+            </div>
+          )}
 
         {/* Debug button for testing - remove in production */}
         {process.env.NODE_ENV === 'development' && (
@@ -1061,109 +1065,25 @@ export function RoutePlanner() {
           </div>
         )}
 
-        {routeError && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#ffebee',
-            borderRadius: '8px',
-            border: '1px solid #ffcdd2',
-            fontSize: '12px',
-            color: '#c62828',
-            marginBottom: '20px'
-          }}>
-            ⚠️ {routeError}
-          </div>
-        )}
-
-        {/* Simple Profile Setup Modal */}
-        {showProfileModal && (
-          <div 
-            className="modal-overlay" 
-            onClick={(e) => {
-              // Close modal when clicking on overlay
-              if (e.target === e.currentTarget) {
-                setShowProfileModal(false);
-              }
-            }}
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              pointerEvents: 'auto'
+          {routeError && (
+            <div style={{
+              padding: '12px',
+              backgroundColor: '#ffebee',
+              borderRadius: '8px',
+              border: '1px solid #ffcdd2',
+              fontSize: '12px',
+              color: '#c62828',
+              marginBottom: '20px'
             }}>
-            <div className="modal-content" style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '20px',
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              position: 'relative'
-            }}>
-              {/* Save and Close button */}
-              <button
-                onClick={() => {
-                  // Save current answer first
-                  if (profileChatRef.current) {
-                    profileChatRef.current.saveCurrentAnswer();
-                  }
-                  
-                  // Save current profile and close modal
-                  if (userProfile) {
-                    localStorage.setItem('userProfile', JSON.stringify(userProfile));
-                  }
-                  setShowProfileModal(false);
-                }}
-                style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  background: '#28a745',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '8px 16px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  color: 'white',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  transition: 'background-color 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#218838';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#28a745';
-                }}
-              >
-                💾 Save and Close
-              </button>
-
-              {/* Simple Profile Setup Chat */}
-              <SimpleProfileSetupChat
-                ref={profileChatRef}
-                userProfile={userProfile}
-                onProfileUpdate={setUserProfile}
-                onComplete={(profile) => {
-                  setUserProfile(profile);
-                  setShowProfileModal(false);
-                  // Save to localStorage
-                  localStorage.setItem('userProfile', JSON.stringify(profile.toJSON()));
-                }}
-              />
+              ⚠️ {routeError}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* POI List */}
-        {sortedFilteredPois.length > 0 && (
+        {/* Scrollable POI List - takes remaining space */}
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          {/* POI List */}
+          {sortedFilteredPois.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
             <h3 style={{ 
               marginTop: 0, 
@@ -1184,10 +1104,8 @@ export function RoutePlanner() {
               )}
             </h3>
           <div style={{ 
-              maxHeight: '600px',
-              overflowY: 'auto',
               backgroundColor: '#fff',
-            borderRadius: '8px',
+              borderRadius: '8px',
               border: '1px solid #ddd'
             }}>
               {sortedFilteredPois.map((poi, index) => {
@@ -1289,23 +1207,111 @@ export function RoutePlanner() {
           </div>
         )}
 
-        {sortedFilteredPois.length === 0 && !isLoadingPOIs && (
-        <div style={{ 
-            padding: '40px 20px',
-            textAlign: 'center',
-            color: '#999',
-          backgroundColor: '#fff', 
-          borderRadius: '8px',
-            border: '1px dashed #ddd'
-          }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
-            <p style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '500' }}>
-              No POIs loaded yet
-            </p>
-            <p style={{ margin: 0, fontSize: '14px' }}>
-              Zoom in on the map and click "Find points of interest"
-            </p>
+          {sortedFilteredPois.length === 0 && !isLoadingPOIs && (
+            <div style={{ 
+              padding: '40px 20px',
+              textAlign: 'center',
+              color: '#999',
+              backgroundColor: '#fff', 
+              borderRadius: '8px',
+              border: '1px dashed #ddd'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
+              <p style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '500' }}>
+                No POIs loaded yet
+              </p>
+              <p style={{ margin: 0, fontSize: '14px' }}>
+                Zoom in on the map and click "Find points of interest"
+              </p>
+            </div>
+          )}
         </div>
+
+        {/* Simple Profile Setup Modal */}
+        {showProfileModal && (
+          <div 
+            className="modal-overlay" 
+            onClick={(e) => {
+              // Close modal when clicking on overlay
+              if (e.target === e.currentTarget) {
+                setShowProfileModal(false);
+              }
+            }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              pointerEvents: 'auto'
+            }}>
+            <div className="modal-content" style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              padding: '20px',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              position: 'relative'
+            }}>
+              {/* Save and Close button */}
+              <button
+                onClick={() => {
+                  // Save current answer first
+                  if (profileChatRef.current) {
+                    profileChatRef.current.saveCurrentAnswer();
+                  }
+                  
+                  // Save current profile and close modal
+                  if (userProfile) {
+                    localStorage.setItem('userProfile', JSON.stringify(userProfile));
+                  }
+                  setShowProfileModal(false);
+                }}
+                style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  background: '#28a745',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  color: 'white',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#218838';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#28a745';
+                }}
+              >
+                💾 Save and Close
+              </button>
+
+              {/* Simple Profile Setup Chat */}
+              <SimpleProfileSetupChat
+                ref={profileChatRef}
+                userProfile={userProfile}
+                onProfileUpdate={setUserProfile}
+                onComplete={(profile) => {
+                  setUserProfile(profile);
+                  setShowProfileModal(false);
+                  // Save to localStorage
+                  localStorage.setItem('userProfile', JSON.stringify(profile.toJSON()));
+                }}
+              />
+            </div>
+          </div>
         )}
       </div>
 
