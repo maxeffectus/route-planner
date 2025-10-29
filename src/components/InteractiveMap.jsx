@@ -504,6 +504,7 @@ export function InteractiveMap({
   selectedCategories = [],
   onCategoriesChange,
   onApplyProfileInterests,
+  onSelectCity,
   categoryColors = {},
   selectedPoiId = null,
   onPoiSelect,
@@ -841,6 +842,39 @@ export function InteractiveMap({
                 }}
               >
                 ⭐ Set according to my interests
+              </button>
+            )}
+            
+            {/* Select Another City Button - inside category row */}
+            {onSelectCity && (
+              <button
+                onClick={onSelectCity}
+                title="Choose a different city or location"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '3px 10px',
+                  backgroundColor: '#FF9800',
+                  color: 'white',
+                  border: '1px solid #F57C00',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                  flexShrink: 0
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.backgroundColor = '#F57C00';
+                  e.target.style.borderColor = '#E65100';
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.backgroundColor = '#FF9800';
+                  e.target.style.borderColor = '#F57C00';
+                }}
+              >
+                🌍 Select another city
               </button>
             )}
           </div>

@@ -813,6 +813,11 @@ export function RoutePlanner() {
     setSelectedCategories(categoriesFromProfile);
   }, [userProfile]);
 
+  // Open city selection modal
+  const handleOpenCitySelection = useCallback(() => {
+    setShowWelcomeModal(true);
+  }, []);
+
   // Handle AI highlights request
   const handleGetAIHighlights = useCallback(async () => {
     if (!selectedCity) return;
@@ -1390,6 +1395,7 @@ export function RoutePlanner() {
           selectedCategories={selectedCategories}
           onCategoriesChange={setSelectedCategories}
           onApplyProfileInterests={applyProfileInterests}
+          onSelectCity={handleOpenCitySelection}
           categoryColors={categoryColors}
           selectedPoiId={selectedPoiId}
           onPoiSelect={setSelectedPoiId}
