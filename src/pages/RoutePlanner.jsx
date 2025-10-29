@@ -17,6 +17,9 @@ import { ResponseDisplay } from '../components/ResponseDisplay';
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
 
+// Default zoom level when selecting a city (if city bounds are too large, we use this zoom level)
+const DEFAULT_SELECTED_CITY_ZOOM = 13;
+
 // Color for want-to-visit POI highlight (used for both card background and marker halos)
 export const WANT_TO_VISIT_POI_HIGHLIGHT_COLOR = '#BBDEFB'; // Medium blue - more visible than light blue
 
@@ -1381,6 +1384,7 @@ export function RoutePlanner() {
           isLoadingPOIs={isLoadingPOIs}
           currentZoom={currentZoom}
           minZoomLevel={MIN_ZOOM_LEVEL}
+          defaultSelectedCityZoom={DEFAULT_SELECTED_CITY_ZOOM}
           poiError={poiError}
           hasPOIsInArea={filteredPois.length > 0}
           selectedCategories={selectedCategories}

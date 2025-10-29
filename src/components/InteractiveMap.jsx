@@ -175,7 +175,7 @@ const createStartFinishMarkerIcon = () => {
 };
 
 // Component to handle map updates when bbox changes
-function MapUpdater({ bbox, onZoomChange, onBoundsChange }) {
+function MapUpdater({ bbox, onZoomChange, onBoundsChange, minZoom }) {
   const map = useMap();
 
   useEffect(() => {
@@ -184,28 +184,67 @@ function MapUpdater({ bbox, onZoomChange, onBoundsChange }) {
         [bbox.minLat, bbox.minLng],
         [bbox.maxLat, bbox.maxLng]
       ];
-      map.fitBounds(bounds, { padding: [50, 50] });
       
-      // Manually update zoom and bounds after fitBounds
-      setTimeout(() => {
-        const newZoom = map.getZoom();
-        const newBounds = map.getBounds();
+      // If minZoom is specified (for city selection), check if fitBounds would result in a zoom less than minZoom
+      if (minZoom !== undefined) {
+        // First, fit bounds to see what zoom level we would get
+        map.fitBounds(bounds, { padding: [50, 50] });
         
-        if (onZoomChange) {
-          onZoomChange(newZoom);
-        }
+        // Check the resulting zoom level
+        setTimeout(() => {
+          const currentZoom = map.getZoom();
+          
+          if (currentZoom < minZoom) {
+            // If zoom is less than minimum, set zoom to minimum and center on the city
+            const centerLat = (bbox.minLat + bbox.maxLat) / 2;
+            const centerLng = (bbox.minLng + bbox.maxLng) / 2;
+            map.setView([centerLat, centerLng], minZoom);
+          }
+          
+          // Update zoom and bounds after adjustments
+          setTimeout(() => {
+            const newZoom = map.getZoom();
+            const newBounds = map.getBounds();
+            
+            if (onZoomChange) {
+              onZoomChange(newZoom);
+            }
+            
+            if (onBoundsChange) {
+              onBoundsChange({
+                minLat: newBounds.getSouth(),
+                maxLat: newBounds.getNorth(),
+                minLng: newBounds.getWest(),
+                maxLng: newBounds.getEast()
+              });
+            }
+          }, 150);
+        }, 100);
+      } else {
+        // No minZoom specified (e.g., for route bounds), use normal fitBounds
+        map.fitBounds(bounds, { padding: [50, 50] });
         
-        if (onBoundsChange) {
-          onBoundsChange({
-            minLat: newBounds.getSouth(),
-            maxLat: newBounds.getNorth(),
-            minLng: newBounds.getWest(),
-            maxLng: newBounds.getEast()
-          });
-        }
-      }, 150); // Slightly longer delay to ensure map has finished animating
+        // Manually update zoom and bounds after fitBounds
+        setTimeout(() => {
+          const newZoom = map.getZoom();
+          const newBounds = map.getBounds();
+          
+          if (onZoomChange) {
+            onZoomChange(newZoom);
+          }
+          
+          if (onBoundsChange) {
+            onBoundsChange({
+              minLat: newBounds.getSouth(),
+              maxLat: newBounds.getNorth(),
+              minLng: newBounds.getWest(),
+              maxLng: newBounds.getEast()
+            });
+          }
+        }, 150); // Slightly longer delay to ensure map has finished animating
+      }
     }
-  }, [bbox, map, onZoomChange, onBoundsChange]);
+  }, [bbox, map, onZoomChange, onBoundsChange, minZoom]);
 
   return null;
 }
@@ -459,6 +498,7 @@ export function InteractiveMap({
   isLoadingPOIs,
   currentZoom,
   minZoomLevel = 11,
+  defaultSelectedCityZoom = 13,
   poiError,
   hasPOIsInArea = false,
   selectedCategories = [],
@@ -657,7 +697,7 @@ export function InteractiveMap({
         />
       )}
       
-      {bbox && <MapUpdater bbox={bbox} onZoomChange={onZoomChange} onBoundsChange={onBoundsChange} />}
+      {bbox && <MapUpdater bbox={bbox} onZoomChange={onZoomChange} onBoundsChange={onBoundsChange} minZoom={defaultSelectedCityZoom} />}
       {routeBounds && <MapUpdater bbox={routeBounds} onZoomChange={onZoomChange} onBoundsChange={onBoundsChange} />}
       
       <MapEventHandler 
