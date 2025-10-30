@@ -868,6 +868,22 @@ export function RoutePlanner() {
       await destroySession();
     } catch (error) {
       console.error('Error getting AI highlights:', error);
+      
+      // Show user-friendly error message
+      let errorMessage = error.message;
+      if (errorMessage.includes('not available')) {
+        errorMessage = 
+          'Chrome AI (Prompt API) is not available in your browser.\n\n' +
+          'To use this feature:\n' +
+          '1. Use Chrome Canary or Chrome Dev (version 138+)\n' +
+          '2. Enable flags:\n' +
+          '   • chrome://flags/#prompt-api-for-gemini-nano\n' +
+          '   • chrome://flags/#optimization-guide-on-device-model\n' +
+          '3. Restart your browser';
+      }
+      
+      alert(`Failed to get AI highlights:\n\n${errorMessage}`);
+      
       // Try to clean up session even on error
       try {
         if (hasSession) {
