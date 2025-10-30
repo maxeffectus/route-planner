@@ -12,17 +12,19 @@ export class SummarizerAPI {
    * @returns {Promise<string>} 'available', 'downloadable', or 'unavailable'
    */
   async checkAvailability() {
+    console.log('[SummarizerAPI] Checking availability...');
     try {
       if (!window.Summarizer) {
-        console.warn('Summarizer API is not available in this browser');
+        console.warn('[SummarizerAPI] Summarizer API is not available in this browser');
         return 'unavailable';
       }
 
+      console.log('[SummarizerAPI] Calling window.Summarizer.availability()...');
       const availability = await window.Summarizer.availability();
-      console.log('Summarizer availability:', availability);
+      console.log('[SummarizerAPI] Availability check result:', availability);
       return availability;
     } catch (error) {
-      console.error('Availability check error:', error);
+      console.error('[SummarizerAPI] Availability check error:', error);
       throw new Error('Failed to check Summarizer availability: ' + error.message);
     }
   }
@@ -34,6 +36,7 @@ export class SummarizerAPI {
    * @private
    */
   async createSummarizer(options = {}) {
+    console.log('[SummarizerAPI] Creating summarizer with options:', options);
     try {
         options = {
             sharedContext: `These are requests to summarize the traveler's needs and special requirements \
@@ -48,9 +51,11 @@ export class SummarizerAPI {
             expectedContextLanguages: ['en'],
             ...options,
         }
+        console.log('[SummarizerAPI] Calling window.Summarizer.create()...');
         this.summarizer = await window.Summarizer.create(options);
+        console.log('[SummarizerAPI] Summarizer created successfully');
     } catch (error) {
-      console.error('Summarizer creation error:', error);
+      console.error('[SummarizerAPI] Summarizer creation error:', error);
       throw new Error('Failed to create summarizer: ' + error.message);
     }
   }
@@ -62,22 +67,23 @@ export class SummarizerAPI {
    * @returns {Promise<void>}
    */
   async downloadModel(onProgress, options = {}) {
+    console.log('[SummarizerAPI] Downloading model with options:', options);
     try {
       await this.createSummarizer({
         ...options,
         monitor(m) {
           m.addEventListener('downloadprogress', (e) => {
             const progress = e.loaded * 100;
-            console.log(`Downloaded ${progress.toFixed(1)}%`);
+            console.log(`[SummarizerAPI] Downloaded ${progress.toFixed(1)}%`);
             if (onProgress) {
               onProgress(progress);
             }
           });
         }
       });
-      console.log('Summarizer model downloaded successfully');
+      console.log('[SummarizerAPI] Summarizer model downloaded successfully');
     } catch (error) {
-      console.error('Model download error:', error);
+      console.error('[SummarizerAPI] Model download error:', error);
       throw new Error('Failed to download summarizer model: ' + error.message);
     }
   }
@@ -94,7 +100,9 @@ export class SummarizerAPI {
    * @returns {Promise<AsyncIterable>} Streaming summary
    */
   async summarizeText(text, options = {}) {
+    console.log('[SummarizerAPI] Summarizing text, length:', text.length);
     if (!this.summarizer) {
+      console.error('[SummarizerAPI] No summarizer session, cannot summarize');
       throw new Error('Summarizer session not created. Please create a session first.');
     }
     
@@ -104,11 +112,13 @@ export class SummarizerAPI {
         context: 'This article is intended for identifying travelers needs and interests.',
         ...options
       };
+      console.log('[SummarizerAPI] Calling summarizeStreaming with options:', streamOptions);
       
       const stream = this.summarizer.summarizeStreaming(text, streamOptions);
+      console.log('[SummarizerAPI] Stream received, returning...');
       return stream;
     } catch (error) {
-      console.error('Summarization error:', error);
+      console.error('[SummarizerAPI] Summarization error:', error);
       throw new Error('Summarization failed: ' + error.message);
     }
   }
@@ -126,14 +136,17 @@ export class SummarizerAPI {
    * @returns {Promise<void>}
    */
   async destroySummarizer() {
+    console.log('[SummarizerAPI] Destroying summarizer...');
     if (this.summarizer) {
       try {
         await this.summarizer.destroy();
-        console.log('Summarizer instance destroyed');
+        console.log('[SummarizerAPI] Summarizer instance destroyed successfully');
       } catch (error) {
-        console.warn('Error destroying summarizer:', error);
+        console.warn('[SummarizerAPI] Error destroying summarizer:', error);
       }
       this.summarizer = null;
+    } else {
+      console.log('[SummarizerAPI] No summarizer instance to destroy');
     }
   }
 

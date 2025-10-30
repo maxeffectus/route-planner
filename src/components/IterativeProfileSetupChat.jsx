@@ -6,7 +6,7 @@ import { IterativeProfileService } from '../services/IterativeProfileService';
 /**
  * Chat Loading Animation Component
  */
-function ChatLoadingAnimation() {
+export function ChatLoadingAnimation() {
   const [currentMessage, setCurrentMessage] = useState(0);
   
   const loadingMessages = [

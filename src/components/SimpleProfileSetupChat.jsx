@@ -12,6 +12,7 @@ import { useSummarizer } from '../hooks/useSummarizer.js';
 import { useStreamingText } from '../hooks/useStreamingText.js';
 import { createProfileSummaryPrompt } from '../services/UserProfilePromptConfig.js';
 import { ResponseDisplay } from './ResponseDisplay.jsx';
+import { ChatLoadingAnimation } from './IterativeProfileSetupChat.jsx';
 
 /**
  * Simple profile setup chat component with predefined questions and answers
@@ -43,7 +44,7 @@ const SimpleProfileSetupChat = React.forwardRef(({
     const [showSummary, setShowSummary] = useState(false);
 
     // Summarizer API hooks for profile summary
-    const { hasSession, createSession, summarizeText, destroySummarizer } = useSummarizer();
+    const { hasSession, createSession, summarizeText, destroySummarizer, summarizerAPI } = useSummarizer();
     const { response: summaryResponse, isLoading: isLoadingSummary, processStream, resetResponse } = useStreamingText();
 
     // Helper function to reset all answer states
@@ -183,10 +184,9 @@ const SimpleProfileSetupChat = React.forwardRef(({
         // Check if this is the last question
         const isLastQuestion = currentQuestionIndex >= questionHistory.length - 1;
         if (isLastQuestion) {
-            // Show summary page after a short delay
+            // Show summary page (without generating summary - user will click button)
             setTimeout(() => {
                 setShowSummary(true);
-                generateSummary();
             }, 100);
         } else {
             // Move to next question after a short delay to allow save to complete
@@ -224,39 +224,92 @@ const SimpleProfileSetupChat = React.forwardRef(({
 
     // Generate profile summary using Summarizer API
     const generateSummary = async () => {
-        if (!userProfile) return;
+        if (!userProfile) {
+            console.log('[SimpleProfileSetupChat] No user profile, skipping summary generation');
+            return;
+        }
+        
+        console.log('[SimpleProfileSetupChat] Starting summary generation');
         
         try {
+            // Check availability first using SummarizerAPI directly
+            console.log('[SimpleProfileSetupChat] Checking Summarizer API availability...');
+            const availability = await summarizerAPI.checkAvailability();
+            console.log('[SimpleProfileSetupChat] Availability check result:', availability);
+            
+            if (availability !== 'available' && availability !== 'downloadable') {
+                const errorMessage = 'Summarizer API is not available in your browser.\n\n' +
+                    'To use this feature:\n' +
+                    '• Use Chrome 138 or later\n' +
+                    '• Make sure you allow the model download on first use\n\n' +
+                    'Your profile has been saved successfully.';
+                
+                alert(`Failed to generate profile summary:\n\n${errorMessage}`);
+                
+                // Set a fallback message
+                processStream(
+                    async function*() {
+                        yield 'Your travel profile has been successfully created. We will use your preferences to suggest the best routes and places to visit.';
+                    }(),
+                    {
+                        initialMessage: 'Profile saved successfully'
+                    }
+                );
+                return;
+            }
+            
+            // Check user activation for downloadable model
+            if (availability === 'downloadable') {
+                if (!navigator.userActivation.isActive) {
+                    alert('Please click the button again to confirm model download.');
+                    return;
+                }
+                console.log('[SimpleProfileSetupChat] User activation confirmed, proceeding with model download');
+            }
+            
             // Create summarizer session if needed
             if (!hasSession) {
+                console.log('[SimpleProfileSetupChat] Creating summarizer session...');
                 await createSession({
                     sharedContext: 'This is a request to summarize a traveler profile in a friendly, conversational way.',
                     type: 'key-points',
                     format: 'markdown',
                     length: 'short'
                 });
+                console.log('[SimpleProfileSetupChat] Summarizer session created successfully');
+            } else {
+                console.log('[SimpleProfileSetupChat] Summarizer session already exists');
             }
             
             // Create profile text for summarization
+            console.log('[SimpleProfileSetupChat] Creating profile summary prompt...');
             const profileText = createProfileSummaryPrompt(userProfile.toJSON());
+            console.log('[SimpleProfileSetupChat] Profile summary prompt created, length:', profileText.length);
             
             // Generate summary using streaming
+            console.log('[SimpleProfileSetupChat] Starting summarization...');
             const stream = await summarizeText(profileText);
+            console.log('[SimpleProfileSetupChat] Summary stream received, processing...');
+            
             await processStream(stream, {
                 initialMessage: 'Generating your profile summary...',
                 onComplete: () => {
-                    console.log('Profile summary generated');
+                    console.log('[SimpleProfileSetupChat] Profile summary generated successfully');
                     // Call onComplete to notify parent
                     if (onComplete) {
                         onComplete(userProfile);
                     }
                 },
                 onError: (error) => {
-                    console.error('Failed to generate summary:', error);
+                    console.error('[SimpleProfileSetupChat] Failed to generate summary:', error);
                 }
             });
         } catch (error) {
-            console.error('Error generating summary:', error);
+            console.error('[SimpleProfileSetupChat] Error generating summary:', error);
+            
+            // Show user-friendly error message
+            alert(`Failed to generate profile summary:\n\n${error.message}\n\nYour profile has been saved successfully.`);
+            
             // Set a fallback message if summarization fails
             processStream(
                 async function*() {
@@ -291,7 +344,47 @@ const SimpleProfileSetupChat = React.forwardRef(({
                         <h3 className="question-text">📋 Profile Summary</h3>
                     </div>
                     <div style={{ marginTop: '20px' }}>
-                        <ResponseDisplay response={summaryResponse} />
+                        {summaryResponse ? (
+                            // Show summary if already generated
+                            <ResponseDisplay response={summaryResponse} />
+                        ) : isLoadingSummary ? (
+                            // Show loader while generating
+                            <ChatLoadingAnimation />
+                        ) : (
+                            // Show button to generate summary
+                            <div style={{ textAlign: 'center', padding: '40px' }}>
+                                <button
+                                    onClick={generateSummary}
+                                    disabled={isLoadingSummary}
+                                    style={{
+                                        padding: '15px 30px',
+                                        fontSize: '18px',
+                                        fontWeight: 'bold',
+                                        backgroundColor: '#4CAF50',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        cursor: isLoadingSummary ? 'not-allowed' : 'pointer',
+                                        opacity: isLoadingSummary ? 0.6 : 1,
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        if (!isLoadingSummary) {
+                                            e.target.style.backgroundColor = '#45a049';
+                                            e.target.style.transform = 'scale(1.05)';
+                                        }
+                                    }}
+                                    onMouseOut={(e) => {
+                                        if (!isLoadingSummary) {
+                                            e.target.style.backgroundColor = '#4CAF50';
+                                            e.target.style.transform = 'scale(1)';
+                                        }
+                                    }}
+                                >
+                                    ✨ Generate Profile Summary with AI
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

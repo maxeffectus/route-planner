@@ -58,10 +58,13 @@ export function useSummarizer() {
   };
 
   const summarizeText = useCallback(async (longText, options = {}) => {
+    console.log('[useSummarizer] Summarizing text, length:', longText.length);
     try {
       const stream = await summarizerAPIRef.current.summarizeText(longText, options);
+      console.log('[useSummarizer] Summary stream received');
       return stream;
     } catch (error) {
+      console.error('[useSummarizer] Summarization failed:', error);
       throw new Error('Summarization failed: ' + error.message);
     }
   }, []);
