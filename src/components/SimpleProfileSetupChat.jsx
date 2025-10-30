@@ -12,7 +12,7 @@ import { useSummarizer } from '../hooks/useSummarizer.js';
 import { useStreamingText } from '../hooks/useStreamingText.js';
 import { createProfileSummaryPrompt } from '../services/UserProfilePromptConfig.js';
 import { ResponseDisplay } from './ResponseDisplay.jsx';
-import { ChatLoadingAnimation } from './IterativeProfileSetupChat.jsx';
+import { ChatLoadingAnimation } from './ChatLoadingAnimation.jsx';
 
 /**
  * Simple profile setup chat component with predefined questions and answers
