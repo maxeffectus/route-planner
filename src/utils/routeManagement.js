@@ -3,6 +3,8 @@
  * Handles route-related operations like saving, loading, and POI extraction
  */
 
+import { OpenStreetPOI } from '../models/POI';
+
 /**
  * Extract POI data for storage
  * @param {Object} poi - POI object
@@ -11,6 +13,12 @@
 export function extractPOIData(poi) {
   if (!poi) return null;
   
+  // Check if POI has toJSON method (OpenStreetPOI instance)
+  if (typeof poi.toJSON === 'function') {
+    return poi.toJSON();
+  }
+  
+  // Otherwise, extract manually but include allTags if available
   return {
     id: poi.id,
     name: poi.name,
@@ -22,7 +30,8 @@ export function extractPOIData(poi) {
     imageUrl: poi.imageUrl || poi.resolvedImageUrl || null,
     type: poi.type || null,
     osmType: poi.osmType || null,
-    osmId: poi.osmId || null
+    osmId: poi.osmId || null,
+    allTags: poi.allTags || {}
   };
 }
 
@@ -112,8 +121,8 @@ export function reconstructPOIsFromRoute(route, poiCache, userProfile) {
       // Use cached POI (it has full OpenStreetPOI methods)
       poi.wantToVisit = true;
     } else {
-      // Create POI from saved data
-      poi = {
+      // Create OpenStreetPOI from saved data to get all methods
+      poi = new OpenStreetPOI({
         id: poiData.id,
         name: poiData.name,
         location: poiData.location,
@@ -125,8 +134,9 @@ export function reconstructPOIsFromRoute(route, poiCache, userProfile) {
         type: poiData.type || null,
         osmType: poiData.osmType || null,
         osmId: poiData.osmId || null,
+        allTags: poiData.allTags || {},
         wantToVisit: true
-      };
+      });
     }
     
     // Make sure it's in the profile's wantToVisit
