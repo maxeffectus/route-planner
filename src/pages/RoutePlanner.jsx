@@ -912,8 +912,9 @@ export function RoutePlanner() {
   return (
     <div style={{ 
       display: 'flex', 
-      height: 'calc(100vh - 100px)', // Account for header
-      gap: '0'
+      height: '100vh',
+      gap: '0',
+      overflow: 'hidden'
     }}>
       {/* Left Half - POI List */}
       <div style={{ 
@@ -1243,7 +1244,8 @@ export function RoutePlanner() {
       {/* Right Half - Interactive Map */}
       <div style={{ 
         flex: '0 0 50%',
-        position: 'relative'
+        position: 'relative',
+        height: '100%'
       }}>
         <InteractiveMap 
           bbox={selectedCityBbox}
