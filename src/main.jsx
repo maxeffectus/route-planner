@@ -8,9 +8,16 @@ import { Summarizer } from './pages/Summarizer.jsx'
 import { PageSwitcher } from './components/PageSwitcher.jsx'
 
 function AppContainer() {
-  const [currentPage, setCurrentPage] = useState('gemini');
+  const isDevelopment = import.meta.env.DEV;
+  const [currentPage, setCurrentPage] = useState(isDevelopment ? 'gemini' : 'app');
 
   const renderPage = () => {
+    // In production, always show RoutePlanner
+    if (!isDevelopment) {
+      return <RoutePlanner />;
+    }
+
+    // In development, allow switching between pages
     switch (currentPage) {
       case 'gemini':
         return <GeminiNano />;
@@ -27,7 +34,7 @@ function AppContainer() {
 
   return (
     <>
-      <PageSwitcher currentPage={currentPage} onPageChange={setCurrentPage} />
+      {isDevelopment && <PageSwitcher currentPage={currentPage} onPageChange={setCurrentPage} />}
       {renderPage()}
     </>
   );
