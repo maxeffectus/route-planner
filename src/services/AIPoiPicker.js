@@ -101,9 +101,10 @@ function validateDiversity(selectedPOIs, allPOIs) {
  * Main function to pick POIs using AI
  * @param {Array} accessiblePOIs - Array of accessible POIs
  * @param {Object} userProfile - User profile with timeWindow and travelPace
+ * @param {Function} onDownloadable - Callback when model is downloadable (should return Promise)
  * @returns {Promise<Array>} Array of selected POI IDs
  */
-export async function pickPOIsWithAI(accessiblePOIs, userProfile) {
+export async function pickPOIsWithAI(accessiblePOIs, userProfile, onDownloadable = null) {
   // Validate inputs
   if (!accessiblePOIs || accessiblePOIs.length === 0) {
     throw new Error('No accessible POIs available for selection');
@@ -159,18 +160,8 @@ export async function pickPOIsWithAI(accessiblePOIs, userProfile) {
   // Create PromptAPI instance and session
   const promptAPI = new PromptAPI();
   
-  // Check availability first
-  const availability = await promptAPI.checkAvailability();
-  if (availability !== 'available') {
-    throw new Error(
-      `Prompt API is not available. Status: ${availability}. ` +
-      'Please enable Chrome AI features or use a supported browser.'
-    );
-  }
-
-  // Create session with system prompt
-  await promptAPI.createSession({
-    systemPrompt: `You are a POI selection assistant. Your task is to select POIs and return ONLY a JSON array.
+  // Build system prompt
+  const systemPrompt = `You are a POI selection assistant. Your task is to select POIs and return ONLY a JSON array.
 
 # The Goal:
 Pick a DIVERSE and BALANCED collection of attractions from the submitted array of POIs.
@@ -223,14 +214,42 @@ OR
   12   # Theater QWE
 ]
 
-RESPOND WITH ONLY THE ARRAY OF ID VALUES.`,
+RESPOND WITH ONLY THE ARRAY OF ID VALUES.`;
+  
+  const sessionOptions = {
+    systemPrompt: systemPrompt,
     responseConstraint: {
       type: 'array',
       items: {
         type: 'integer'
       }
     }
-  });
+  };
+  
+  // Check availability first
+  const availability = await promptAPI.checkAvailability();
+  if (availability === 'unavailable') {
+    throw new Error(
+      `Prompt API is not available. Status: ${availability}. ` +
+      'Please enable Chrome AI features or use a supported browser.'
+    );
+  }
+  
+  // Handle downloadable status
+  if (availability === 'downloadable') {
+    if (onDownloadable) {
+      // Call the callback to show modal and wait for user confirmation
+      await onDownloadable(promptAPI, sessionOptions);
+    } else {
+      // Fallback: throw error if no callback provided
+      throw new Error(
+        'Model download required. Please click the button again to confirm.'
+      );
+    }
+  } else {
+    // Create session with system prompt
+    await promptAPI.createSession(sessionOptions);
+  }
 
   try {
     // Get user interests text

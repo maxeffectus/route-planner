@@ -111,6 +111,8 @@ export function RoutePlanner() {
   // AI POI picker state
   const [isPickingPOIs, setIsPickingPOIs] = useState(false);
   const [aiPickerWarning, setAiPickerWarning] = useState(null); // { pois: [], onConfirm: function }
+  const [showModelDownloadModal, setShowModelDownloadModal] = useState(false); // For Prompt API model download confirmation
+  const [modelDownloadCallback, setModelDownloadCallback] = useState(null); // Callback to execute after download
   
   // Route deletion confirmation state
   const [routeToDelete, setRouteToDelete] = useState(null); // SavedRoute object to delete
@@ -786,8 +788,26 @@ export function RoutePlanner() {
     setIsPickingPOIs(true);
 
     try {
-      // Call AI service
-      const selectedIds = await pickPOIsWithAI(accessiblePOIs, userProfile);
+      // Call AI service with callback for downloadable model
+      const selectedIds = await pickPOIsWithAI(accessiblePOIs, userProfile, async (promptAPI, sessionOptions) => {
+        // Show modal and wait for user confirmation
+        return new Promise((resolve, reject) => {
+          setShowModelDownloadModal(true);
+          setModelDownloadCallback(async () => {
+            try {
+              // User confirmed, download model
+              await promptAPI.downloadModel(undefined, sessionOptions);
+              setShowModelDownloadModal(false);
+              setModelDownloadCallback(null);
+              resolve();
+            } catch (error) {
+              setShowModelDownloadModal(false);
+              setModelDownloadCallback(null);
+              reject(error);
+            }
+          });
+        });
+      });
       
       if (!selectedIds || selectedIds.length === 0) {
         alert('AI could not select any POIs. Please try again.');
@@ -1907,6 +1927,98 @@ export function RoutePlanner() {
                 }}
               >
                 Yes
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Model Download Confirmation Modal */}
+      {showModelDownloadModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            setShowModelDownloadModal(false);
+            setModelDownloadCallback(null);
+            setIsPickingPOIs(false);
+          }}
+          title="📥 Download AI Model Required"
+        >
+          <div style={{ padding: '20px 0' }}>
+            <p style={{ 
+              margin: '0 0 20px 0', 
+              fontSize: '15px', 
+              color: '#333',
+              lineHeight: '1.5'
+            }}>
+              To use AI-powered POI selection, the AI model needs to be downloaded to your device. 
+              This will happen automatically after you click "Download".
+            </p>
+            
+            <div style={{ 
+              padding: '12px 16px',
+              backgroundColor: '#e3f2fd',
+              border: '1px solid #90caf9',
+              borderRadius: '6px',
+              marginBottom: '20px'
+            }}>
+              <p style={{ margin: 0, fontSize: '14px', color: '#1565c0' }}>
+                ℹ️ The model will be cached on your device for future use.
+              </p>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowModelDownloadModal(false);
+                  setModelDownloadCallback(null);
+                  setIsPickingPOIs(false);
+                }}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: '#f5f5f5',
+                  color: '#333',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#e0e0e0';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f5f5f5';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (modelDownloadCallback) {
+                    modelDownloadCallback();
+                  }
+                }}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#45a049';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#4CAF50';
+                }}
+              >
+                Download
               </button>
             </div>
           </div>

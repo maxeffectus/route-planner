@@ -52,6 +52,34 @@ export class PromptAPI {
   }
 
   /**
+   * Download the language model
+   * @param {Function} onProgress - Callback function for progress updates (receives progress value 0-100)
+   * @param {Object} options - Creation options for the language model
+   * @returns {Promise<void>}
+   */
+  async downloadModel(onProgress, options = {}) {
+    console.log('[PromptAPI] Downloading model with options:', options);
+    try {
+      await this.createSession({
+        ...options,
+        monitor(m) {
+          m.addEventListener('downloadprogress', (e) => {
+            const progress = e.loaded * 100;
+            console.log(`[PromptAPI] Downloaded ${progress.toFixed(1)}%`);
+            if (onProgress) {
+              onProgress(progress);
+            }
+          });
+        }
+      });
+      console.log('[PromptAPI] Language model downloaded successfully');
+    } catch (error) {
+      console.error('[PromptAPI] Model download error:', error);
+      throw new Error('Failed to download language model: ' + error.message);
+    }
+  }
+
+  /**
    * Send a prompt to the Language Model and get a response
    * @param {string} prompt - The prompt text to send
    * @param {Object} options - Additional options for the prompt
