@@ -212,7 +212,7 @@ Markers have color coding that matches the interest categories colors. Each mark
 
 #### Searching for new POIs
 
-In order not to fetch too many POIs in a single request (Nominatim API might simply refuse to process such request), the minimum zoom level required to request POIs is set to 11. POIs are always requested for the area visible on the map, but they are cached. So, if the user requested some POIs, then moved the map away and afterwards moved the map to the initial position, the POIs are going to be still there.
+In order not to fetch too many POIs in a single request (Overpass API might simply refuse to process such request), the minimum zoom level required to request POIs is set to 11. POIs are always requested for the area visible on the map, but they are cached. So, if the user requested some POIs, then moved the map away and afterwards moved the map to the initial position, the POIs are going to be still there.
 
 
 ## License
