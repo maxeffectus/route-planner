@@ -1017,6 +1017,8 @@ export function RoutePlanner() {
         <RouteInfoDisplay
           routeData={routeData}
           onSaveRoute={handleSaveRoute}
+          poiCount={routeData?.intermediatePOIIds?.length || 0}
+          travelPace={userProfile?.travelPace}
         />
 
         {isLoadingRoute && (

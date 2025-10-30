@@ -55,6 +55,19 @@ export const TransportMode = {
 };
 
 /**
+ * Defines travel pace for the trip.
+ * Affects POI visit duration and route planning.
+ */
+export const TravelPace = {
+    // Relaxed pace - few places, plenty of time for each (2.5 hours per POI)
+    LOW: 'LOW',
+    // Balanced pace - moderate number of places (2 hours per POI)
+    MEDIUM: 'MEDIUM',
+    // Intensive pace - many places, packed schedule (1.5 hours per POI)
+    HIGH: 'HIGH'
+};
+
+/**
  * Defines the main interest categories that will be matched with POIs.
  * Used as keys in the map with weights.
  */
@@ -379,9 +392,9 @@ export class UserProfile {
                 field: 'travelPace',
                 question: 'What pace do you prefer for your trip?',
                 options: [
-                    { value: 'LOW', label: 'Relaxed - few places, plenty of time' },
-                    { value: 'MEDIUM', label: 'Balanced - moderate number of places' },
-                    { value: 'HIGH', label: 'Intensive - many places, packed schedule' }
+                    { value: TravelPace.LOW, label: 'Relaxed - few places, plenty of time' },
+                    { value: TravelPace.MEDIUM, label: 'Balanced - moderate number of places' },
+                    { value: TravelPace.HIGH, label: 'Intensive - many places, packed schedule' }
                 ]
             });
         }
@@ -625,7 +638,7 @@ export function createExampleProfile() {
     travellerProfile.mobility = MobilityType.STROLLER; // Travels with a baby stroller
     travellerProfile.avoidStairs = true; // Avoids stairs
     travellerProfile.preferredTransport = [TransportMode.PUBLIC_TRANSIT, TransportMode.WALK];
-    travellerProfile.travelPace = 'LOW';
+    travellerProfile.travelPace = TravelPace.LOW;
     travellerProfile.budgetLevel = 1; // Low budget
 
     // Setting interests with weights

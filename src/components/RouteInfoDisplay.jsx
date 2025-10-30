@@ -1,13 +1,21 @@
 import React from 'react';
+import { calculateRouteDuration } from '../utils/routeDuration';
 
 /**
  * RouteInfoDisplay Component
  * Displays route information and save button
  */
-export function RouteInfoDisplay({ routeData, onSaveRoute }) {
+export function RouteInfoDisplay({ routeData, onSaveRoute, poiCount, travelPace }) {
   if (!routeData) {
     return null;
   }
+
+  // Calculate duration breakdown
+  const duration = calculateRouteDuration(
+    routeData.duration,
+    poiCount || 0,
+    travelPace
+  );
 
   return (
     <div style={{
@@ -24,8 +32,14 @@ export function RouteInfoDisplay({ routeData, onSaveRoute }) {
         <div style={{ marginBottom: '4px' }}>
           📏 Distance: {(routeData.distance / 1000).toFixed(2)} km
         </div>
-        <div style={{ marginBottom: '8px' }}>
-          ⏱️ Duration: {Math.round(routeData.duration / 1000 / 60)} min
+        <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '13px' }}>
+          ⏱️ Total Duration: {duration.formatted.total}
+        </div>
+        <div style={{ marginBottom: '2px', paddingLeft: '20px', fontSize: '11px', color: '#666' }}>
+          🚶 Travel time: {duration.formatted.travel}
+        </div>
+        <div style={{ marginBottom: '8px', paddingLeft: '20px', fontSize: '11px', color: '#666' }}>
+          🏛️ Visit time: {duration.formatted.visit} ({poiCount || 0} POI{(poiCount || 0) !== 1 ? 's' : ''})
         </div>
         <button
           onClick={onSaveRoute}
