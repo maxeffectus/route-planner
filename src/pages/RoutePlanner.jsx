@@ -16,6 +16,7 @@ import { ResponseDisplay } from '../components/ResponseDisplay';
 import { usePOIGrouping } from '../hooks/usePOIGrouping';
 import { pickPOIsWithAI } from '../services/AIPoiPicker';
 import { exportRouteToGeoJSON, downloadGeoJSON } from '../utils/geojsonExport';
+import { exportRouteToKML, downloadKML } from '../utils/kmlExport';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -633,6 +634,18 @@ export function RoutePlanner() {
       downloadGeoJSON(geojson, route.name);
     } catch (error) {
       alert(`Error exporting GeoJSON: ${error.message}`);
+    }
+  }, []);
+
+  // Handler to export route as KML
+  const handleExportKML = useCallback((route, event) => {
+    event.stopPropagation(); // Prevent route loading when clicking export button
+    
+    try {
+      const kml = exportRouteToKML(route);
+      downloadKML(kml, route.name);
+    } catch (error) {
+      alert(`Error exporting KML: ${error.message}`);
     }
   }, []);
 
@@ -1830,6 +1843,29 @@ export function RoutePlanner() {
                     }}
                   >
                     Export GeoJSON
+                  </button>
+                  <button
+                    onClick={(e) => handleExportKML(route, e)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      backgroundColor: '#FF9800',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#F57C00';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#FF9800';
+                    }}
+                  >
+                    Export KML
                   </button>
                 </div>
               </div>
