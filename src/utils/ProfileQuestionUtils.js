@@ -8,11 +8,10 @@ export class ProfileQuestionUtils {
      * Get the appropriate answer value based on question type
      * @param {Object} question - Question configuration
      * @param {Array} selectedAnswers - Selected answers array
-     * @param {Object} dietaryAnswers - Dietary answers object
      * @param {Object} timeWindowAnswers - Time window answers object
      * @returns {*} Processed answer value
      */
-    static getAnswerValue(question, selectedAnswers, dietaryAnswers, timeWindowAnswers) {
+    static getAnswerValue(question, selectedAnswers, timeWindowAnswers) {
         switch (question.type) {
             case 'single-choice':
                 return selectedAnswers[0];
@@ -30,10 +29,9 @@ export class ProfileQuestionUtils {
      * @param {Object} question - Current question
      * @param {Object} profile - User profile
      * @param {Function} setSelectedAnswers - Setter for selected answers
-     * @param {Function} setDietaryAnswers - Setter for dietary answers
      * @param {Function} setTimeWindowAnswers - Setter for time window answers
      */
-    static loadCurrentValues(question, profile, setSelectedAnswers, setDietaryAnswers, setTimeWindowAnswers) {
+    static loadCurrentValues(question, profile, setSelectedAnswers, setTimeWindowAnswers) {
         if (!question || !profile) return;
         
         const currentValue = getCurrentFieldValue(profile, question.field);
@@ -65,19 +63,10 @@ export class ProfileQuestionUtils {
     /**
      * Reset all answer states to default values
      * @param {Function} setSelectedAnswers - Setter for selected answers
-     * @param {Function} setDietaryAnswers - Setter for dietary answers
      * @param {Function} setTimeWindowAnswers - Setter for time window answers
      */
-    static resetAnswerStates(setSelectedAnswers, setDietaryAnswers, setTimeWindowAnswers) {
+    static resetAnswerStates(setSelectedAnswers, setTimeWindowAnswers) {
         setSelectedAnswers([]);
-        setDietaryAnswers({
-            vegan: false,
-            vegetarian: false,
-            glutenFree: false,
-            halal: false,
-            kosher: false,
-            allergies: ''
-        });
         setTimeWindowAnswers({
             startHour: 9,
             endHour: 18

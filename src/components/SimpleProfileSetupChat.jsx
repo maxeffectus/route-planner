@@ -27,14 +27,6 @@ const SimpleProfileSetupChat = React.forwardRef(({
     const [questionHistory, setQuestionHistory] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [selectedAnswers, setSelectedAnswers] = useState([]);
-    const [dietaryAnswers, setDietaryAnswers] = useState({
-        vegan: false,
-        vegetarian: false,
-        glutenFree: false,
-        halal: false,
-        kosher: false,
-        allergies: ''
-    });
     const [timeWindowAnswers, setTimeWindowAnswers] = useState({
         startHour: 9,
         endHour: 18
@@ -49,7 +41,7 @@ const SimpleProfileSetupChat = React.forwardRef(({
 
     // Helper function to reset all answer states
     const resetAnswerStates = () => {
-        ProfileQuestionUtils.resetAnswerStates(setSelectedAnswers, setDietaryAnswers, setTimeWindowAnswers);
+        ProfileQuestionUtils.resetAnswerStates(setSelectedAnswers, setTimeWindowAnswers);
     };
 
     // Load current values from profile when question changes
@@ -58,7 +50,6 @@ const SimpleProfileSetupChat = React.forwardRef(({
             currentQuestion, 
             userProfile, 
             setSelectedAnswers, 
-            setDietaryAnswers, 
             setTimeWindowAnswers
         );
     };
@@ -108,14 +99,6 @@ const SimpleProfileSetupChat = React.forwardRef(({
         });
     };
 
-    const handleDietaryChange = (field, value) => {
-        if (isProcessing) return;
-        setDietaryAnswers(prev => ({
-            ...prev,
-            [field]: value
-        }));
-    };
-
     const handleTimeWindowChange = (field, value) => {
         if (isProcessing) return;
         
@@ -137,7 +120,6 @@ const SimpleProfileSetupChat = React.forwardRef(({
         const answer = ProfileQuestionUtils.getAnswerValue(
             currentQuestion, 
             selectedAnswers, 
-            dietaryAnswers, 
             timeWindowAnswers
         );
         
@@ -189,8 +171,8 @@ const SimpleProfileSetupChat = React.forwardRef(({
                 setShowSummary(true);
             }, 100);
         } else {
-            // Move to next question after a short delay to allow save to complete
-            navigateToQuestion('next');
+        // Move to next question after a short delay to allow save to complete
+        navigateToQuestion('next');
         }
     };
 
@@ -214,13 +196,6 @@ const SimpleProfileSetupChat = React.forwardRef(({
     useEffect(() => {
         loadCurrentValues();
     }, [currentQuestion]);
-
-    const handleDietaryToggle = (key) => {
-        setDietaryAnswers(prev => ({
-            ...prev,
-            [key]: !prev[key]
-        }));
-    };
 
     // Generate profile summary using Summarizer API
     const generateSummary = async () => {
@@ -461,39 +436,6 @@ const SimpleProfileSetupChat = React.forwardRef(({
                                     <span className="checkbox-label">{option.label}</span>
                                 </label>
                             ))}
-                        </div>
-                    )}
-
-                    {currentQuestion.type === 'dietary-form' && (
-                        <div className="dietary-form">
-                            <div className="dietary-checkboxes">
-                                {currentQuestion.options.map((option, index) => (
-                                    <label key={index} className="checkbox-option">
-                                        <input
-                                            type="checkbox"
-                                            checked={dietaryAnswers[option.key]}
-                                            onChange={() => handleDietaryToggle(option.key)}
-                                            disabled={isProcessing}
-                                        />
-                                        <span className="checkbox-label">{option.label}</span>
-                                    </label>
-                                ))}
-                            </div>
-                            <div className="allergies-input">
-                                <label className="input-label">
-                                    {currentQuestion.allergiesPrompt}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={dietaryAnswers.allergies}
-                                    onChange={(e) => setDietaryAnswers(prev => ({
-                                        ...prev,
-                                        allergies: e.target.value
-                                    }))}
-                                    placeholder="e.g., nuts, shellfish"
-                                    disabled={isProcessing}
-                                />
-                            </div>
                         </div>
                     )}
 
