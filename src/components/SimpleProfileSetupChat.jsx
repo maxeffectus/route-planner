@@ -270,10 +270,7 @@ const SimpleProfileSetupChat = React.forwardRef(({
                 initialMessage: 'Generating your profile summary...',
                 onComplete: () => {
                     console.log('[SimpleProfileSetupChat] Profile summary generated successfully');
-                    // Call onComplete to notify parent
-                    if (onComplete) {
-                        onComplete(userProfile);
-                    }
+                    // Don't call onComplete here - the modal should stay open
                 },
                 onError: (error) => {
                     console.error('[SimpleProfileSetupChat] Failed to generate summary:', error);
