@@ -422,17 +422,23 @@ export function RoutePlanner() {
       
       // Clear current route
       clearRoutePoints();
-      
-      // Set route data for display
+
+      // Reconstruct POIs using utility function
+      const loadedPOIs = reconstructPOIsFromRoute(route, poiCache, userProfile);
+
+      // Extract intermediate POI IDs (exclude start and finish)
+      const intermediatePOIIds = loadedPOIs.length > 2 
+        ? loadedPOIs.slice(1, -1).map(poi => String(poi.id))
+        : [];
+
+      // Set route data for display with intermediate POI IDs
       setRouteData({
         geometry: route.geometry,
         distance: route.distance,
         duration: route.duration,
-        instructions: route.instructions
+        instructions: route.instructions,
+        intermediatePOIIds: intermediatePOIIds
       });
-
-      // Reconstruct POIs using utility function
-      const loadedPOIs = reconstructPOIsFromRoute(route, poiCache, userProfile);
 
       // Add new POIs to cache using utility
       const newPOIs = filterNewPOIs(loadedPOIs, poiCache);
