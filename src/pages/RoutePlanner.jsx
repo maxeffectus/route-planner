@@ -1102,7 +1102,7 @@ export function RoutePlanner() {
                 }
               }}
             >
-              {isPickingPOIs ? '⏳ AI is selecting POIs...' : '🤖 Pick POIs with AI'}
+              {isPickingPOIs ? '⏳ AI is selecting Points Of Interest...' : '🤖 Pick Points Of Interest with AI'}
             </button>
 
             <POIAccordion
