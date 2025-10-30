@@ -215,15 +215,6 @@ const SimpleProfileSetupChat = React.forwardRef(({
         loadCurrentValues();
     }, [currentQuestion]);
 
-    // Cleanup summarizer session on unmount
-    useEffect(() => {
-        return () => {
-            if (hasSession) {
-                destroySummarizer();
-            }
-        };
-    }, [hasSession, destroySummarizer]);
-
     const handleDietaryToggle = (key) => {
         setDietaryAnswers(prev => ({
             ...prev,
