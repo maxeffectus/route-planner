@@ -5,8 +5,10 @@ import { SavedRoute } from '../models/SavedRoute';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { Autocomplete } from '../components/Autocomplete';
 import { POIAccordion } from '../components/POIAccordion';
+import { RoutePointSelector } from '../components/RoutePointSelector';
+import { RouteInfoDisplay } from '../components/RouteInfoDisplay';
 import SimpleProfileSetupChat from '../components/SimpleProfileSetupChat';
-import { getAllCategoryValues } from '../utils/categoryMapping';
+import { getAllCategoryValues, categoryColors } from '../utils/categoryMapping';
 import { GraphHopperRouteProvider } from '../services/GraphHopperRouteProvider';
 import { Modal } from '../components/Modal';
 import { sortWaypointsByNearestNeighbor } from '../utils/routeOptimization';
@@ -14,9 +16,14 @@ import { usePromptAPI } from '../hooks/usePromptAPI';
 import { useStreamingText } from '../hooks/useStreamingText';
 import { ResponseDisplay } from '../components/ResponseDisplay';
 import { usePOIGrouping } from '../hooks/usePOIGrouping';
+import { useRouteState } from '../hooks/useRouteState';
+import { usePOICache } from '../hooks/usePOICache';
 import { pickPOIsWithAI } from '../services/AIPoiPicker';
 import { exportRouteToGeoJSON, downloadGeoJSON } from '../utils/geojsonExport';
 import { exportRouteToKML, downloadKML } from '../utils/kmlExport';
+import { loadUserProfile, saveUserProfile, clearUserProfile, hasVisitedBefore as checkVisited, markAsVisited, clearVisitFlag } from '../utils/profileStorage';
+import { buildPOIListForRoute, calculateRouteBounds, reconstructPOIsFromRoute, filterNewPOIs } from '../utils/routeManagement';
+import { filterPOIsByCategories, sortPOIsByWantToVisit } from '../utils/poiFilters';
 
 // Minimum zoom level required for POI search
 const MIN_ZOOM_LEVEL = 11;
@@ -31,27 +38,52 @@ export const WANT_TO_VISIT_POI_HIGHLIGHT_COLOR = '#BBDEFB'; // Medium blue - mor
 const MAX_INTERMEDIATE_ROUTE_POINTS = 15;
 
 export function RoutePlanner() {
-  const [pois, setPois] = useState([]);
+  // Use custom hooks for state management
+  const {
+    pois,
+    poiCache,
+    selectedPoiId,
+    mapBounds,
+    setPois,
+    setPoiCache,
+    setSelectedPoiId,
+    setMapBounds,
+    handleImageLoaded,
+    handleBoundsChange
+  } = usePOICache();
+
+  const {
+    routeStartPOI,
+    routeFinishPOI,
+    sameStartFinish,
+    routeData,
+    isLoadingRoute,
+    routeError,
+    routeBounds,
+    isLoadingSavedRouteRef,
+    setRouteStartPOI,
+    setRouteFinishPOI,
+    setSameStartFinish,
+    setRouteData,
+    setIsLoadingRoute,
+    setRouteError,
+    setRouteBounds,
+    handleStartSelect,
+    handleFinishSelect,
+    handleSameStartFinishChange,
+    clearRoutePoints
+  } = useRouteState();
+
+  // Local state that doesn't fit into hooks
   const [isLoadingPOIs, setIsLoadingPOIs] = useState(false);
   const [poiError, setPoiError] = useState(null);
-  const [poiCache, setPoiCache] = useState([]); // Cache all fetched POIs
-  const [mapBounds, setMapBounds] = useState(null);
   const [currentZoom, setCurrentZoom] = useState(2);
   const [selectedCityBbox, setSelectedCityBbox] = useState(null);
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [selectedPoiId, setSelectedPoiId] = useState(null);
-  const [routeStartPOI, setRouteStartPOI] = useState(null);
-  const [routeFinishPOI, setRouteFinishPOI] = useState(null);
-  const [sameStartFinish, setSameStartFinish] = useState(false);
-  const [routeData, setRouteData] = useState(null);
-  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
-  const [routeError, setRouteError] = useState(null);
-  const [routeBounds, setRouteBounds] = useState(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const mapsAPI = useMemo(() => new OpenStreetAPI(), []); // Create once and reuse
   const citySelectionRef = React.useRef(null); // Track city selection for auto-search
-  const isLoadingSavedRouteRef = useRef(false); // Track if we're loading a saved route to prevent clearing routeData
   
   // Prompt API is no longer used for profile setup
   
@@ -83,16 +115,9 @@ export function RoutePlanner() {
 
   // Load user profile from localStorage on component mount
   useEffect(() => {
-    const savedProfile = localStorage.getItem('userProfile');
-    if (savedProfile) {
-      try {
-        const profileData = JSON.parse(savedProfile);
-        const profile = UserProfile.fromJSON(profileData);
-        setUserProfile(profile);
-      } catch (error) {
-        console.error('Failed to load profile from localStorage:', error);
-        localStorage.removeItem('userProfile'); // Remove corrupted data
-      }
+    const profile = loadUserProfile();
+    if (profile) {
+      setUserProfile(profile);
     }
   }, []);
 
@@ -122,102 +147,24 @@ export function RoutePlanner() {
     }
   }, [userProfile]);
 
-  // Handler to update POI cache with resolved image URL
-  const handleImageLoaded = useCallback((poiId, imageUrl) => {
-    setPoiCache(prevCache => 
-      prevCache.map(cachedPoi => {
-        if (cachedPoi.id === poiId) {
-          // Update POI instance with resolved image
-          cachedPoi.setResolvedImageUrl(imageUrl);
-        }
-        return cachedPoi;
-      })
-    );
-    
-    // Also update the current pois display
-    setPois(prevPois => 
-      prevPois.map(poi => {
-        if (poi.id === poiId) {
-          poi.setResolvedImageUrl(imageUrl);
-        }
-        return poi;
-      })
-    );
-  }, []);
+  // handleImageLoaded is now provided by usePOICache hook
+  // categoryColors is now imported from utils/categoryMapping
+  // isPoiInBbox is now imported from utils/poiFilters
 
-  // Colorblind-friendly color mapping for POI categories
-  const categoryColors = {
-    [InterestCategory.HISTORY_CULTURE]: '#795548',    // Brown - исторические места
-    [InterestCategory.ART_MUSEUMS]: '#1976D2',         // Blue - музеи и искусство
-    [InterestCategory.ARCHITECTURE]: '#7B1FA2',        // Purple - архитектура
-    [InterestCategory.NATURE_PARKS]: '#388E3C',        // Green - природа и парки
-    [InterestCategory.ENTERTAINMENT]: '#FF6F00',       // Orange - развлечения
-    [InterestCategory.GASTRONOMY]: '#D32F2F',          // Red - гастрономия
-    [InterestCategory.NIGHTLIFE]: '#1A237E'            // Very Dark Blue - ночная жизнь
-  };
-
-  // Helper: Check if a POI is within a bounding box
-  const isPoiInBbox = (poi, bbox) => {
-    // Use POI instance method if available, otherwise fallback
-    if (poi.isInBbox) {
-      return poi.isInBbox(bbox);
-    }
-    // Fallback for plain objects
-    if (!poi.location?.lat || !poi.location?.lng) return false;
-    const { lat, lng } = poi.location;
-    return (
-      lat >= bbox.minLat &&
-      lat <= bbox.maxLat &&
-      lng >= bbox.minLng &&
-      lng <= bbox.maxLng
-    );
-  };
-
-  // Filter POIs based on selected categories
-  // A POI is shown if it has at least one category in common with selectedCategories
+  // Filter POIs based on selected categories using utility
   const filteredPois = useMemo(() => {
-    return pois.filter(poi => {
-    const poiCategories = poi.interest_categories || [];
-    return poiCategories.some(cat => selectedCategories.includes(cat));
-  });
+    return filterPOIsByCategories(pois, selectedCategories);
   }, [pois, selectedCategories]);
 
   // Sort POIs: selected ones first, then alphabetically within groups
   const sortedFilteredPois = useMemo(() => {
-    return [...filteredPois].sort((a, b) => {
-      // Selected POIs first
-      if (a.wantToVisit && !b.wantToVisit) return -1;
-      if (!a.wantToVisit && b.wantToVisit) return 1;
-      
-      // Alphabetically within groups
-      return a.name.localeCompare(b.name);
-    });
+    return sortPOIsByWantToVisit(filteredPois);
   }, [filteredPois]);
 
   // Use POI grouping to check accessibility
   const { getGroupForPOI, groups } = usePOIGrouping(sortedFilteredPois, userProfile);
 
-  // UNIFIED POI DISPLAY: Always show POIs that are in the current map bounds
-  // This is the single source of truth for what POIs to display
-  useEffect(() => {
-    if (!mapBounds) {
-      console.log('No map bounds - clearing POIs');
-      setPois([]);
-      return;
-    }
-    
-    if (poiCache.length === 0) {
-      console.log('Cache is empty - clearing POIs');
-      setPois([]);
-      return;
-    }
-    
-    // Show all cached POIs that are in the current visible area
-    const poisInView = poiCache.filter(poi => isPoiInBbox(poi, mapBounds));
-    setPois(poisInView);
-    console.log(`Map bounds updated - displaying ${poisInView.length} POIs in current view`);
-    console.log('Current bounds:', mapBounds);
-  }, [mapBounds, poiCache]); // Re-run whenever bounds or cache changes
+  // POI display logic is now handled by usePOICache hook
 
   // Auto-scroll selected POI into view
   React.useEffect(() => {
@@ -229,10 +176,7 @@ export function RoutePlanner() {
     }
   }, [selectedPoiId]);
 
-  const handleBoundsChange = useCallback((bounds) => {
-    console.log('Map bounds changed:', bounds);
-    setMapBounds(bounds);
-  }, []);
+  // handleBoundsChange is now provided by usePOICache hook
 
   const handleZoomChange = useCallback((zoom) => {
     setCurrentZoom(zoom);
@@ -258,15 +202,7 @@ export function RoutePlanner() {
     setSelectedCity(city);
   }, []);
 
-  const handleStartSelect = useCallback((poi) => {
-    console.log('Start point selected:', poi);
-    setRouteStartPOI(poi);
-  }, []);
-
-  const handleFinishSelect = useCallback((poi) => {
-    console.log('Finish point selected:', poi);
-    setRouteFinishPOI(poi);
-  }, []);
+  // handleStartSelect and handleFinishSelect are now provided by useRouteState hook
 
   // Handler for selecting route point from context menu on map
   const handleRoutePointSelect = useCallback((type, poi) => {
@@ -279,12 +215,7 @@ export function RoutePlanner() {
     }
   }, []);
 
-  const clearRoutePoints = () => {
-    setRouteStartPOI(null);
-    setRouteFinishPOI(null);
-    setSameStartFinish(false);
-    setRouteData(null);
-  };
+  // clearRoutePoints is now provided by useRouteState hook
 
   // API key save handler
   const handleSaveApiKey = useCallback(() => {
@@ -416,19 +347,7 @@ export function RoutePlanner() {
 
   // Note: Removed automatic route building on point changes
   // Routes will only be calculated when user clicks "Calculate Route" button
-
-  // Clear route when points change (but not when loading a saved route)
-  useEffect(() => {
-    // Don't clear route data if we're loading a saved route
-    if (isLoadingSavedRouteRef.current) {
-      isLoadingSavedRouteRef.current = false;
-      return;
-    }
-    
-    setRouteData(null);
-    setRouteError(null);
-    setRouteBounds(null); // Clear route bounds when route points change
-  }, [routeStartPOI, routeFinishPOI]);
+  // Route clearing on point changes is now handled by useRouteState hook
 
   // Handler to open profile/routes choice modal
   const handleOpenProfileOrRoutes = useCallback(() => {
@@ -449,50 +368,13 @@ export function RoutePlanner() {
     }
 
     try {
-      // Extract full POI objects from route in correct order: start -> intermediates -> finish
-      const pois = [];
-      
-      // Helper function to extract POI data for storage
-      const extractPOIData = (poi) => {
-        if (!poi) return null;
-        return {
-          id: poi.id,
-          name: poi.name,
-          location: poi.location,
-          interest_categories: poi.interest_categories || [],
-          description: poi.description || poi.name,
-          website: poi.website || null,
-          wikipedia: poi.wikipedia || null,
-          imageUrl: poi.imageUrl || poi.resolvedImageUrl || null,
-          type: poi.type || null,
-          osmType: poi.osmType || null,
-          osmId: poi.osmId || null
-        };
-      };
-      
-      // Start POI
-      if (routeStartPOI) {
-        const poiData = extractPOIData(routeStartPOI);
-        if (poiData) pois.push(poiData);
-      }
-      
-      // Add intermediate POIs (already in correct order from route building)
-      if (routeData.intermediatePOIIds && routeData.intermediatePOIIds.length > 0) {
-        routeData.intermediatePOIIds.forEach(poiId => {
-          // Find full POI object from cache
-          const poi = poiCache.find(p => String(p.id) === String(poiId));
-          if (poi) {
-            const poiData = extractPOIData(poi);
-            if (poiData) pois.push(poiData);
-          }
-        });
-      }
-      
-      // Finish POI
-      if (routeFinishPOI) {
-        const poiData = extractPOIData(routeFinishPOI);
-        if (poiData) pois.push(poiData);
-      }
+      // Extract full POI objects using utility function
+      const pois = buildPOIListForRoute(
+        routeStartPOI,
+        routeData.intermediatePOIIds || [],
+        routeFinishPOI,
+        poiCache
+      );
 
       // Create SavedRoute instance with full POI data
       const savedRoute = new SavedRoute({
@@ -508,12 +390,11 @@ export function RoutePlanner() {
       // Add to user profile
       userProfile.addSavedRoute(savedRoute);
 
-      // Save to localStorage
-      const savedJSON = userProfile.toJSON();
-      localStorage.setItem('userProfile', JSON.stringify(savedJSON));
+      // Save to localStorage using utility
+      saveUserProfile(userProfile);
       
       // Reload profile from localStorage to trigger re-render
-      const updatedProfile = UserProfile.fromJSON(savedJSON);
+      const updatedProfile = loadUserProfile();
       setUserProfile(updatedProfile);
 
       alert(`Route "${routeName}" saved successfully!`);
@@ -541,53 +422,13 @@ export function RoutePlanner() {
         instructions: route.instructions
       });
 
-      // Load POI objects from saved route data
-      const loadedPOIs = [];
-      
-      if (!route.pois || route.pois.length === 0) {
-        throw new Error('Route does not contain POI data. Cannot load route.');
-      }
-      
-      route.pois.forEach(poiData => {
-        // Check if POI already exists in cache
-        let poi = poiCache.find(p => String(p.id) === String(poiData.id));
-        
-        if (poi) {
-          // Use cached POI (it has full OpenStreetPOI methods)
-          poi.wantToVisit = true;
-        } else {
-          // Create POI from saved data
-          poi = {
-            id: poiData.id,
-            name: poiData.name,
-            location: poiData.location,
-            description: poiData.description || poiData.name,
-            interest_categories: poiData.interest_categories || [],
-            website: poiData.website || null,
-            wikipedia: poiData.wikipedia || null,
-            imageUrl: poiData.imageUrl || null,
-            type: poiData.type || null,
-            osmType: poiData.osmType || null,
-            osmId: poiData.osmId || null,
-            wantToVisit: true
-          };
-        }
-        
-        // Make sure it's in the profile's wantToVisit
-        if (!userProfile.isWantToVisit(poiData.id)) {
-          userProfile.addWantToVisit(poi);
-        }
-        
-        loadedPOIs.push(poi);
-      });
+      // Reconstruct POIs using utility function
+      const loadedPOIs = reconstructPOIsFromRoute(route, poiCache, userProfile);
 
-      // Add loaded POIs to cache (if they're not already there)
-      if (loadedPOIs.length > 0) {
-        const existingIds = new Set(poiCache.map(p => String(p.id)));
-        const newPOIs = loadedPOIs.filter(p => !existingIds.has(String(p.id)));
-        if (newPOIs.length > 0) {
-          setPoiCache(prev => [...prev, ...newPOIs]);
-        }
+      // Add new POIs to cache using utility
+      const newPOIs = filterNewPOIs(loadedPOIs, poiCache);
+      if (newPOIs.length > 0) {
+        setPoiCache(prev => [...prev, ...newPOIs]);
       }
 
       // Set start and finish POIs
@@ -596,23 +437,10 @@ export function RoutePlanner() {
         setRouteFinishPOI(loadedPOIs[loadedPOIs.length - 1]);
       }
 
-      // Calculate map bounds to fit route
-      if (route.geometry && route.geometry.coordinates && route.geometry.coordinates.length > 0) {
-        const coords = route.geometry.coordinates;
-        let minLat = coords[0][1]; // GeoJSON has [lng, lat]
-        let maxLat = coords[0][1];
-        let minLng = coords[0][0];
-        let maxLng = coords[0][0];
-        
-        coords.forEach(([lng, lat]) => {
-          minLat = Math.min(minLat, lat);
-          maxLat = Math.max(maxLat, lat);
-          minLng = Math.min(minLng, lng);
-          maxLng = Math.max(maxLng, lng);
-        });
-
-        // Set bounds to trigger map fitBounds
-        setRouteBounds({ minLat, maxLat, minLng, maxLng });
+      // Calculate and set route bounds using utility
+      const bounds = calculateRouteBounds(route.geometry);
+      if (bounds) {
+        setRouteBounds(bounds);
       }
 
       // Close modal
@@ -675,10 +503,9 @@ export function RoutePlanner() {
       userProfile.removeWantToVisit(poi.id);
     }
     
-    // Save to localStorage and reload profile to trigger re-render
-    const savedJSON = userProfile.toJSON();
-    localStorage.setItem('userProfile', JSON.stringify(savedJSON));
-    const updatedProfile = UserProfile.fromJSON(savedJSON);
+    // Save to localStorage and reload profile to trigger re-render using utility
+    saveUserProfile(userProfile);
+    const updatedProfile = loadUserProfile();
     setUserProfile(updatedProfile);
     
     // Force re-render of POI lists
@@ -1107,114 +934,16 @@ export function RoutePlanner() {
           </div>
         )}
 
-        <div style={{ marginBottom: '20px' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '8px', fontSize: '16px' }}>
-            {!routeStartPOI ? '📍 Select Start Point' : '🏁 Select Finish Point'}
-          </h3>
-          
-          {!sameStartFinish && (
-            <Autocomplete
-              searchFunction={(query, limit) => mapsAPI.autocompletePOI(query, limit)}
-              onSelect={routeStartPOI ? handleFinishSelect : handleStartSelect}
-              renderSuggestion={(poi) => (
-                <>
-                  <div style={{ fontWeight: '500', color: '#333' }}>
-                    {poi.name}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-                    {poi.description || poi.name}
-                  </div>
-                </>
-              )}
-              placeholder={routeStartPOI ? "Search finish point..." : "Search start point..."}
-              minChars={3}
-              maxResults={5}
-              debounceMs={300}
-            />
-          )}
-          
-          {routeStartPOI && !routeFinishPOI && (
-            <div style={{ marginTop: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={sameStartFinish}
-                  onChange={(e) => {
-                    setSameStartFinish(e.target.checked);
-                    if (e.target.checked) {
-                      setRouteFinishPOI(routeStartPOI);
-                    } else {
-                      setRouteFinishPOI(null);
-                    }
-                  }}
-                  style={{ marginRight: '8px' }}
-                />
-                <span>Route should start and end at the same place</span>
-              </label>
-            </div>
-          )}
-        </div>
-
-        {(routeStartPOI || routeFinishPOI) && (
-          <div style={{
-            marginBottom: '20px',
-            padding: '12px',
-            backgroundColor: '#f0f7ff',
-            borderRadius: '8px',
-            border: '1px solid #d0e7ff'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold' }}>Route Points</h4>
-              <button
-                onClick={clearRoutePoints}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  backgroundColor: '#fff',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px'
-                }}
-              >
-                Clear
-              </button>
-            </div>
-            
-            {routeStartPOI && (
-              <div style={{ marginBottom: '8px' }}>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
-                  📍 Start:
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: '500' }}>
-                  {routeStartPOI.name}
-                </div>
-                <div style={{ fontSize: '11px', color: '#888' }}>
-                  {routeStartPOI.description || routeStartPOI.name}
-                </div>
-              </div>
-            )}
-            
-            {routeFinishPOI && !sameStartFinish && (
-              <div>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
-                  🏁 Finish:
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: '500' }}>
-                  {routeFinishPOI.name}
-                </div>
-                <div style={{ fontSize: '11px', color: '#888' }}>
-                  {routeFinishPOI.description || routeFinishPOI.name}
-                </div>
-              </div>
-            )}
-            
-            {sameStartFinish && (
-              <div style={{ fontSize: '11px', color: '#666', fontStyle: 'italic', marginTop: '4px' }}>
-                ↻ Same start and finish point
-              </div>
-            )}
-          </div>
-        )}
+        <RoutePointSelector
+          routeStartPOI={routeStartPOI}
+          routeFinishPOI={routeFinishPOI}
+          sameStartFinish={sameStartFinish}
+          onStartSelect={handleStartSelect}
+          onFinishSelect={handleFinishSelect}
+          onSameStartFinishChange={handleSameStartFinishChange}
+          onClear={clearRoutePoints}
+          mapsAPI={mapsAPI}
+        />
 
         {/* Calculate Route Button */}
         {routeStartPOI && routeFinishPOI && (
@@ -1256,50 +985,10 @@ export function RoutePlanner() {
         )}
 
         {/* Route Information Display */}
-        {routeData && (
-          <div style={{
-            marginBottom: '20px',
-            padding: '12px',
-            backgroundColor: '#e8f5e9',
-            borderRadius: '8px',
-            border: '1px solid #c8e6c9'
-          }}>
-            <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 'bold' }}>
-              Route Information
-            </h4>
-            <div style={{ fontSize: '12px', color: '#333' }}>
-              <div style={{ marginBottom: '4px' }}>
-                📏 Distance: {(routeData.distance / 1000).toFixed(2)} km
-              </div>
-              <div style={{ marginBottom: '8px' }}>
-                ⏱️ Duration: {Math.round(routeData.duration / 1000 / 60)} min
-              </div>
-              <button
-                onClick={handleSaveRoute}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#45a049';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#4CAF50';
-                }}
-              >
-                💾 Save Route
-              </button>
-            </div>
-          </div>
-        )}
+        <RouteInfoDisplay
+          routeData={routeData}
+          onSaveRoute={handleSaveRoute}
+        />
 
         {isLoadingRoute && (
           <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: '#666', marginBottom: '20px' }}>
@@ -1451,7 +1140,7 @@ export function RoutePlanner() {
                   
                   // Save current profile and close modal
                   if (userProfile) {
-                    localStorage.setItem('userProfile', JSON.stringify(userProfile));
+                    saveUserProfile(userProfile);
                   }
                   setShowProfileModal(false);
                 }}
@@ -1489,7 +1178,7 @@ export function RoutePlanner() {
                   setUserProfile(profile);
                   setShowProfileModal(false);
                   // Save to localStorage
-                  localStorage.setItem('userProfile', JSON.stringify(profile.toJSON()));
+                  saveUserProfile(profile);
                 }}
               />
             </div>

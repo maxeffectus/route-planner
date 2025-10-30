@@ -19,7 +19,20 @@ describe('UserProfile Saved Routes', () => {
       },
       distance: 5000,
       duration: 3600,
-      poiIds: ['poi1', 'poi2']
+      pois: [
+        { 
+          id: 'poi1', 
+          name: 'Start POI', 
+          location: { lat: 52.5, lng: 13.4 },
+          interest_categories: ['history_culture']
+        },
+        { 
+          id: 'poi2', 
+          name: 'Finish POI', 
+          location: { lat: 52.51, lng: 13.41 },
+          interest_categories: ['art_museums']
+        }
+      ]
     });
   });
 
@@ -45,7 +58,7 @@ describe('UserProfile Saved Routes', () => {
         geometry: null, // Missing required fields
         distance: 0,
         duration: 0,
-        poiIds: []
+        pois: []
       });
       
       expect(() => {
@@ -78,7 +91,20 @@ describe('UserProfile Saved Routes', () => {
         geometry: { type: 'LineString', coordinates: [[0, 0], [0.001, 0.001]] },
         distance: 1000,
         duration: 600,
-        poiIds: ['poi3', 'poi4']
+        pois: [
+          { 
+            id: 'poi3', 
+            name: 'Start POI 2', 
+            location: { lat: 0, lng: 0 },
+            interest_categories: []
+          },
+          { 
+            id: 'poi4', 
+            name: 'Finish POI 2', 
+            location: { lat: 0.001, lng: 0.001 },
+            interest_categories: []
+          }
+        ]
       });
       profile.addSavedRoute(route2);
       

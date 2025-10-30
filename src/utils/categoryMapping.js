@@ -65,3 +65,16 @@ export function getAllCategoryValues() {
   return CATEGORY_CONFIG.map(cat => cat.value);
 }
 
+/**
+ * Colorblind-friendly color mapping for POI categories
+ */
+export const categoryColors = {
+  [InterestCategory.HISTORY_CULTURE]: '#795548',    // Brown - исторические места
+  [InterestCategory.ART_MUSEUMS]: '#1976D2',         // Blue - музеи и искусство
+  [InterestCategory.ARCHITECTURE]: '#7B1FA2',        // Purple - архитектура
+  [InterestCategory.NATURE_PARKS]: '#388E3C',        // Green - природа и парки
+  [InterestCategory.ENTERTAINMENT]: '#FF6F00',       // Orange - развлечения
+  [InterestCategory.GASTRONOMY]: '#D32F2F',          // Red - гастрономия
+  [InterestCategory.NIGHTLIFE]: '#1A237E'            // Very Dark Blue - ночная жизнь
+};
+
