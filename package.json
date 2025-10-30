@@ -2,6 +2,7 @@
   "name": "gemini-nano-react",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "dependencies": {
     "leaflet": "^1.9.4",
     "marked": "^9.1.6",
