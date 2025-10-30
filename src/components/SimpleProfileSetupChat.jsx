@@ -8,6 +8,10 @@ import {
     getCompletionPercentage 
 } from '../services/SimpleProfileConfig.js';
 import { ProfileQuestionUtils } from '../utils/ProfileQuestionUtils.js';
+import { useSummarizer } from '../hooks/useSummarizer.js';
+import { useStreamingText } from '../hooks/useStreamingText.js';
+import { createProfileSummaryPrompt } from '../services/UserProfilePromptConfig.js';
+import { ResponseDisplay } from './ResponseDisplay.jsx';
 
 /**
  * Simple profile setup chat component with predefined questions and answers
@@ -36,6 +40,11 @@ const SimpleProfileSetupChat = React.forwardRef(({
     });
     const [isProcessing, setIsProcessing] = useState(false);
     const [completionPercentage, setCompletionPercentage] = useState(0);
+    const [showSummary, setShowSummary] = useState(false);
+
+    // Summarizer API hooks for profile summary
+    const { hasSession, createSession, summarizeText, destroySummarizer } = useSummarizer();
+    const { response: summaryResponse, isLoading: isLoadingSummary, processStream, resetResponse } = useStreamingText();
 
     // Helper function to reset all answer states
     const resetAnswerStates = () => {
@@ -160,7 +169,7 @@ const SimpleProfileSetupChat = React.forwardRef(({
     };
 
     const handleNext = () => {
-        if (isProcessing || currentQuestionIndex >= questionHistory.length - 1) return;
+        if (isProcessing) return;
         
         // Check for validation errors before saving
         if (isTimeWindowInvalid()) {
@@ -171,8 +180,18 @@ const SimpleProfileSetupChat = React.forwardRef(({
         // Save current answer before moving to next question
         saveCurrentAnswer();
         
-        // Move to next question after a short delay to allow save to complete
-        navigateToQuestion('next');
+        // Check if this is the last question
+        const isLastQuestion = currentQuestionIndex >= questionHistory.length - 1;
+        if (isLastQuestion) {
+            // Show summary page after a short delay
+            setTimeout(() => {
+                setShowSummary(true);
+                generateSummary();
+            }, 100);
+        } else {
+            // Move to next question after a short delay to allow save to complete
+            navigateToQuestion('next');
+        }
     };
 
     const handlePrevious = () => {
@@ -196,11 +215,67 @@ const SimpleProfileSetupChat = React.forwardRef(({
         loadCurrentValues();
     }, [currentQuestion]);
 
+    // Cleanup summarizer session on unmount
+    useEffect(() => {
+        return () => {
+            if (hasSession) {
+                destroySummarizer();
+            }
+        };
+    }, [hasSession, destroySummarizer]);
+
     const handleDietaryToggle = (key) => {
         setDietaryAnswers(prev => ({
             ...prev,
             [key]: !prev[key]
         }));
+    };
+
+    // Generate profile summary using Summarizer API
+    const generateSummary = async () => {
+        if (!userProfile) return;
+        
+        try {
+            // Create summarizer session if needed
+            if (!hasSession) {
+                await createSession({
+                    sharedContext: 'This is a request to summarize a traveler profile in a friendly, conversational way.',
+                    type: 'key-points',
+                    format: 'markdown',
+                    length: 'short'
+                });
+            }
+            
+            // Create profile text for summarization
+            const profileText = createProfileSummaryPrompt(userProfile.toJSON());
+            
+            // Generate summary using streaming
+            const stream = await summarizeText(profileText);
+            await processStream(stream, {
+                initialMessage: 'Generating your profile summary...',
+                onComplete: () => {
+                    console.log('Profile summary generated');
+                    // Call onComplete to notify parent
+                    if (onComplete) {
+                        onComplete(userProfile);
+                    }
+                },
+                onError: (error) => {
+                    console.error('Failed to generate summary:', error);
+                }
+            });
+        } catch (error) {
+            console.error('Error generating summary:', error);
+            // Set a fallback message if summarization fails
+            processStream(
+                async function*() {
+                    yield 'Your travel profile has been successfully created. We will use your preferences to suggest the best routes and places to visit.';
+                }(),
+                {
+                    initialMessage: 'Generating your profile summary...'
+                }
+            );
+        }
     };
 
     if (!userProfile) {
@@ -210,6 +285,22 @@ const SimpleProfileSetupChat = React.forwardRef(({
                     <div className="loading-message">
                         <h3>⏳ Initializing Profile Setup...</h3>
                         <p>Please wait while we prepare your profile setup.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show profile summary page if all questions are completed
+    if (showSummary) {
+        return (
+            <div className="simple-profile-chat">
+                <div className="chat-container">
+                    <div className="question-section">
+                        <h3 className="question-text">📋 Profile Summary</h3>
+                    </div>
+                    <div style={{ marginTop: '20px' }}>
+                        <ResponseDisplay response={summaryResponse} />
                     </div>
                 </div>
             </div>
@@ -382,9 +473,9 @@ const SimpleProfileSetupChat = React.forwardRef(({
                     <button
                         className="nav-button next-button"
                         onClick={handleNext}
-                        disabled={isProcessing || currentQuestionIndex >= questionHistory.length - 1 || isTimeWindowInvalid()}
+                        disabled={isProcessing || isTimeWindowInvalid()}
                     >
-                        Next →
+                        {currentQuestionIndex >= questionHistory.length - 1 ? 'Complete' : 'Next →'}
                     </button>
                 </div>
 

@@ -186,11 +186,11 @@ ${JSON.stringify(profileData, null, 2)}
 The summary should be:
 - Friendly and conversational
 - Highlight the key preferences and needs
-- Mention any special requirements (mobility, dietary, etc.)
-- Be concise but informative
+- Mention any special requirements (mobility, etc.)
+- Be concise but informative (2-3 sentences)
 - Written in third person (as if describing the traveler)
 
-Example format: "You are a [mobility] traveler who prefers [transport] and enjoys [interests]. You have [dietary] dietary requirements and typically travel during [time window]. Your budget level is [budget] and you prefer a [pace] travel pace."
+Example format: "You are a [mobility] traveler who prefers [transport] and enjoys [interests]. You typically travel during [time window] and prefer a [pace] travel pace."
 
 Please respond with ONLY the summary text, no additional formatting or commentary. Any enums, constants, or other non-textual information should be replaced with their human-readable equivalents.`;
 }
