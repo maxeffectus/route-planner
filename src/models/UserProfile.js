@@ -81,20 +81,6 @@ export const InterestCategory = {
     GASTRONOMY: 'gastronomy', // Restaurants, cafes, street food
 };
 
-/**
- * Interface for dietary preferences (can affect restaurant choices).
- */
-export class DietaryPreference {
-    constructor() {
-        this.vegan = false;
-        this.vegetarian = false;
-        this.glutenFree = false;
-        this.halal = false;
-        this.kosher = false;
-        this.allergies = []; // List of allergens
-    }
-}
-
 // --- 2. PROFILE CLASS ---
 
 export class UserProfile {
@@ -128,23 +114,12 @@ export class UserProfile {
     interests;
 
     /**
-     * Budget constraints for visiting POIs (e.g., entrance ticket costs).
-     * 0: Free only, 1: Low, 2: Medium, 3: High
-     */
-    budgetLevel;
-
-    /**
      * Desired travel pace.
      * HIGH: Many POIs, little time for each.
      * MEDIUM: Optimal number of POIs, comfortable time.
      * LOW: Few POIs, plenty of time for rest and relaxation.
      */
     travelPace;
-
-    /**
-     * Dietary preferences.
-     */
-    dietary;
 
     /**
      * Time constraints (e.g., "not earlier than 10:00" or "not later than 22:00").
@@ -170,9 +145,7 @@ export class UserProfile {
         this.avoidStairs = UNFILLED_MARKERS.BOOLEAN; // Will be determined by AI questions
         this.preferredTransport = UNFILLED_MARKERS.STRING; // Single value, not array
         this.interests = UNFILLED_MARKERS.OBJECT; // Will be filled based on user preferences
-        this.budgetLevel = UNFILLED_MARKERS.NUMBER; // Will be determined by AI questions
         this.travelPace = UNFILLED_MARKERS.STRING; // Will be determined by AI questions
-        this.dietary = UNFILLED_MARKERS.OBJECT; // Will be determined by AI questions
         this.timeWindow = {
             startHour: UNFILLED_MARKERS.NUMBER, // Will be determined by AI questions
             endHour: UNFILLED_MARKERS.NUMBER    // Will be determined by AI questions
@@ -307,15 +280,13 @@ export class UserProfile {
      * Check if profile is complete (all required fields filled)
      */
     isComplete() {
-        return this.isFieldFilled(this.mobility) &&
+        return                this.isFieldFilled(this.mobility) &&
                this.isFieldFilled(this.avoidStairs) &&
-               this.isFieldFilled(this.budgetLevel) &&
                this.isFieldFilled(this.travelPace) &&
                this.isFieldFilled(this.timeWindow.startHour) &&
                this.isFieldFilled(this.timeWindow.endHour) &&
                this.isFieldFilled(this.preferredTransport) &&
-               this.interests !== UNFILLED_MARKERS.OBJECT &&
-               this.dietary !== UNFILLED_MARKERS.OBJECT;
+               this.interests !== UNFILLED_MARKERS.OBJECT;
     }
 
     /**
@@ -325,13 +296,11 @@ export class UserProfile {
         const missing = [];
         if (!this.isFieldFilled(this.mobility)) missing.push('mobility');
         if (!this.isFieldFilled(this.avoidStairs)) missing.push('avoidStairs');
-        if (!this.isFieldFilled(this.budgetLevel)) missing.push('budgetLevel');
         if (!this.isFieldFilled(this.travelPace)) missing.push('travelPace');
         if (!this.isFieldFilled(this.timeWindow.startHour)) missing.push('timeWindow.startHour');
         if (!this.isFieldFilled(this.timeWindow.endHour)) missing.push('timeWindow.endHour');
         if (!this.isFieldFilled(this.preferredTransport)) missing.push('preferredTransport');
         if (this.interests === UNFILLED_MARKERS.OBJECT) missing.push('interests');
-        if (this.dietary === UNFILLED_MARKERS.OBJECT) missing.push('dietary');
         return missing;
     }
 
@@ -339,7 +308,7 @@ export class UserProfile {
      * Get completion percentage (0-100)
      */
     getCompletionPercentage() {
-        const totalFields = 9; // mobility, avoidStairs, budgetLevel, travelPace, timeWindow.startHour, timeWindow.endHour, preferredTransport, interests, dietary
+        const totalFields = 7; // mobility, avoidStairs, travelPace, timeWindow.startHour, timeWindow.endHour, preferredTransport, interests
         const filledFields = totalFields - this.getMissingFields().length;
         return Math.round((filledFields / totalFields) * 100);
     }
@@ -370,19 +339,6 @@ export class UserProfile {
                 options: [
                     { value: true, label: 'Yes, avoid stairs' },
                     { value: false, label: 'No, stairs are fine' }
-                ]
-            });
-        }
-
-        if (!this.isFieldFilled(this.budgetLevel)) {
-            questions.push({
-                field: 'budgetLevel',
-                question: 'What is your budget preference for attractions and activities?',
-                options: [
-                    { value: 0, label: 'Free only' },
-                    { value: 1, label: 'Low budget' },
-                    { value: 2, label: 'Medium budget' },
-                    { value: 3, label: 'High budget' }
                 ]
             });
         }
@@ -441,23 +397,6 @@ export class UserProfile {
             });
         }
 
-        if (this.dietary === UNFILLED_MARKERS.OBJECT) {
-            questions.push({
-                field: 'dietary',
-                question: 'Do you have any dietary preferences or restrictions?',
-                options: [
-                    { value: 'none', label: 'No dietary restrictions' },
-                    { value: 'vegetarian', label: 'Vegetarian' },
-                    { value: 'vegan', label: 'Vegan' },
-                    { value: 'gluten_free', label: 'Gluten-free' },
-                    { value: 'halal', label: 'Halal' },
-                    { value: 'kosher', label: 'Kosher' },
-                    { value: 'allergies', label: 'Food allergies' }
-                ],
-                multiple: true
-            });
-        }
-
         return questions;
     }
 
@@ -500,40 +439,6 @@ export class UserProfile {
     }
 
     /**
-     * Check if user has any dietary restrictions
-     */
-    hasDietaryRestrictions() {
-        if (this.dietary === UNFILLED_MARKERS.OBJECT) {
-            return false;
-        }
-        return this.dietary.vegan || 
-               this.dietary.vegetarian || 
-               this.dietary.glutenFree || 
-               this.dietary.halal || 
-               this.dietary.kosher || 
-               this.dietary.allergies.length > 0;
-    }
-
-    /**
-     * Get dietary restrictions as a readable string
-     */
-    getDietaryDescription() {
-        if (this.dietary === UNFILLED_MARKERS.OBJECT) {
-            return 'Not specified';
-        }
-        const restrictions = [];
-        if (this.dietary.vegan) restrictions.push('Vegan');
-        if (this.dietary.vegetarian) restrictions.push('Vegetarian');
-        if (this.dietary.glutenFree) restrictions.push('Gluten-free');
-        if (this.dietary.halal) restrictions.push('Halal');
-        if (this.dietary.kosher) restrictions.push('Kosher');
-        if (this.dietary.allergies.length > 0) {
-            restrictions.push(`Allergies: ${this.dietary.allergies.join(', ')}`);
-        }
-        return restrictions.length > 0 ? restrictions.join(', ') : 'No dietary restrictions';
-    }
-
-    /**
      * Get time window as a readable string
      */
     getTimeWindowDescription() {
@@ -560,16 +465,7 @@ export class UserProfile {
             avoidStairs: this.avoidStairs,
             preferredTransport: this.preferredTransport,
             interests: this.interests,
-            budgetLevel: this.budgetLevel,
             travelPace: this.travelPace,
-            dietary: this.dietary === UNFILLED_MARKERS.OBJECT ? UNFILLED_MARKERS.OBJECT : {
-                vegan: this.dietary.vegan,
-                vegetarian: this.dietary.vegetarian,
-                glutenFree: this.dietary.glutenFree,
-                halal: this.dietary.halal,
-                kosher: this.dietary.kosher,
-                allergies: [...this.dietary.allergies]
-            },
             timeWindow: {
                 startHour: this.timeWindow.startHour,
                 endHour: this.timeWindow.endHour
@@ -592,17 +488,7 @@ export class UserProfile {
         profile.avoidStairs = data.avoidStairs;
         profile.preferredTransport = data.preferredTransport;
         profile.interests = data.interests;
-        profile.budgetLevel = data.budgetLevel;
         profile.travelPace = data.travelPace;
-        
-        // Handle dietary field - if it's the unfilled marker, keep it; otherwise create DietaryPreference
-        if (data.dietary === UNFILLED_MARKERS.OBJECT) {
-            profile.dietary = UNFILLED_MARKERS.OBJECT;
-        } else {
-            profile.dietary = new DietaryPreference();
-            Object.assign(profile.dietary, data.dietary);
-        }
-        
         profile.timeWindow = data.timeWindow;
 
         // Handle wantToVisitPOIs field - if it's the unfilled marker, keep it; otherwise create the object

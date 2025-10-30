@@ -23,14 +23,7 @@ describe('Profile Setup Integration Tests', () => {
       expect(profile.avoidStairs).toBe(false);
       
       // Step 2: Avoid stairs question is skipped for standard mobility (auto-set to false)
-      // Go directly to budgetLevel
-      nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('budgetLevel');
-      
-      processAnswer(profile, 'budgetLevel', 2);
-      expect(profile.budgetLevel).toBe(2);
-      
-      // Step 3: Travel pace
+      // Go directly to travelPace
       nextQuestion = getNextQuestion(profile);
       expect(nextQuestion.field).toBe('travelPace');
       
@@ -55,18 +48,7 @@ describe('Profile Setup Integration Tests', () => {
       expect(profile.interests[InterestCategory.ART_MUSEUMS]).toBe(true);
       expect(profile.interests[InterestCategory.HISTORY_CULTURE]).toBe(true);
       
-      // Step 6: Dietary preferences
-      nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('dietary');
-      
-      processAnswer(profile, 'dietary', {
-        vegetarian: true,
-        glutenFree: false
-      });
-      expect(profile.dietary.vegetarian).toBe(true);
-      expect(profile.dietary.glutenFree).toBe(false);
-      
-      // Step 7: Time window
+      // Step 6: Time window
       nextQuestion = getNextQuestion(profile);
       expect(nextQuestion.field).toBe('timeWindow');
       
@@ -88,7 +70,7 @@ describe('Profile Setup Integration Tests', () => {
       processAnswer(profile, 'mobility', MobilityType.WHEELCHAIR);
       
       const nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('budgetLevel');
+      expect(nextQuestion.field).toBe('travelPace');
       expect(profile.avoidStairs).toBe(true);
     });
     
@@ -96,7 +78,7 @@ describe('Profile Setup Integration Tests', () => {
       processAnswer(profile, 'mobility', MobilityType.STROLLER);
       
       const nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('budgetLevel');
+      expect(nextQuestion.field).toBe('travelPace');
       expect(profile.avoidStairs).toBe(true);
     });
     
@@ -104,7 +86,7 @@ describe('Profile Setup Integration Tests', () => {
       processAnswer(profile, 'mobility', MobilityType.LOW_ENDURANCE);
       
       const nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('budgetLevel');
+      expect(nextQuestion.field).toBe('travelPace');
       expect(profile.avoidStairs).toBe(true);
     });
   });
@@ -126,7 +108,7 @@ describe('Profile Setup Integration Tests', () => {
       
       const nextQuestion = getNextQuestion(profile);
       expect(nextQuestion).toBeDefined();
-      expect(nextQuestion.field).toBe('budgetLevel');
+      expect(nextQuestion.field).toBe('travelPace');
     });
   });
   
@@ -137,7 +119,7 @@ describe('Profile Setup Integration Tests', () => {
       }).not.toThrow();
       
       expect(() => {
-        processAnswer(profile, 'budgetLevel', 5); // Invalid budget level
+        processAnswer(profile, 'travelPace', 'INVALID'); // Invalid travel pace
       }).not.toThrow();
     });
     

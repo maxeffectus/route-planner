@@ -26,17 +26,6 @@ export const profileQuestions = [
         condition: (profile) => profile.mobility === MobilityType.STANDARD
     },
     {
-        field: 'budgetLevel',
-        question: 'What is your budget level for this trip?',
-        type: 'single-choice',
-        options: [
-            { value: 0, label: 'Free/Low cost - Prefer free activities and budget accommodations' },
-            { value: 1, label: 'Low budget - Looking for affordable options' },
-            { value: 2, label: 'Medium budget - Comfortable with moderate spending' },
-            { value: 3, label: 'High budget - Money is not a major concern' }
-        ]
-    },
-    {
         field: 'travelPace',
         question: 'What pace do you prefer for your travels?',
         type: 'single-choice',
@@ -72,19 +61,6 @@ export const profileQuestions = [
         ]
     },
     {
-        field: 'dietary',
-        question: 'Do you have any dietary preferences or restrictions?',
-        type: 'dietary-form',
-        options: [
-            { key: 'vegan', label: 'Vegan' },
-            { key: 'vegetarian', label: 'Vegetarian' },
-            { key: 'glutenFree', label: 'Gluten-free' },
-            { key: 'halal', label: 'Halal' },
-            { key: 'kosher', label: 'Kosher' }
-        ],
-        allergiesPrompt: 'Do you have any food allergies? (Enter them separated by commas, or leave blank if none)'
-    },
-    {
         field: 'timeWindow',
         question: 'What are your preferred hours for activities?',
         type: 'time-range',
@@ -105,7 +81,6 @@ export function getCurrentFieldValue(profile, fieldName) {
     switch (fieldName) {
         case 'mobility':
         case 'avoidStairs':
-        case 'budgetLevel':
         case 'travelPace':
             return profile.isFieldFilled(profile[fieldName]) ? profile[fieldName] : null;
             
@@ -114,27 +89,7 @@ export function getCurrentFieldValue(profile, fieldName) {
                    
         case 'interests':
             return (profile.interests !== UNFILLED_MARKERS.OBJECT && Object.keys(profile.interests).length > 0) 
-                ? Object.keys(profile.interests) : [];
-                   
-        case 'dietary':
-            if (profile.dietary !== UNFILLED_MARKERS.OBJECT && Object.keys(profile.dietary).length > 0) {
-                return {
-                    vegan: profile.dietary.vegan || false,
-                    vegetarian: profile.dietary.vegetarian || false,
-                    glutenFree: profile.dietary.glutenFree || false,
-                    halal: profile.dietary.halal || false,
-                    kosher: profile.dietary.kosher || false,
-                    allergies: profile.dietary.allergies ? profile.dietary.allergies.join(', ') : ''
-                };
-            }
-            return {
-                vegan: false,
-                vegetarian: false,
-                glutenFree: false,
-                halal: false,
-                kosher: false,
-                allergies: ''
-            };
+                    ? Object.keys(profile.interests) : [];
                    
         case 'timeWindow':
             if (profile.isFieldFilled(profile.timeWindow.startHour) && profile.isFieldFilled(profile.timeWindow.endHour)) {
@@ -201,7 +156,6 @@ function isFieldUnfilled(profile, fieldName) {
     switch (fieldName) {
         case 'mobility':
         case 'avoidStairs':
-        case 'budgetLevel':
         case 'travelPace':
             return !profile.isFieldFilled(profile[fieldName]);
             
@@ -209,7 +163,6 @@ function isFieldUnfilled(profile, fieldName) {
             return !profile.isFieldFilled(profile.preferredTransport);
                    
         case 'interests':
-        case 'dietary':
             return profile[fieldName] === UNFILLED_MARKERS.OBJECT || 
                    Object.keys(profile[fieldName]).length === 0;
                    
@@ -252,15 +205,6 @@ export function processAnswer(profile, fieldName, answer) {
                 // Validate: avoidStairs must have a boolean value
                 if (answer === null || answer === undefined) {
                     console.warn('avoidStairs field requires a value');
-                    return false;
-                }
-                profile[fieldName] = answer;
-                break;
-                
-            case 'budgetLevel':
-                // Validate: budgetLevel must have a numeric value
-                if (answer === null || answer === undefined) {
-                    console.warn('budgetLevel field requires a value');
                     return false;
                 }
                 profile[fieldName] = answer;
@@ -314,24 +258,6 @@ export function processAnswer(profile, fieldName, answer) {
                 } else {
                     console.warn('interests field requires at least one selection');
                     return false;
-                }
-                break;
-                
-            case 'dietary':
-                // Dietary is ALWAYS valid, even if empty (no restrictions is a valid state)
-                if (profile.dietary === UNFILLED_MARKERS.OBJECT) {
-                    profile.dietary = {
-                        vegan: false,
-                        vegetarian: false,
-                        glutenFree: false,
-                        halal: false,
-                        kosher: false,
-                        allergies: []
-                    };
-                }
-                
-                if (typeof answer === 'object') {
-                    Object.assign(profile.dietary, answer);
                 }
                 break;
                 

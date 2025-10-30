@@ -18,17 +18,6 @@ export class ProfileQuestionUtils {
                 return selectedAnswers[0];
             case 'multi-choice':
                 return selectedAnswers;
-            case 'dietary-form':
-                // Process allergies
-                const allergies = dietaryAnswers.allergies
-                    .split(',')
-                    .map(allergy => allergy.trim())
-                    .filter(allergy => allergy.length > 0);
-                
-                return {
-                    ...dietaryAnswers,
-                    allergies
-                };
             case 'time-range':
                 return timeWindowAnswers;
             default:
@@ -52,7 +41,6 @@ export class ProfileQuestionUtils {
         switch (question.field) {
             case 'mobility':
             case 'avoidStairs':
-            case 'budgetLevel':
             case 'travelPace':
             case 'preferredTransport':
                 if (currentValue !== null) {
@@ -64,11 +52,6 @@ export class ProfileQuestionUtils {
                     setSelectedAnswers(currentValue);
                 } else {
                     setSelectedAnswers([]);
-                }
-                break;
-            case 'dietary':
-                if (currentValue && typeof currentValue === 'object') {
-                    setDietaryAnswers(currentValue);
                 }
                 break;
             case 'timeWindow':

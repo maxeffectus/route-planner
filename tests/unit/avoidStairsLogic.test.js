@@ -56,7 +56,7 @@ describe('AvoidStairs Logic Tests', () => {
       const nextQuestion = getNextQuestion(profile);
       
       expect(nextQuestion).toBeDefined();
-      expect(nextQuestion.field).toBe('budgetLevel');
+      expect(nextQuestion.field).toBe('travelPace');
       expect(nextQuestion.field).not.toBe('avoidStairs');
     });
     
@@ -68,7 +68,7 @@ describe('AvoidStairs Logic Tests', () => {
       const nextQuestion = getNextQuestion(profile);
       
       expect(nextQuestion).toBeDefined();
-      expect(nextQuestion.field).toBe('budgetLevel');
+      expect(nextQuestion.field).toBe('travelPace');
     });
   });
   

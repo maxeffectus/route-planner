@@ -100,11 +100,11 @@ describe('Example: How to Write Tests', () => {
     
     test('should handle undefined values', () => {
       // Undefined is not a valid answer, so processAnswer should return false and not update the field
-      const result = processAnswer(profile, 'budgetLevel', undefined);
+      const result = processAnswer(profile, 'travelPace', undefined);
       
       expect(result).toBe(false);
       // Field should remain unfilled
-      expect(profile.budgetLevel).toBe(-999);
+      expect(profile.travelPace).toBe('__UNFILLED__');
     });
   });
   
@@ -113,16 +113,16 @@ describe('Example: How to Write Tests', () => {
       // Test standard mobility flow
       processAnswer(profile, 'mobility', MobilityType.STANDARD);
       
-      // For standard mobility, avoidStairs is auto-set to false, so next question is budgetLevel
+      // For standard mobility, avoidStairs is auto-set to false, so next question is travelPace
       let nextQuestion = getNextQuestion(profile);
-      expect(nextQuestion.field).toBe('budgetLevel');
+      expect(nextQuestion.field).toBe('travelPace');
       
       // Test wheelchair mobility flow
       const wheelchairProfile = new UserProfile('wheelchair-user');
       processAnswer(wheelchairProfile, 'mobility', MobilityType.WHEELCHAIR);
       
       nextQuestion = getNextQuestion(wheelchairProfile);
-      expect(nextQuestion.field).toBe('budgetLevel');
+      expect(nextQuestion.field).toBe('travelPace');
       expect(wheelchairProfile.avoidStairs).toBe(true);
     });
     
