@@ -21,7 +21,7 @@ import { usePOICache } from '../hooks/usePOICache';
 import { pickPOIsWithAI } from '../services/AIPoiPicker';
 import { exportRouteToGeoJSON, downloadGeoJSON } from '../utils/geojsonExport';
 import { exportRouteToKML, downloadKML } from '../utils/kmlExport';
-import { loadUserProfile, saveUserProfile, clearUserProfile, hasVisitedBefore as checkVisited, markAsVisited, clearVisitFlag } from '../utils/profileStorage';
+import { loadUserProfile, saveUserProfile, clearUserProfile } from '../utils/profileStorage';
 import { buildPOIListForRoute, calculateRouteBounds, reconstructPOIsFromRoute, filterNewPOIs } from '../utils/routeManagement';
 import { filterPOIsByCategories, sortPOIsByWantToVisit } from '../utils/poiFilters';
 
@@ -92,7 +92,6 @@ export function RoutePlanner() {
   const [showProfileOrRoutesModal, setShowProfileOrRoutesModal] = useState(false);
   const [showSavedRoutesModal, setShowSavedRoutesModal] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
-  const [hasVisitedBefore, setHasVisitedBefore] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const profileChatRef = useRef(null);
   // Simple chat is now the only option
@@ -635,7 +634,6 @@ export function RoutePlanner() {
     if (!visited) {
       // First time visitor - mark as visited, create empty profile, and show welcome modal
       localStorage.setItem('routePlannerVisited', 'true');
-      setHasVisitedBefore(false);
       
       // Create new empty profile
       const newProfile = new UserProfile();
@@ -645,7 +643,6 @@ export function RoutePlanner() {
       setShowWelcomeModal(true);
     } else {
       // Returning user - show welcome modal on every visit
-      setHasVisitedBefore(true);
       setShowWelcomeModal(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -687,7 +684,6 @@ export function RoutePlanner() {
 
   // Debug logging
   console.log('RoutePlanner Debug:', {
-    hasVisitedBefore,
     showProfileModal,
     userProfile: userProfile ? {
       isComplete: userProfile.isComplete(),
@@ -902,38 +898,36 @@ export function RoutePlanner() {
         {/* Fixed top section with all controls */}
         <div style={{ flexShrink: 0 }}>
           {/* Profile Setup Button - show different states based on profile completion */}
-          {hasVisitedBefore && (
-            <div style={{ marginBottom: '20px' }}>
-              <button
-                onClick={handleOpenProfileOrRoutes}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: userProfile && userProfile.isComplete() ? '#28a745' : '#ffc107',
-                  color: userProfile && userProfile.isComplete() ? 'white' : '#000',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  width: '100%'
-                }}
-              >
-                {userProfile && userProfile.isComplete() 
-                  ? '✅ Profile Complete - Edit Profile' 
-                  : userProfile 
-                    ? `📝 Continue Profile Setup (${userProfile.getCompletionPercentage()}% complete)`
-                    : '📝 Setup Travel Profile'
-                }
-              </button>
-              <p style={{ 
-                fontSize: '12px', 
-                color: '#666', 
-                marginTop: '5px',
-                textAlign: 'center'
-              }}>
-                {userProfile && userProfile.isComplete() ? 'Profile completed successfully' : 'Complete your profile for better recommendations'}
-              </p>
-            </div>
-          )}
+          <div style={{ marginBottom: '20px' }}>
+            <button
+              onClick={handleOpenProfileOrRoutes}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: userProfile && userProfile.isComplete() ? '#28a745' : '#ffc107',
+                color: userProfile && userProfile.isComplete() ? 'white' : '#000',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                width: '100%'
+              }}
+            >
+              {userProfile && userProfile.isComplete() 
+                ? '✅ Profile Complete - Edit Profile' 
+                : userProfile 
+                  ? `📝 Continue Profile Setup (${userProfile.getCompletionPercentage()}% complete)`
+                  : '📝 Setup Travel Profile'
+              }
+            </button>
+            <p style={{ 
+              fontSize: '12px', 
+              color: '#666', 
+              marginTop: '5px',
+              textAlign: 'center'
+            }}>
+              {userProfile && userProfile.isComplete() ? 'Profile completed successfully' : 'Complete your profile for better recommendations'}
+            </p>
+          </div>
 
         {/* Debug button for testing - remove in production */}
         {process.env.NODE_ENV === 'development' && (
@@ -942,7 +936,6 @@ export function RoutePlanner() {
               onClick={() => {
                 localStorage.removeItem('routePlannerVisited');
                 localStorage.removeItem('userProfile');
-                setHasVisitedBefore(false);
                 setUserProfile(null);
                 // Don't auto-open profile modal - let user open it manually
                 window.location.reload(); // Reload to reset state

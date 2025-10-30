@@ -6,7 +6,6 @@
 import { UserProfile } from '../models/UserProfile';
 
 const PROFILE_KEY = 'userProfile';
-const VISITED_KEY = 'routePlannerVisited';
 
 /**
  * Load user profile from localStorage
@@ -57,25 +56,4 @@ export function clearUserProfile() {
   localStorage.removeItem(PROFILE_KEY);
 }
 
-/**
- * Check if user has visited before
- * @returns {boolean} True if user has visited before
- */
-export function hasVisitedBefore() {
-  return localStorage.getItem(VISITED_KEY) === 'true';
-}
-
-/**
- * Mark user as visited
- */
-export function markAsVisited() {
-  localStorage.setItem(VISITED_KEY, 'true');
-}
-
-/**
- * Clear visit flag (for testing)
- */
-export function clearVisitFlag() {
-  localStorage.removeItem(VISITED_KEY);
-}
 
