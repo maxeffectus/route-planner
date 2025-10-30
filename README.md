@@ -20,6 +20,7 @@ A web application for planning accessible routes for travelers with special need
 
 - Node.js 20 or later
 - npm or yarn
+- Chrome Canary or Dev v.138+ with enabled [PromptAPI](https://developer.chrome.com/docs/ai/prompt-api) and [Summarizer API](https://developer.chrome.com/docs/ai/summarizer-api) features. While Summarizer API is enabled by default, Prompt API is not. To enable Prompt API you can follow [these instructions](https://muthuishere.medium.com/ai-within-your-browser-exploring-google-chromes-new-prompt-api-a5c2c6bd5b4c).
 
 ### Installation
 
