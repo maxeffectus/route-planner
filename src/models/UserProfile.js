@@ -616,11 +616,19 @@ export class UserProfile {
 
         // Handle savedRoutes field
         if (data.savedRoutes) {
+            console.log('Loading saved routes:', Object.keys(data.savedRoutes).length, 'routes');
             for (const [name, routeData] of Object.entries(data.savedRoutes)) {
-                profile.savedRoutes[name] = SavedRoute.fromJSON(routeData);
+                try {
+                    const route = SavedRoute.fromJSON(routeData);
+                    console.log('Loaded route:', name, 'with', route.pois?.length || 0, 'POIs');
+                    profile.savedRoutes[name] = route;
+                } catch (error) {
+                    console.error('Failed to load route', name, ':', error);
+                }
             }
         }
 
+        console.log('UserProfile.fromJSON completed. Total saved routes:', Object.keys(profile.savedRoutes).length);
         return profile;
     }
 }

@@ -687,9 +687,11 @@ export function RoutePlanner() {
     showProfileModal,
     userProfile: userProfile ? {
       isComplete: userProfile.isComplete(),
-      completionPercentage: userProfile.getCompletionPercentage()
+      completionPercentage: userProfile.getCompletionPercentage(),
+      savedRoutesCount: userProfile.getAllSavedRoutes?.().length || 0
     } : null,
-    localStorage: localStorage.getItem('routePlannerVisited')
+    localStorage: localStorage.getItem('routePlannerVisited'),
+    userProfileFromStorage: localStorage.getItem('userProfile') ? 'exists' : 'missing'
   });
 
   // Auto-search for POIs when city is selected with appropriate zoom level
