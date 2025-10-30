@@ -112,6 +112,9 @@ export function RoutePlanner() {
   // AI POI picker state
   const [isPickingPOIs, setIsPickingPOIs] = useState(false);
   const [aiPickerWarning, setAiPickerWarning] = useState(null); // { pois: [], onConfirm: function }
+  
+  // Route deletion confirmation state
+  const [routeToDelete, setRouteToDelete] = useState(null); // SavedRoute object to delete
 
   // Load user profile from localStorage on component mount
   useEffect(() => {
@@ -476,6 +479,32 @@ export function RoutePlanner() {
       alert(`Error exporting KML: ${error.message}`);
     }
   }, []);
+
+  // Handler to delete a saved route
+  const handleDeleteRoute = useCallback(() => {
+    if (!routeToDelete || !userProfile) return;
+
+    try {
+      // Delete route from profile
+      const success = userProfile.deleteSavedRoute(routeToDelete.name);
+      
+      if (success) {
+        // Save updated profile to localStorage
+        saveUserProfile(userProfile);
+        
+        // Reload profile from localStorage to trigger re-render
+        const updatedProfile = loadUserProfile();
+        setUserProfile(updatedProfile);
+        
+        // Close confirmation modal
+        setRouteToDelete(null);
+      } else {
+        alert(`Route "${routeToDelete.name}" not found.`);
+      }
+    } catch (error) {
+      alert(`Error deleting route: ${error.message}`);
+    }
+  }, [routeToDelete, userProfile]);
 
   // Restore wantToVisit state from user profile
   const restoreWantToVisitState = useCallback((pois) => {
@@ -1457,6 +1486,7 @@ export function RoutePlanner() {
               <div
                 key={route.name}
                 style={{
+                  position: 'relative',
                   padding: '12px',
                   backgroundColor: '#f5f5f5',
                   borderRadius: '8px',
@@ -1474,7 +1504,52 @@ export function RoutePlanner() {
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px' }}>
+                {/* Delete button in top-right corner */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRouteToDelete(route);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    padding: '6px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = 'rgba(244, 67, 54, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
+                  title="Delete route"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#f44336"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                </button>
+
+                <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px', paddingRight: '30px' }}>
                   {route.name}
                 </div>
                 <div style={{ fontSize: '12px', color: '#666' }}>
@@ -1738,6 +1813,73 @@ export function RoutePlanner() {
                 }}
               >
                 Add All Anyway
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete Route Confirmation Modal */}
+      {routeToDelete && (
+        <Modal
+          isOpen={true}
+          onClose={() => setRouteToDelete(null)}
+          title="🗑️ Delete Route"
+        >
+          <div style={{ padding: '20px 0' }}>
+            <p style={{ 
+              margin: '0 0 20px 0', 
+              fontSize: '15px', 
+              color: '#333',
+              lineHeight: '1.5'
+            }}>
+              Are you sure you want to delete route <strong>"{routeToDelete.name}"</strong>?
+            </p>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setRouteToDelete(null)}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: '#f5f5f5',
+                  color: '#333',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#e0e0e0';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f5f5f5';
+                }}
+              >
+                No
+              </button>
+              <button
+                onClick={handleDeleteRoute}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  backgroundColor: '#f44336',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#d32f2f';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#f44336';
+                }}
+              >
+                Yes
               </button>
             </div>
           </div>
