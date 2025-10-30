@@ -116,10 +116,17 @@ export function RoutePlanner() {
   const [routeToDelete, setRouteToDelete] = useState(null); // SavedRoute object to delete
 
   // Load user profile from localStorage on component mount
+  // If no profile exists, create a new one
   useEffect(() => {
     const profile = loadUserProfile();
     if (profile) {
+      console.log('Profile loaded from localStorage on mount');
       setUserProfile(profile);
+    } else {
+      console.log('No profile found in localStorage - creating new one');
+      const newProfile = new UserProfile();
+      setUserProfile(newProfile);
+      saveUserProfile(newProfile);
     }
   }, []);
 
@@ -632,12 +639,11 @@ export function RoutePlanner() {
   useEffect(() => {
     const visited = localStorage.getItem('routePlannerVisited');
     if (!visited) {
-      // First time visitor - mark as visited, create empty profile, and show welcome modal
+      // First time visitor - mark as visited
       localStorage.setItem('routePlannerVisited', 'true');
+      console.log('First-time visitor - marking as visited');
       
-      // Create new empty profile
-      const newProfile = new UserProfile();
-      setUserProfile(newProfile);
+      // Profile will be created by the first useEffect, so don't create it here
       
       // Show welcome modal
       setShowWelcomeModal(true);
