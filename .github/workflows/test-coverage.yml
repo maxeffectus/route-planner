@@ -26,10 +26,11 @@ jobs:
     - name: Run tests with coverage
       run: npm run test:ci
     
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage/lcov.info
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: true
+    # Codecov upload disabled - uncomment if needed
+    # - name: Upload coverage to Codecov
+    #   uses: codecov/codecov-action@v3
+    #   with:
+    #     file: ./coverage/lcov.info
+    #     flags: unittests
+    #     name: codecov-umbrella
+    #     fail_ci_if_error: true
