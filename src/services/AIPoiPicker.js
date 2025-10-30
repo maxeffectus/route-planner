@@ -273,42 +273,50 @@ Do NOT add any text, comments, or explanations. ONLY the array of id values.`;
     // Parse the response
     let selectedIds;
     try {
-      // First, try to clean up the response by removing markdown code blocks and comments
-      let cleanedResponse = response.trim();
-      
-      // Remove markdown code blocks
-      cleanedResponse = cleanedResponse.replace(/```[a-z]*\n/g, '').replace(/\n```/g, '');
-      
-      // Extract the array part
-      const arrayMatch = cleanedResponse.match(/\[([\s\S]*?)\]/);
-      if (!arrayMatch) {
-        throw new Error('No array found in response');
+      // First, try to parse the response directly as JSON
+      try {
+        selectedIds = JSON.parse(response.trim());
+        console.log('✅ Successfully parsed AI response as JSON');
+      } catch (directParseError) {
+        // If direct parsing fails, try cleaning the response
+        console.log('⚠️ Direct JSON parse failed, trying to clean response...');
+        
+        // First, try to clean up the response by removing markdown code blocks and comments
+        let cleanedResponse = response.trim();
+        
+        // Remove markdown code blocks
+        cleanedResponse = cleanedResponse.replace(/```[a-z]*\n/g, '').replace(/\n```/g, '');
+        
+        // Extract the array part
+        const arrayMatch = cleanedResponse.match(/\[([\s\S]*?)\]/);
+        if (!arrayMatch) {
+          throw new Error('No array found in response');
+        }
+        
+        let arrayContent = arrayMatch[1];
+        
+        // Remove Python/JS style comments (# comment or // comment) and empty lines
+        arrayContent = arrayContent.split('\n')
+          .map(line => {
+            // Remove # comments
+            const hashIndex = line.indexOf('#');
+            if (hashIndex !== -1) {
+              line = line.substring(0, hashIndex);
+            }
+            // Remove // comments
+            const slashIndex = line.indexOf('//');
+            if (slashIndex !== -1) {
+              line = line.substring(0, slashIndex);
+            }
+            return line.trim();
+          })
+          .filter(line => line.length > 0) // Remove empty lines after trimming
+          .join(',');
+        
+        // Try to parse as JSON
+        selectedIds = JSON.parse(`[${arrayContent}]`);
+        console.log('✅ Successfully parsed cleaned AI response');
       }
-      
-      let arrayContent = arrayMatch[1];
-      
-      // Remove Python/JS style comments (# comment or // comment)
-      arrayContent = arrayContent.split('\n')
-        .map(line => {
-          // Remove # comments
-          const hashIndex = line.indexOf('#');
-          if (hashIndex !== -1) {
-            line = line.substring(0, hashIndex);
-          }
-          // Remove // comments
-          const slashIndex = line.indexOf('//');
-          if (slashIndex !== -1) {
-            line = line.substring(0, slashIndex);
-          }
-          return line.trim();
-        })
-        .filter(line => line.length > 0)
-        .join(',');
-      
-      // Try to parse as JSON
-      selectedIds = JSON.parse(`[${arrayContent}]`);
-      
-      console.log('✅ Successfully parsed AI response');
     } catch (parseError) {
       console.error('❌ Failed to parse AI response:', parseError);
       console.error('Original response:', response);
