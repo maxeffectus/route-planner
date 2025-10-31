@@ -875,6 +875,7 @@ export function RoutePlanner() {
       // Don't show error if it was aborted
       if (error.name === 'AbortError') {
         console.log('AI POI picking was cancelled');
+        setIsPickingPOIs(false);
         aiPickerAbortControllerRef.current = null;
         return;
       }
@@ -941,6 +942,15 @@ export function RoutePlanner() {
       // Don't show error if it was aborted
       if (error.name === 'AbortError') {
         console.log('AI highlights request was cancelled');
+        // Clean up session and reset response
+        try {
+          if (hasSession) {
+            await destroySession();
+          }
+        } catch (cleanupError) {
+          console.error('Error cleaning up session:', cleanupError);
+        }
+        resetResponse();
         abortControllerRef.current = null;
         return;
       }
