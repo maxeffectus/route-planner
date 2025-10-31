@@ -102,9 +102,10 @@ function validateDiversity(selectedPOIs, allPOIs) {
  * @param {Array} accessiblePOIs - Array of accessible POIs
  * @param {Object} userProfile - User profile with timeWindow and travelPace
  * @param {Function} onDownloadable - Callback when model is downloadable (should return Promise)
+ * @param {AbortSignal} signal - Signal to abort the request
  * @returns {Promise<Array>} Array of selected POI IDs
  */
-export async function pickPOIsWithAI(accessiblePOIs, userProfile, onDownloadable = null) {
+export async function pickPOIsWithAI(accessiblePOIs, userProfile, onDownloadable = null, signal = null) {
   // Validate inputs
   if (!accessiblePOIs || accessiblePOIs.length === 0) {
     throw new Error('No accessible POIs available for selection');
@@ -268,7 +269,7 @@ Example: if you select POIs with id=10, id=15, id=22, respond with: [10, 15, 22]
 Do NOT add any text, comments, or explanations. ONLY the array of id values.`;
 
     // Get AI response
-    const response = await promptAPI.prompt(prompt);
+    const response = await promptAPI.prompt(prompt, signal ? { signal } : {});
 
     // Parse the response
     let selectedIds;

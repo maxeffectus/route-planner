@@ -104,12 +104,14 @@ export function RoutePlanner() {
   // Prompt API hooks for AI highlights
   const { hasSession, createSession, promptStreaming, destroySession } = usePromptAPI();
   const { response: aiHighlights, isLoading: isLoadingHighlights, processStream, resetResponse } = useStreamingText();
+  const abortControllerRef = useRef(null); // For cancelling ongoing AI highlights
 
   // Accessibility warning modal state
   const [accessibilityWarning, setAccessibilityWarning] = useState(null); // { poi, message }
 
   // AI POI picker state
   const [isPickingPOIs, setIsPickingPOIs] = useState(false);
+  const aiPickerAbortControllerRef = useRef(null); // For cancelling ongoing AI POI picking
   const [aiPickerWarning, setAiPickerWarning] = useState(null); // { pois: [], onConfirm: function }
   const [showModelDownloadModal, setShowModelDownloadModal] = useState(false); // For Prompt API model download confirmation
   const [modelDownloadCallback, setModelDownloadCallback] = useState(null); // Callback to execute after download
@@ -785,33 +787,47 @@ export function RoutePlanner() {
       return;
     }
 
+    // If already picking, cancel the previous request
+    if (aiPickerAbortControllerRef.current) {
+      aiPickerAbortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    aiPickerAbortControllerRef.current = new AbortController();
+
     setIsPickingPOIs(true);
 
     try {
       // Call AI service with callback for downloadable model
-      const selectedIds = await pickPOIsWithAI(accessiblePOIs, userProfile, async (promptAPI, sessionOptions) => {
-        // Show modal and wait for user confirmation
-        return new Promise((resolve, reject) => {
-          setShowModelDownloadModal(true);
-          setModelDownloadCallback(async () => {
-            try {
-              // User confirmed, download model
-              await promptAPI.downloadModel(undefined, sessionOptions);
-              setShowModelDownloadModal(false);
-              setModelDownloadCallback(null);
-              resolve();
-            } catch (error) {
-              setShowModelDownloadModal(false);
-              setModelDownloadCallback(null);
-              reject(error);
-            }
+      const selectedIds = await pickPOIsWithAI(
+        accessiblePOIs, 
+        userProfile, 
+        async (promptAPI, sessionOptions) => {
+          // Show modal and wait for user confirmation
+          return new Promise((resolve, reject) => {
+            setShowModelDownloadModal(true);
+            setModelDownloadCallback(async () => {
+              try {
+                // User confirmed, download model
+                await promptAPI.downloadModel(undefined, sessionOptions);
+                setShowModelDownloadModal(false);
+                setModelDownloadCallback(null);
+                resolve();
+              } catch (error) {
+                setShowModelDownloadModal(false);
+                setModelDownloadCallback(null);
+                reject(error);
+              }
+            });
           });
-        });
-      });
+        },
+        aiPickerAbortControllerRef.current.signal
+      );
       
       if (!selectedIds || selectedIds.length === 0) {
         alert('AI could not select any POIs. Please try again.');
         setIsPickingPOIs(false);
+        aiPickerAbortControllerRef.current = null;
         return;
       }
 
@@ -841,6 +857,7 @@ export function RoutePlanner() {
             });
             setAiPickerWarning(null);
             setIsPickingPOIs(false);
+            aiPickerAbortControllerRef.current = null;
           }
         });
       } else {
@@ -849,10 +866,18 @@ export function RoutePlanner() {
           performWantToVisitToggle(poi);
         });
         setIsPickingPOIs(false);
+        aiPickerAbortControllerRef.current = null;
       }
 
     } catch (error) {
       console.error('Error picking POIs with AI:', error);
+      
+      // Don't show error if it was aborted
+      if (error.name === 'AbortError') {
+        console.log('AI POI picking was cancelled');
+        aiPickerAbortControllerRef.current = null;
+        return;
+      }
       
       // Show user-friendly error message
       let errorMessage = error.message;
@@ -870,6 +895,7 @@ export function RoutePlanner() {
       
       alert(`Failed to pick POIs with AI:\n\n${errorMessage}`);
       setIsPickingPOIs(false);
+      aiPickerAbortControllerRef.current = null;
     }
   }, [userProfile, groups, getGroupForPOI, performWantToVisitToggle]);
 
@@ -878,6 +904,14 @@ export function RoutePlanner() {
     if (!selectedCity) return;
     
     try {
+      // Cancel any existing request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+      
       // Destroy existing session if it exists
       if (hasSession) {
         await destroySession();
@@ -889,8 +923,8 @@ export function RoutePlanner() {
       // Build prompt with city name
       const prompt = `Provide a short tourist summary in a few paragraphs (2-3) about what ${selectedCity.displayName} is famous for. Focus on the most well-known facts and the main reasons why tourists visit. Respond only with the summary text, without any comments or introductory lines.`;
       
-      // Get streaming response
-      const stream = await promptStreaming(prompt);
+      // Get streaming response with abort signal
+      const stream = await promptStreaming(prompt, { signal: abortControllerRef.current.signal });
       await processStream(stream, {
         initialMessage: 'Generating highlights...'
       });
@@ -900,8 +934,16 @@ export function RoutePlanner() {
       
       // Destroy session after completion
       await destroySession();
+      abortControllerRef.current = null;
     } catch (error) {
       console.error('Error getting AI highlights:', error);
+      
+      // Don't show error if it was aborted
+      if (error.name === 'AbortError') {
+        console.log('AI highlights request was cancelled');
+        abortControllerRef.current = null;
+        return;
+      }
       
       // Show user-friendly error message
       let errorMessage = error.message;
@@ -926,6 +968,7 @@ export function RoutePlanner() {
       } catch (cleanupError) {
         console.error('Error cleaning up session:', cleanupError);
       }
+      abortControllerRef.current = null;
     }
   }, [selectedCity, hasSession, createSession, promptStreaming, processStream, destroySession]);
 
@@ -1112,32 +1155,36 @@ export function RoutePlanner() {
 
             <button
               onClick={handlePickPOIsWithAI}
-              disabled={isPickingPOIs || sortedFilteredPois.length === 0}
+              disabled={sortedFilteredPois.length === 0}
               style={{
                 width: '100%',
                 padding: '10px',
                 marginBottom: '12px',
                 fontSize: '14px',
                 fontWeight: '500',
-                backgroundColor: isPickingPOIs || sortedFilteredPois.length === 0 ? '#ccc' : '#9C27B0',
+                backgroundColor: sortedFilteredPois.length === 0 ? '#ccc' : (isPickingPOIs ? '#E53935' : '#9C27B0'),
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: isPickingPOIs || sortedFilteredPois.length === 0 ? 'not-allowed' : 'pointer',
+                cursor: sortedFilteredPois.length === 0 ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.2s'
               }}
               onMouseEnter={(e) => {
                 if (!isPickingPOIs && sortedFilteredPois.length > 0) {
                   e.target.style.backgroundColor = '#7B1FA2';
+                } else if (isPickingPOIs && sortedFilteredPois.length > 0) {
+                  e.target.style.backgroundColor = '#C62828';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isPickingPOIs && sortedFilteredPois.length > 0) {
                   e.target.style.backgroundColor = '#9C27B0';
+                } else if (isPickingPOIs && sortedFilteredPois.length > 0) {
+                  e.target.style.backgroundColor = '#E53935';
                 }
               }}
             >
-              {isPickingPOIs ? '⏳ AI is selecting Points Of Interest...' : '🤖 Pick Points Of Interest with AI'}
+              {isPickingPOIs ? '⏳ AI is selecting Points Of Interest. Click to abort' : '🤖 Pick Points Of Interest with AI'}
             </button>
 
             <POIAccordion
@@ -1428,6 +1475,12 @@ export function RoutePlanner() {
       <Modal
         isOpen={showWelcomeModal}
         onClose={async () => {
+          // Cancel any ongoing AI highlights request
+          if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+          }
+          
           // Destroy PromptAPI session if it exists
           if (hasSession) {
             try {

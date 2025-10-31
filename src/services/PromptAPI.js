@@ -123,7 +123,7 @@ export class PromptAPI {
     }
 
     try {
-      const stream = await this.session.promptStreaming(prompt);
+      const stream = await this.session.promptStreaming(prompt, options);
       return stream;
     } catch (error) {
       console.error('Error sending prompt:', error);
